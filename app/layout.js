@@ -1,3 +1,4 @@
+// Triggering Vercel deployment with updated git author configuration
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
