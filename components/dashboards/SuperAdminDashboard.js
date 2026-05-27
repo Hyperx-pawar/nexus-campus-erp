@@ -156,7 +156,7 @@ export default function SuperAdminDashboard() {
                     <div className="space-y-1">
                       <p className="text-sm font-bold text-text-primary">{tenant.name}</p>
                       <div className="flex flex-wrap items-center gap-3 text-[10px] text-text-secondary">
-                        <span className="font-bold text-accent">{tenant.subdomain}.nexus.in</span>
+                        <span className="font-bold text-accent">{tenant.subdomain}.campuserp.in</span>
                         <span className="opacity-40">•</span>
                         <span>{tenant.email || 'No email'}</span>
                         <span className="opacity-40">•</span>

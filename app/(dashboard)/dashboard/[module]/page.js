@@ -277,7 +277,7 @@ function SettingsEditor({ activeTenant }) {
                     required
                   />
                   <span className="bg-bg-main border border-l-0 border-border text-[10px] font-bold text-text-secondary px-3 py-3 rounded-r-xl">
-                    {activeRole === 'SUPER_ADMIN' ? '.nexus.in' : '.campus.in'}
+                    {activeRole === 'SUPER_ADMIN' ? '.campuserp.in' : '.campus.in'}
                   </span>
                 </div>
               </div>
@@ -404,7 +404,7 @@ export default function ModuleFallbackPage({ params }) {
     title: `${module.charAt(0).toUpperCase() + module.slice(1)} Module`,
     icon: Shield,
     desc: 'Modular administrative workspace for school operations.',
-    indianInfo: `${activeRole === 'SUPER_ADMIN' ? 'Nexus' : 'Campus'} localized data registry is operational.`,
+    indianInfo: 'Campus localized data registry is operational.',
     roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN']
   };
 
@@ -475,7 +475,7 @@ export default function ModuleFallbackPage({ params }) {
                 <div className="p-3 bg-bg-sidebar border border-border rounded-xl text-center">
                   <span className="text-[9px] text-text-secondary uppercase font-bold">Subdomain Route</span>
                   <p className="text-xs font-black text-text-primary mt-1">
-                    {activeTenant.subdomain}{activeRole === 'SUPER_ADMIN' ? '.nexus.in' : '.campus.in'}
+                    {activeTenant.subdomain}{activeRole === 'SUPER_ADMIN' ? '.campuserp.in' : '.campus.in'}
                   </p>
                 </div>
               </div>

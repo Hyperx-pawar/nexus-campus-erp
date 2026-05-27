@@ -33,7 +33,7 @@ export default function Providers({ children }) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('nexus-theme') || 'light';
+      const savedTheme = localStorage.getItem('campus-erp-theme') || localStorage.getItem('nexus-theme') || 'light';
       setTheme(savedTheme);
       document.documentElement.className = savedTheme;
     }
@@ -43,7 +43,7 @@ export default function Providers({ children }) {
   useEffect(() => {
     if (typeof window !== 'undefined' && activeTenant) {
       if (activeRole === 'SUPER_ADMIN') {
-        document.title = "Nexus ERP | Multi-Tenant Educational Suite";
+        document.title = "Campus ERP | Multi-Tenant Educational Suite";
       } else {
         document.title = `${activeTenant.name} | Campus Portal`;
       }
@@ -54,7 +54,7 @@ export default function Providers({ children }) {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('nexus-theme', nextTheme);
+      localStorage.setItem('campus-erp-theme', nextTheme);
       document.documentElement.className = nextTheme;
     }
     toast.success(`Switched to ${nextTheme === 'light' ? 'Light' : 'Dark'} Mode`);
@@ -330,7 +330,7 @@ export default function Providers({ children }) {
     
     let email = activeTenant?.subdomain ? `user@${activeTenant.subdomain}.edu.in` : 'user@school.edu.in';
     if (role === 'SUPER_ADMIN') {
-      email = 'ramesh.kumar@nexus.in';
+      email = 'ramesh.kumar@campuserp.in';
     } else if (role === 'PARENT') {
       const parent = sharedParents.find(p => p.id === activeParentId) || sharedParents[0];
       names.PARENT = `${parent.first_name} ${parent.last_name} (Guardian)`;

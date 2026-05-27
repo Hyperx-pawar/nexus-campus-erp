@@ -13,7 +13,7 @@ export default function Chatbot() {
 
   useEffect(() => {
     const defaultText = activeRole === 'SUPER_ADMIN'
-      ? `Namaste! I am the Nexus AI Assistant. How can I help you analyze global school operations today?`
+      ? `Namaste! I am the Campus ERP AI Assistant. How can I help you analyze global school operations today?`
       : `Namaste! I am your ${activeTenant?.name || 'Campus'} AI Assistant. How can I help you analyze operations today?`;
     setMessages([
       { id: 1, text: defaultText, sender: 'bot' }
@@ -37,7 +37,7 @@ export default function Chatbot() {
     // AI Mock response generator
     setTimeout(() => {
       let reply = activeRole === 'SUPER_ADMIN'
-        ? `I've analyzed the Nexus database schemas. All Row-Level Security parameters are configured, and operations look stable.`
+        ? `I've analyzed the campus ERP database schemas. All Row-Level Security parameters are configured, and operations look stable.`
         : `I've analyzed the campus database schemas. All Row-Level Security parameters are configured, and operations for this campus look stable.`;
       
       const qLower = text.toLowerCase();
@@ -67,7 +67,7 @@ export default function Chatbot() {
               <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white"><Bot size={18} /></div>
               <div>
                 <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">
-                  {activeRole === 'SUPER_ADMIN' ? 'Nexus AI Core' : 'Campus AI Core'}
+                  {activeRole === 'SUPER_ADMIN' ? 'Platform AI Core' : 'Campus AI Core'}
                 </h4>
                 <span className="text-[9px] text-success font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>

@@ -130,7 +130,7 @@ export default function Header() {
                <div className="absolute right-0 top-full mt-3 w-64 glass p-3 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl">
                   <div className="p-3 mb-2 bg-slate-100/50 border border-border rounded-xl">
                      <p className="text-[9px] font-black text-text-secondary uppercase tracking-widest mb-1">Corporate Account</p>
-                     <p className="text-xs font-bold text-text-primary truncate">{activeUser?.email || (activeRole === 'SUPER_ADMIN' ? 'admin@nexus.in' : `admin@${activeTenant?.subdomain || 'school'}.edu.in`)}</p>
+                     <p className="text-xs font-bold text-text-primary truncate">{activeUser?.email || (activeRole === 'SUPER_ADMIN' ? 'admin@campuserp.in' : `admin@${activeTenant?.subdomain || 'school'}.edu.in`)}</p>
                   </div>
                   
                   <div className="space-y-1">
