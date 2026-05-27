@@ -23,7 +23,7 @@ export default function Providers({ children }) {
   const [theme, setTheme] = useState('light');
 
   // Dev-mode state for switching roles and tenants instantly to preview dashboards
-  const [activeRole, setActiveRole] = useState('SUPER_ADMIN');
+  const [activeRole, setActiveRole] = useState('SCHOOL_ADMIN');
   const [activeTenant, setActiveTenant] = useState({
     id: 'demo-tenant-1',
     name: 'Indian Institute of Technology (IIT) Delhi',
@@ -61,9 +61,9 @@ export default function Providers({ children }) {
   };
 
   const [activeUser, setActiveUser] = useState({
-    name: 'Dr. Ramesh Kumar',
-    email: 'ramesh.kumar@iitd.ac.in',
-    role: 'SUPER_ADMIN'
+    name: 'Smt. Anjali Sharma (School Principal)',
+    email: 'anjali.sharma@iitd.edu.in',
+    role: 'SCHOOL_ADMIN'
   });
 
   const [availableTenants] = useState([
