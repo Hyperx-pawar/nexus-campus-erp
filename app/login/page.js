@@ -43,11 +43,19 @@ export default function LoginPage() {
         
         {/* Brand Logo & Header */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/10">
-            <Shield size={24} />
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/10 shrink-0">
+            {activeTenant?.name ? (
+              <span className="font-outfit font-black text-xl uppercase leading-none">
+                {activeTenant.name.charAt(0)}
+              </span>
+            ) : (
+              <Shield size={24} />
+            )}
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-black font-outfit text-slate-900 tracking-tight">Sign in to Nexus ERP</h2>
+            <h2 className="text-2xl font-black font-outfit text-slate-900 tracking-tight">
+              Sign in to {activeTenant?.name ? activeTenant.name.split(' (')[0] : 'Nexus ERP'}
+            </h2>
             <p className="text-xs text-slate-500 font-medium">Enter your credentials to access your workspace</p>
           </div>
         </div>

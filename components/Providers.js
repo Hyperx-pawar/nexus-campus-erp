@@ -22,6 +22,15 @@ export default function Providers({ children }) {
   // Theme support
   const [theme, setTheme] = useState('light');
 
+  // Dev-mode state for switching roles and tenants instantly to preview dashboards
+  const [activeRole, setActiveRole] = useState('SUPER_ADMIN');
+  const [activeTenant, setActiveTenant] = useState({
+    id: 'demo-tenant-1',
+    name: 'Indian Institute of Technology (IIT) Delhi',
+    subdomain: 'iitd',
+    settings: { currency: '₹' }
+  });
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('nexus-theme') || 'light';
@@ -29,6 +38,17 @@ export default function Providers({ children }) {
       document.documentElement.className = savedTheme;
     }
   }, []);
+
+  // White-label page title dynamically
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeTenant) {
+      if (activeRole === 'SUPER_ADMIN') {
+        document.title = "Nexus ERP | Multi-Tenant Educational Suite";
+      } else {
+        document.title = `${activeTenant.name} | Campus Portal`;
+      }
+    }
+  }, [activeTenant, activeRole]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -39,15 +59,6 @@ export default function Providers({ children }) {
     }
     toast.success(`Switched to ${nextTheme === 'light' ? 'Light' : 'Dark'} Mode`);
   };
-
-  // Dev-mode state for switching roles and tenants instantly to preview dashboards
-  const [activeRole, setActiveRole] = useState('SUPER_ADMIN');
-  const [activeTenant, setActiveTenant] = useState({
-    id: 'demo-tenant-1',
-    name: 'Indian Institute of Technology (IIT) Delhi',
-    subdomain: 'iitd',
-    settings: { currency: '₹' }
-  });
 
   const [activeUser, setActiveUser] = useState({
     name: 'Dr. Ramesh Kumar',

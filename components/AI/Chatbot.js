@@ -1,17 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, X, Send, Bot, MessageSquare, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 
 export default function Chatbot() {
-  const { activeRole } = useAuth();
+  const { activeRole, activeTenant } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, text: `Namaste! I am the Nexus AI Assistant. How can I help you analyze school operations today?`, sender: 'bot' }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const defaultText = activeRole === 'SUPER_ADMIN'
+      ? `Namaste! I am the Nexus AI Assistant. How can I help you analyze global school operations today?`
+      : `Namaste! I am your ${activeTenant?.name || 'Campus'} AI Assistant. How can I help you analyze operations today?`;
+    setMessages([
+      { id: 1, text: defaultText, sender: 'bot' }
+    ]);
+  }, [activeTenant, activeRole]);
 
   const presets = [
     { label: 'Check class conflicts', q: 'Are there any timetable conflicts or room over-allocations?' },
@@ -29,7 +36,9 @@ export default function Chatbot() {
 
     // AI Mock response generator
     setTimeout(() => {
-      let reply = `I've analyzed the Nexus database schemas. All Row-Level Security parameters are configured, and operations for this campus look stable. Let me know if you need specific rosters.`;
+      let reply = activeRole === 'SUPER_ADMIN'
+        ? `I've analyzed the Nexus database schemas. All Row-Level Security parameters are configured, and operations look stable.`
+        : `I've analyzed the campus database schemas. All Row-Level Security parameters are configured, and operations for this campus look stable.`;
       
       const qLower = text.toLowerCase();
       if (qLower.includes('conflict') || qLower.includes('timetable') || qLower.includes('schedule')) {
@@ -57,7 +66,9 @@ export default function Chatbot() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white"><Bot size={18} /></div>
               <div>
-                <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Nexus AI Core</h4>
+                <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">
+                  {activeRole === 'SUPER_ADMIN' ? 'Nexus AI Core' : 'Campus AI Core'}
+                </h4>
                 <span className="text-[9px] text-success font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
                   Active Advisory
