@@ -14,7 +14,7 @@ const outfit = Outfit({
 });
 
 export const metadata = {
-  title: "Nexus ERP | Multi-Tenant Educational Suite",
+  title: "Campus ERP | School & College Management Suite",
   description: "Complete modular ERP system for schools and colleges.",
 };
 

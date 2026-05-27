@@ -190,9 +190,9 @@ export default function Providers({ children }) {
 
   // Shared Roster for employees
   const [sharedStaff, setSharedStaff] = useState([
-    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', basic: 75000, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@nexus.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', basic: 90000, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@nexus.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', basic: 50000, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@nexus.edu.in', tenant_id: 'demo-tenant-2' }
+    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', basic: 75000, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1' },
+    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', basic: 90000, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1' },
+    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', basic: 50000, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2' }
   ]);
 
   // Shared fleet maintenance logs
@@ -328,17 +328,31 @@ export default function Providers({ children }) {
       HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)'
     };
     
-    let email = 'user@nexus.edu.in';
-    if (role === 'PARENT') {
+    let email = activeTenant?.subdomain ? `user@${activeTenant.subdomain}.edu.in` : 'user@school.edu.in';
+    if (role === 'SUPER_ADMIN') {
+      email = 'ramesh.kumar@nexus.in';
+    } else if (role === 'PARENT') {
       const parent = sharedParents.find(p => p.id === activeParentId) || sharedParents[0];
       names.PARENT = `${parent.first_name} ${parent.last_name} (Guardian)`;
       email = parent.email;
+    } else {
+      const staffName = names[role].split(' (')[0]
+        .replace('Smt. ', '')
+        .replace('Prof. ', '')
+        .replace('Dr. ', '')
+        .replace('Karan Johar', 'karan.johar')
+        .replace('Suresh Chandra', 'suresh.chandra')
+        .replace('Harpreet Singh', 'harpreet.singh')
+        .replace('Aarav Patel', 'aarav.patel')
+        .toLowerCase()
+        .replace(' ', '.');
+      email = `${staffName}@${activeTenant.subdomain}.edu.in`;
     }
 
     setActiveUser(prev => ({
       ...prev,
       name: names[role] || 'User Profile',
-      email: role === 'PARENT' ? email : (prev.email || 'user@nexus.edu.in'),
+      email: email,
       role: role
     }));
     toast.success(`Switched dashboard context to: ${role}`);
@@ -348,6 +362,21 @@ export default function Providers({ children }) {
     const tenant = availableTenants.find(t => t.id === tenantId);
     if (tenant) {
       setActiveTenant(tenant);
+      
+      // Update simulated user's email subdomain dynamically if they are not super admin or parent
+      if (activeRole !== 'SUPER_ADMIN' && activeRole !== 'PARENT') {
+        setActiveUser(prev => {
+          const emailParts = prev.email.split('@');
+          if (emailParts.length === 2) {
+            const localPart = emailParts[0];
+            return {
+              ...prev,
+              email: `${localPart}@${tenant.subdomain}.edu.in`
+            };
+          }
+          return prev;
+        });
+      }
       toast.success(`Switched school campus to: ${tenant.name}`);
     }
   };

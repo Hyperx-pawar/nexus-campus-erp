@@ -100,7 +100,9 @@ export default function DevSwitcher() {
                   <FlaskConical size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black uppercase tracking-wider font-outfit">Nexus Testing Hub</h3>
+                  <h3 className="text-sm font-black uppercase tracking-wider font-outfit">
+                    {activeRole === 'SUPER_ADMIN' ? 'Nexus Testing Hub' : 'Campus Testing Hub'}
+                  </h3>
                   <p className="text-[10px] text-text-secondary">Simulate and verify all system modules</p>
                 </div>
               </div>
@@ -128,7 +130,7 @@ export default function DevSwitcher() {
                   ))}
                 </select>
                 <div className="flex items-center justify-between text-[8px] text-text-secondary mt-2 px-1">
-                  <span>Subdomain: {activeTenant.subdomain}.nexus.in</span>
+                  <span>Subdomain: {activeTenant.subdomain}{activeRole === 'SUPER_ADMIN' ? '.nexus.in' : '.campus.in'}</span>
                   <span>ID: {activeTenant.id}</span>
                 </div>
               </div>
@@ -252,7 +254,7 @@ export default function DevSwitcher() {
               <span>Simulation mode is ACTIVE</span>
               <span className="flex items-center gap-1">
                 <Sparkles size={10} className="text-accent animate-pulse" />
-                <span>Nexus ERP v2.4</span>
+                <span>{activeRole === 'SUPER_ADMIN' ? 'Nexus ERP v2.4' : 'Campus ERP v2.4'}</span>
               </span>
             </div>
 
@@ -263,7 +265,7 @@ export default function DevSwitcher() {
         <button
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all group border border-border hover:shadow-indigo-500/20"
-          title="Open Nexus ERP Testing Control Board"
+          title={activeRole === 'SUPER_ADMIN' ? "Open Nexus ERP Testing Control Board" : "Open Campus Testing Control Board"}
         >
           <FlaskConical className="group-hover:rotate-12 transition-transform" size={24} />
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-400 rounded-full border-2 border-bg-main shadow-lg"></span>

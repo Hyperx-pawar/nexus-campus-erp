@@ -323,14 +323,18 @@ export default function IDCardGeneratorPage() {
               
               {showLogo && (
                 <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center border border-white/30 relative z-10">
-                  <Shield size={10} className="text-white fill-white/10" />
+                  <span className="text-[9px] text-white font-black font-outfit uppercase">
+                    {activeTenant?.name ? activeTenant.name.charAt(0) : 'C'}
+                  </span>
                 </div>
               )}
               
               <QRCodeSVG value={selectedType === 'student' ? record.admission_no : record.employee_id} />
               
               <div className="text-center relative z-10 w-full">
-                <span className="text-[5px] tracking-widest uppercase leading-none font-black block">NEXUS</span>
+                <span className="text-[5px] tracking-widest uppercase leading-none font-black block">
+                  {activeTenant?.subdomain ? activeTenant.subdomain.toUpperCase() : 'CAMPUS'}
+                </span>
                 <span className="text-[4px] tracking-widest opacity-75 uppercase leading-none block mt-0.5">Verified</span>
               </div>
             </div>

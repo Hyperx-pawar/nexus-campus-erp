@@ -54,7 +54,7 @@ export default function LoginPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-black font-outfit text-slate-900 tracking-tight">
-              Sign in to {activeTenant?.name ? activeTenant.name.split(' (')[0] : 'Nexus ERP'}
+              Sign in to {activeTenant?.name ? activeTenant.name.split(' (')[0] : 'Campus ERP'}
             </h2>
             <p className="text-xs text-slate-500 font-medium">Enter your credentials to access your workspace</p>
           </div>
