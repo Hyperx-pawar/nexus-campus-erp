@@ -43,8 +43,10 @@ export default function LoginPage() {
         
         {/* Brand Logo & Header */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/10 shrink-0">
-            {activeTenant?.name ? (
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/10 shrink-0 overflow-hidden">
+            {activeTenant?.logo ? (
+              <img src={activeTenant.logo} alt="Logo" className="w-full h-full object-cover" />
+            ) : activeTenant?.name ? (
               <span className="font-outfit font-black text-xl uppercase leading-none">
                 {activeTenant.name.charAt(0)}
               </span>

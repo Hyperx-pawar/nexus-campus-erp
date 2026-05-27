@@ -169,7 +169,8 @@ function SettingsEditor({ activeTenant }) {
     name: '',
     subdomain: '',
     board: 'CBSE',
-    academicYear: '2026-2027'
+    academicYear: '2026-2027',
+    logo: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -179,10 +180,26 @@ function SettingsEditor({ activeTenant }) {
         name: activeTenant.name || '',
         subdomain: activeTenant.subdomain || '',
         board: activeTenant.settings?.board || 'CBSE',
-        academicYear: activeTenant.settings?.academicYear || '2026-2027'
+        academicYear: activeTenant.settings?.academicYear || '2026-2027',
+        logo: activeTenant.logo || ''
       });
     }
   }, [activeTenant]);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings(prev => ({
+          ...prev,
+          logo: reader.result
+        }));
+        toast.success("School logo preloaded! Save configuration to apply changes.");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -201,9 +218,28 @@ function SettingsEditor({ activeTenant }) {
           
           {/* Overview Column */}
           <div className="flex flex-col items-center justify-center p-6 bg-bg-main/50 border border-border rounded-2xl text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
-               <Settings size={28} />
+            <div className="relative group w-20 h-20 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+               {settings.logo ? (
+                 <img src={settings.logo} alt="School Logo" className="w-full h-full object-cover" />
+               ) : (
+                 <span className="text-2xl font-black font-outfit text-accent uppercase">
+                   {settings.name ? settings.name.charAt(0) : 'C'}
+                 </span>
+               )}
+               <label className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[9px] font-black uppercase cursor-pointer transition-all">
+                 <span>Upload</span>
+                 <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+               </label>
             </div>
+            {settings.logo && (
+              <button 
+                type="button" 
+                onClick={() => setSettings(prev => ({ ...prev, logo: '' }))}
+                className="text-[9px] text-danger hover:underline font-bold uppercase"
+              >
+                Remove Logo
+              </button>
+            )}
             <div>
               <h4 className="text-sm font-bold text-text-primary">System Config</h4>
               <span className="text-[10px] text-text-secondary font-black uppercase tracking-widest block mt-1">Tenant Settings</span>

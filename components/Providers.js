@@ -66,10 +66,10 @@ export default function Providers({ children }) {
     role: 'SCHOOL_ADMIN'
   });
 
-  const [availableTenants] = useState([
-    { id: 'demo-tenant-1', name: 'Indian Institute of Technology (IIT) Delhi', subdomain: 'iitd' },
-    { id: 'demo-tenant-2', name: 'Delhi Public School (DPS) RK Puram', subdomain: 'dpsrkp' },
-    { id: 'demo-tenant-3', name: 'St. Stephen\'s College', subdomain: 'ststephens' }
+  const [availableTenants, setAvailableTenants] = useState([
+    { id: 'demo-tenant-1', name: 'Indian Institute of Technology (IIT) Delhi', subdomain: 'iitd', logo: '' },
+    { id: 'demo-tenant-2', name: 'Delhi Public School (DPS) RK Puram', subdomain: 'dpsrkp', logo: '' },
+    { id: 'demo-tenant-3', name: 'St. Stephen\'s College', subdomain: 'ststephens', logo: '' }
   ]);
 
   // Shared state for multi-role dynamic simulation
@@ -543,12 +543,20 @@ export default function Providers({ children }) {
       ...prev,
       name: tenantData.name,
       subdomain: tenantData.subdomain,
+      logo: tenantData.logo,
       settings: {
         ...prev.settings,
         board: tenantData.board,
         academicYear: tenantData.academicYear
       }
     }));
+    
+    setAvailableTenants(prev => prev.map(t => 
+      t.id === activeTenant.id 
+        ? { ...t, name: tenantData.name, subdomain: tenantData.subdomain, logo: tenantData.logo } 
+        : t
+    ));
+    
     toast.success('System configuration saved successfully!');
   };
 

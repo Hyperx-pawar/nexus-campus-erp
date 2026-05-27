@@ -322,10 +322,14 @@ export default function IDCardGeneratorPage() {
               <div className="absolute inset-0 opacity-15 bg-gradient-to-b from-white to-transparent"></div>
               
               {showLogo && (
-                <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center border border-white/30 relative z-10">
-                  <span className="text-[9px] text-white font-black font-outfit uppercase">
-                    {activeTenant?.name ? activeTenant.name.charAt(0) : 'C'}
-                  </span>
+                <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center border border-white/30 relative z-10 overflow-hidden">
+                  {activeTenant?.logo ? (
+                    <img src={activeTenant.logo} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] text-white font-black font-outfit uppercase">
+                      {activeTenant?.name ? activeTenant.name.charAt(0) : 'C'}
+                    </span>
+                  )}
                 </div>
               )}
               

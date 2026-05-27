@@ -37,8 +37,12 @@ export default function Header() {
       
       {/* Active Campus Name Indicator */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-accent shrink-0">
-          <School size={16} />
+        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-accent shrink-0 overflow-hidden border border-border/10">
+          {activeTenant?.logo ? (
+            <img src={activeTenant.logo} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <School size={16} />
+          )}
         </div>
         <div className="flex flex-col">
           <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Active Campus</span>

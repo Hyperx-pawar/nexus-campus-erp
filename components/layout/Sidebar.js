@@ -86,42 +86,8 @@ export default function Sidebar() {
   return (
     <aside className={`relative z-[60] bg-bg-sidebar border-r border-border h-screen flex flex-col transition-all duration-300 ease-in-out font-inter ${isCollapsed ? 'w-[88px]' : 'w-[280px]'}`}>
       
-      {/* Sidebar Header */}
-      <div className="h-20 flex items-center px-6 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-indigo-600 flex items-center justify-center shadow-lg shadow-accent/20 border border-border shrink-0">
-             {activeRole === 'SUPER_ADMIN' ? (
-               <Shield size={20} className="text-white" />
-             ) : (
-               <span className="text-white font-black font-outfit text-base uppercase">
-                 {activeTenant?.name ? activeTenant.name.charAt(0) : 'N'}
-               </span>
-             )}
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-300 max-w-[170px]">
-               {activeRole === 'SUPER_ADMIN' ? (
-                 <>
-                   <span className="font-outfit text-xl font-black text-text-primary tracking-tighter leading-none">NEXUS</span>
-                   <span className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mt-0.5">Management</span>
-                 </>
-               ) : (
-                 <>
-                   <span className="font-outfit text-xs font-black text-text-primary tracking-tight leading-tight uppercase line-clamp-2" title={activeTenant?.name}>
-                     {activeTenant?.name || 'CAMPUS'}
-                   </span>
-                   <span className="text-[8px] font-bold text-accent uppercase tracking-widest mt-1">
-                     {activeRole.replace('_', ' ')}
-                   </span>
-                 </>
-               )}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto px-4 space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6 custom-scrollbar">
         {filteredLinks.map((group, i) => (
           <div key={i} className="space-y-2">
             {!isCollapsed && (
