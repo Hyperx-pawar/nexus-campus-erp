@@ -216,8 +216,12 @@ export default function IDCardGeneratorPage() {
               {/* Logo & School Header */}
               <div className="flex flex-col items-center gap-0.5 relative z-10 w-full">
                 {showLogo && (
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center border border-white/30 shrink-0">
-                    <Shield size={10} className="text-white fill-white/10" />
+                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center border border-white/30 shrink-0 overflow-hidden">
+                    {activeTenant?.logo ? (
+                      <img src={activeTenant.logo} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <Shield size={10} className="text-white fill-white/10" />
+                    )}
                   </div>
                 )}
                 <h4 className="text-[8px] font-black font-outfit uppercase tracking-wider truncate max-w-full leading-none mt-1">

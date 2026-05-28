@@ -1,12 +1,12 @@
 'use client';
 
 import RoleGate from '@/components/RoleGate';
-
 import React, { use, useState, useEffect } from 'react';
 import { useAuth } from '@/components/Providers';
+import { compressImage } from '@/lib/storage';
 import { 
   Shield, Sparkles, Building2, ClipboardList, Library, Home, Bus, 
-  Briefcase, Wallet, FileBox, Settings, TrendingUp, Award, Zap, Bell, MessageSquare, User, Loader2
+  Briefcase, Wallet, FileBox, Settings, TrendingUp, Award, Zap, Bell, MessageSquare, User, Loader2, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -186,18 +186,44 @@ function SettingsEditor({ activeTenant, activeRole }) {
     }
   }, [activeTenant]);
 
-  const handleLogoChange = (e) => {
+  const handleLogoChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSettings(prev => ({
-          ...prev,
-          logo: reader.result
-        }));
-        toast.success("School logo preloaded! Save configuration to apply changes.");
-      };
-      reader.readAsDataURL(file);
+      try {
+        toast.loading("Compressing logo image...");
+        const compressedFile = await compressImage(file, 400, 400, 0.7); // Rescale to max 400x400 for settings logos
+        toast.dismiss();
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSettings(prev => ({
+            ...prev,
+            logo: reader.result
+          }));
+          
+          const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+          const origSizeStr = file.size > 1024 * 1024 
+            ? `${(file.size / 1024 / 1024).toFixed(2)} MB` 
+            : `${(file.size / 1024).toFixed(1)} KB`;
+          const newSizeStr = compressedFile.size > 1024 * 1024 
+            ? `${(compressedFile.size / 1024 / 1024).toFixed(2)} MB` 
+            : `${(compressedFile.size / 1024).toFixed(1)} KB`;
+          
+          toast.success(
+            `📷 Logo Optimized: ${origSizeStr} ➔ ${newSizeStr} (Saved ${savings}%). Click "Save System Configuration" to apply.`
+          );
+        };
+        reader.readAsDataURL(compressedFile);
+      } catch (err) {
+        toast.dismiss();
+        console.error(err);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSettings(prev => ({ ...prev, logo: reader.result }));
+          toast.success("School logo preloaded! Click \"Save System Configuration\" to apply.");
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -218,7 +244,7 @@ function SettingsEditor({ activeTenant, activeRole }) {
           
           {/* Overview Column */}
           <div className="flex flex-col items-center justify-center p-6 bg-bg-main/50 border border-border rounded-2xl text-center space-y-4">
-            <div className="relative group w-20 h-20 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+            <div className="relative w-20 h-20 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                {settings.logo ? (
                  <img src={settings.logo} alt="School Logo" className="w-full h-full object-cover" />
                ) : (
@@ -226,20 +252,26 @@ function SettingsEditor({ activeTenant, activeRole }) {
                    {settings.name ? settings.name.charAt(0) : 'C'}
                  </span>
                )}
-               <label className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[9px] font-black uppercase cursor-pointer transition-all">
-                 <span>Upload</span>
-                 <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-               </label>
             </div>
-            {settings.logo && (
-              <button 
-                type="button" 
-                onClick={() => setSettings(prev => ({ ...prev, logo: '' }))}
-                className="text-[9px] text-danger hover:underline font-bold uppercase"
-              >
-                Remove Logo
-              </button>
-            )}
+            
+            <div className="flex flex-col gap-2 w-full items-center">
+              <label className="px-3.5 py-2 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-accent/10">
+                <Upload size={12} />
+                <span>Upload Logo Image</span>
+                <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+              </label>
+
+              {settings.logo && (
+                <button 
+                  type="button" 
+                  onClick={() => setSettings(prev => ({ ...prev, logo: '' }))}
+                  className="text-[9px] text-danger hover:underline font-bold uppercase"
+                >
+                  Remove Logo
+                </button>
+              )}
+            </div>
+
             <div>
               <h4 className="text-sm font-bold text-text-primary">System Config</h4>
               <span className="text-[10px] text-text-secondary font-black uppercase tracking-widest block mt-1">Tenant Settings</span>
