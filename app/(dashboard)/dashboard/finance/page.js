@@ -74,6 +74,7 @@ export default function FinanceFeesPage() {
   // Receipt modal
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
+  const [includeDigitalSignature, setIncludeDigitalSignature] = useState(true);
   const receiptRef = useRef(null);
 
   // Fee structure form
@@ -1314,10 +1315,66 @@ export default function FinanceFeesPage() {
       {/* ===== RECEIPT MODAL ===== */}
       <style>{`
         @media print {
-          body > *:not(#fee-receipt-print-root) { display: none !important; }
-          #fee-receipt-print-root { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
-          .no-print { display: none !important; }
-          .print-receipt { box-shadow: none !important; border: 1px solid #ccc !important; }
+          /* Hide main app shell components */
+          main, aside, header, nav, .no-print, button {
+            display: none !important;
+          }
+          
+          /* Target React Portal backdrop overlay */
+          div[class*="backdrop-blur-md"] {
+            position: absolute !important;
+            inset: 0 !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important;
+            z-index: auto !important;
+          }
+          
+          /* Expand modal card container to cover page */
+          div[class*="bg-bg-card"][class*="rounded-"] {
+            max-width: 100% !important;
+            width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            transform: none !important;
+          }
+          
+          /* Hide modal title header */
+          div[class*="border-b"][class*="flex"][class*="justify-between"] {
+            display: none !important;
+          }
+          
+          /* Expand modal scrollable content wrapper */
+          div[class*="max-h-"][class*="overflow-y-auto"] {
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          /* Reset receipt card container */
+          #fee-receipt-print-root {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: relative !important;
+          }
+          
+          .print-receipt {
+            border: none !important;
+            box-shadow: none !important;
+            background: white !important;
+          }
         }
       `}</style>
       <Modal
@@ -1492,7 +1549,7 @@ export default function FinanceFeesPage() {
                   ].map((sig, i) => (
                     <div key={i} className="text-center space-y-2">
                       <div className="h-14 border-b-2 border-slate-300 border-dashed flex items-end justify-center pb-1 relative">
-                        {sig.label === 'Cashier / Accountant' && (
+                        {sig.label === 'Cashier / Accountant' && includeDigitalSignature && (
                           <span className="text-2xl text-blue-600 font-bold select-none transform -rotate-2 tracking-wide font-signature block" style={{ fontFamily: 'var(--font-caveat), cursive' }}>
                             {sig.sub}
                           </span>
@@ -1543,6 +1600,20 @@ export default function FinanceFeesPage() {
                   </span>
                 ))}
               </div>
+            </div>
+
+            {/* Digital Signature Toggle */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl no-print">
+              <input
+                id="toggle-digital-sig"
+                type="checkbox"
+                checked={includeDigitalSignature}
+                onChange={(e) => setIncludeDigitalSignature(e.target.checked)}
+                className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent accent-accent"
+              />
+              <label htmlFor="toggle-digital-sig" className="text-xs font-bold text-slate-600 cursor-pointer select-none">
+                Include Cashier / Accountant Digital Signature (Uncheck to sign physically with pen)
+              </label>
             </div>
 
             {/* Actions */}
