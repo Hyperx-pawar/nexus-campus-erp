@@ -28,6 +28,11 @@ export default function Providers({ children }) {
     id: 'demo-tenant-1',
     name: 'Indian Institute of Technology (IIT) Delhi',
     subdomain: 'iitd',
+    address: 'Hauz Khas, New Delhi – 110016, Delhi, India',
+    phone: '+91-11-2659-1777',
+    email: 'admin@iitd.edu.in',
+    affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited',
+    estYear: '1961',
     settings: { currency: '₹' }
   });
 
@@ -67,9 +72,9 @@ export default function Providers({ children }) {
   });
 
   const [availableTenants, setAvailableTenants] = useState([
-    { id: 'demo-tenant-1', name: 'Indian Institute of Technology (IIT) Delhi', subdomain: 'iitd', logo: '' },
-    { id: 'demo-tenant-2', name: 'Delhi Public School (DPS) RK Puram', subdomain: 'dpsrkp', logo: '' },
-    { id: 'demo-tenant-3', name: 'St. Stephen\'s College', subdomain: 'ststephens', logo: '' }
+    { id: 'demo-tenant-1', name: 'Indian Institute of Technology (IIT) Delhi', subdomain: 'iitd', logo: '', address: 'Hauz Khas, New Delhi – 110016, Delhi, India', phone: '+91-11-2659-1777', email: 'admin@iitd.edu.in', affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited', estYear: '1961' },
+    { id: 'demo-tenant-2', name: 'Delhi Public School (DPS) RK Puram', subdomain: 'dpsrkp', logo: '', address: 'Sector 4, R.K. Puram, New Delhi – 110022', phone: '+91-11-2617-6940', email: 'admin@dpsrkp.edu.in', affiliation: 'CBSE Affiliated • School No. 1620009', estYear: '1972' },
+    { id: 'demo-tenant-3', name: "St. Stephen's College", subdomain: 'ststephens', logo: '', address: 'University Enclave, Delhi – 110007', phone: '+91-11-2766-7271', email: 'admin@ststephens.edu.in', affiliation: 'University of Delhi • NAAC A Accredited', estYear: '1881' }
   ]);
 
   // Shared state for multi-role dynamic simulation

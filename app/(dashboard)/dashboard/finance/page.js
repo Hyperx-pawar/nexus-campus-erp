@@ -12,6 +12,33 @@ import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Modal from '@/components/Modal';
 
+// ── Number → Words helper (Indian system) ──────────────────────────────────
+const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function numToWords(n) {
+  if (n === 0) return 'Zero';
+  if (n < 0) return 'Minus ' + numToWords(-n);
+  let words = '';
+  if (n >= 10000000) { words += numToWords(Math.floor(n / 10000000)) + ' Crore '; n %= 10000000; }
+  if (n >= 100000)   { words += numToWords(Math.floor(n / 100000)) + ' Lakh '; n %= 100000; }
+  if (n >= 1000)     { words += numToWords(Math.floor(n / 1000)) + ' Thousand '; n %= 1000; }
+  if (n >= 100)      { words += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+  if (n >= 20)       { words += tens[Math.floor(n / 10)] + ' '; n %= 10; }
+  if (n > 0)         { words += ones[n] + ' '; }
+  return words.trim();
+}
+
+function numberToWords(amount) {
+  const rupees = Math.floor(amount);
+  const paise  = Math.round((amount - rupees) * 100);
+  let result = numToWords(rupees);
+  if (paise > 0) result += ` and ${numToWords(paise)} Paise`;
+  return result;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function FinanceFeesPage() {
   const {
     activeTenant, 
@@ -187,7 +214,25 @@ export default function FinanceFeesPage() {
       newPaid,
       newRemaining,
       newStatus,
-      collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier'
+      collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier',
+      // Institution details
+      schoolAddress: activeTenant.address || '',
+      schoolPhone: activeTenant.phone || '',
+      schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
+      schoolAffiliation: activeTenant.affiliation || '',
+      schoolEstYear: activeTenant.estYear || '',
+      schoolLogo: activeTenant.logo || '',
+      schoolSubdomain: activeTenant.subdomain || '',
+      // Fee breakdown
+      feeBreakdown: (() => {
+        const s = sharedStudents.find(st => st.id === selectedStudentId);
+        const structures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === s?.class_id);
+        const addons = sharedStudentFeeAddons[selectedStudentId] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+        const rows = structures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+        if (addons.transport.enabled && addons.transport.fee > 0) rows.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+        if (addons.hostel.enabled && addons.hostel.fee > 0) rows.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+        return rows;
+      })()
     };
 
     setSharedFeeRecords(prev => ({
@@ -1267,64 +1312,217 @@ export default function FinanceFeesPage() {
       </Modal>
 
       {/* ===== RECEIPT MODAL ===== */}
+      <style>{`
+        @media print {
+          body > *:not(#fee-receipt-print-root) { display: none !important; }
+          #fee-receipt-print-root { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+          .no-print { display: none !important; }
+          .print-receipt { box-shadow: none !important; border: 1px solid #ccc !important; }
+        }
+      `}</style>
       <Modal
         open={showReceiptModal}
         onClose={() => setShowReceiptModal(false)}
-        title="Payment Receipt"
+        title="Official Fee Receipt"
         icon={<Receipt size={16} />}
-        size="md"
+        size="lg"
       >
         {lastReceipt && (
-          <div className="space-y-5">
-            {/* Printable receipt card */}
-            <div ref={receiptRef} className="p-6 border-2 border-dashed border-border rounded-2xl space-y-4 bg-white">
-              {/* Header */}
-              <div className="text-center space-y-1 border-b border-border pb-4">
-                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Official Fee Receipt</p>
-                <h3 className="text-lg font-black font-outfit text-text-primary">{lastReceipt.schoolName}</h3>
-                <p className="text-[10px] text-success font-black">✓ Payment Confirmed</p>
-              </div>
+          <div className="space-y-4">
 
-              {/* Receipt details grid */}
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                {[
-                  { label: 'Receipt No.', val: lastReceipt.id, mono: true },
-                  { label: 'Date & Time', val: `${lastReceipt.dateDisplay} ${lastReceipt.time}` },
-                  { label: 'Student Name', val: lastReceipt.studentName, bold: true },
-                  { label: 'Admission No.', val: lastReceipt.admissionNo, mono: true },
-                  { label: 'Class', val: lastReceipt.className },
-                  { label: 'Payment Mode', val: lastReceipt.method },
-                  { label: 'Collected By', val: lastReceipt.collectedBy },
-                  { label: 'Status', val: lastReceipt.newStatus },
-                ].map((row, i) => (
-                  <div key={i}>
-                    <p className="text-[9px] text-text-secondary uppercase tracking-widest">{row.label}</p>
-                    <p className={`text-text-primary mt-0.5 ${row.bold ? 'font-bold' : ''} ${row.mono ? 'font-mono' : ''}`}>{row.val}</p>
+            {/* === PRINTABLE RECEIPT === */}
+            <div
+              id="fee-receipt-print-root"
+              ref={receiptRef}
+              className="print-receipt bg-white border border-slate-200 rounded-2xl overflow-hidden"
+              style={{ fontFamily: "'Outfit', 'Inter', sans-serif" }}
+            >
+              {/* ── Institution Header ── */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-8 py-6">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Logo + Name */}
+                  <div className="flex items-center gap-4">
+                    {lastReceipt.schoolLogo ? (
+                      <img src={lastReceipt.schoolLogo} alt="logo" className="w-16 h-16 rounded-xl object-cover bg-white" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-white text-2xl font-black">
+                        {lastReceipt.schoolName[0]}
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-xl font-black leading-tight">{lastReceipt.schoolName}</h2>
+                      {lastReceipt.schoolAffiliation && (
+                        <p className="text-white/70 text-[10px] mt-0.5 font-medium">{lastReceipt.schoolAffiliation}</p>
+                      )}
+                      {lastReceipt.schoolEstYear && (
+                        <p className="text-white/50 text-[9px] mt-0.5">Est. {lastReceipt.schoolEstYear}</p>
+                      )}
+                    </div>
                   </div>
-                ))}
+                  {/* Receipt label */}
+                  <div className="text-right shrink-0">
+                    <p className="text-white/50 text-[9px] uppercase tracking-widest font-black">Official Receipt</p>
+                    <p className="text-white font-mono font-black text-sm mt-0.5">{lastReceipt.id}</p>
+                    <p className="text-white/60 text-[10px] mt-0.5">{lastReceipt.dateDisplay} {lastReceipt.time}</p>
+                  </div>
+                </div>
               </div>
 
-              {/* Amount box */}
-              <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-text-secondary uppercase tracking-widest">Amount Collected</p>
-                <p className="text-3xl font-black font-outfit text-success mt-1">₹{lastReceipt.amount.toLocaleString('en-IN')}</p>
+              {/* ── Institution Contact Strip ── */}
+              <div className="bg-slate-50 border-b border-slate-200 px-8 py-2.5 flex flex-wrap gap-x-6 gap-y-1">
+                {lastReceipt.schoolAddress && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {lastReceipt.schoolAddress}
+                  </span>
+                )}
+                {lastReceipt.schoolPhone && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.58 3.42 2 2 0 0 1 3.54 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 6 6l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16z"/></svg>
+                    {lastReceipt.schoolPhone}
+                  </span>
+                )}
+                {lastReceipt.schoolEmail && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    {lastReceipt.schoolEmail}
+                  </span>
+                )}
+                {lastReceipt.schoolSubdomain && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    {lastReceipt.schoolSubdomain}.campus.in
+                  </span>
+                )}
               </div>
 
-              {/* Balance summary */}
-              <div className="flex justify-between text-[11px] font-mono border-t border-border pt-3">
-                <span className="text-text-secondary">Total Fee: ₹{lastReceipt.totalFee.toLocaleString('en-IN')}</span>
-                <span className="text-success font-bold">Paid: ₹{lastReceipt.newPaid.toLocaleString('en-IN')}</span>
-                <span className={lastReceipt.newRemaining > 0 ? 'text-warning font-bold' : 'text-success font-bold'}>
-                  {lastReceipt.newRemaining > 0 ? `Due: ₹${lastReceipt.newRemaining.toLocaleString('en-IN')}` : 'CLEARED'}
-                </span>
-              </div>
+              <div className="px-8 py-6 space-y-6">
+                {/* ── Student Details Row ── */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">Student Information</p>
+                    {[
+                      { label: 'Student Name', val: lastReceipt.studentName },
+                      { label: 'Admission No.', val: lastReceipt.admissionNo },
+                      { label: 'Class / Section', val: lastReceipt.className },
+                    ].map((row, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <span className="text-[10px] text-slate-400">{row.label}</span>
+                        <span className="text-[11px] font-bold text-slate-800">{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">Payment Information</p>
+                    {[
+                      { label: 'Receipt No.', val: lastReceipt.id },
+                      { label: 'Payment Date', val: lastReceipt.dateDisplay },
+                      { label: 'Payment Mode', val: lastReceipt.method },
+                      { label: 'Collected By', val: lastReceipt.collectedBy },
+                    ].map((row, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <span className="text-[10px] text-slate-400">{row.label}</span>
+                        <span className="text-[11px] font-bold text-slate-800 font-mono">{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              <p className="text-[9px] text-center text-text-secondary opacity-50">This is a computer-generated receipt and does not require a signature.</p>
+                {/* ── Fee Breakdown Table ── */}
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Fee Breakdown</p>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider rounded-tl-lg">#</th>
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider">Fee Component</th>
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider">Code</th>
+                        <th className="text-right py-2 px-3 text-[9px] font-black uppercase tracking-wider rounded-tr-lg">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(lastReceipt.feeBreakdown || []).map((row, i) => (
+                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          <td className="py-2 px-3 text-slate-400 font-mono">{String(i + 1).padStart(2, '0')}</td>
+                          <td className="py-2 px-3 text-slate-700 font-medium">{row.label}</td>
+                          <td className="py-2 px-3 text-slate-400 font-mono text-[10px] uppercase">{row.code}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">₹{row.amount.toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                      {(!lastReceipt.feeBreakdown || lastReceipt.feeBreakdown.length === 0) && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={4} className="py-3 px-3 text-center text-slate-400 text-[10px]">Fee structure details not available</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Totals */}
+                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
+                    {[
+                      { label: 'Total Fee', val: lastReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' },
+                      { label: 'Previously Paid', val: lastReceipt.newPaid - lastReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
+                      { label: 'Amount Paid Now', val: lastReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
+                      { label: 'Balance Remaining', val: lastReceipt.newRemaining, color: lastReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true },
+                    ].map((r, i) => (
+                      <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+                        <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
+                        <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
+                          {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Amount in Words ── */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[9px] text-slate-400 uppercase tracking-widest font-black">Amount in Words: </span>
+                  <span className="text-[10px] text-slate-700 font-medium italic">Rupees {numberToWords(lastReceipt.amount)} Only</span>
+                </div>
+
+                {/* ── Signature Section ── */}
+                <div className="grid grid-cols-3 gap-6 pt-4">
+                  {[
+                    { label: 'Student / Parent Signature', sub: 'Received by' },
+                    { label: 'Cashier / Accountant', sub: lastReceipt.collectedBy },
+                    { label: 'Principal / Authorised Signatory', sub: lastReceipt.schoolName },
+                  ].map((sig, i) => (
+                    <div key={i} className="text-center space-y-2">
+                      <div className="h-14 border-b-2 border-slate-300 border-dashed" />
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{sig.label}</p>
+                        <p className="text-[8px] text-slate-400 mt-0.5 truncate">{sig.sub}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Status Badge + Footer Note ── */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                    lastReceipt.newStatus === 'PAID' 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                      : lastReceipt.newStatus === 'PARTIAL'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      lastReceipt.newStatus === 'PAID' ? 'bg-emerald-500' : lastReceipt.newStatus === 'PARTIAL' ? 'bg-amber-500' : 'bg-red-500'
+                    }`} />
+                    Account Status: {lastReceipt.newStatus}
+                  </div>
+                  <p className="text-[8px] text-slate-300 italic">This is a computer-generated receipt. No physical signature required.</p>
+                </div>
+              </div>
             </div>
 
-            {/* Notification confirmation */}
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl space-y-1.5">
-              <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1"><Bell size={10} /> Notifications Dispatched</p>
+            {/* Notification banner */}
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between flex-wrap gap-2 no-print">
+              <div className="flex items-center gap-1.5">
+                <Bell size={12} className="text-blue-500" />
+                <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider">Notifications Dispatched</p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {['School Admin', `Student: ${lastReceipt.studentName.split(' ')[0]}`, 'Parent / Guardian'].map((r, i) => (
                   <span key={i} className="flex items-center gap-1 text-[9px] font-bold text-success bg-success/10 border border-success/20 px-2 py-1 rounded-lg">
@@ -1335,10 +1533,10 @@ export default function FinanceFeesPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 no-print">
               <button
                 onClick={() => window.print()}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200/60 border border-border text-text-primary text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
               >
                 <Printer size={14} />
                 <span>Print Receipt</span>
