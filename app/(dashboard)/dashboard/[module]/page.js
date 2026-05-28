@@ -163,7 +163,7 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
 // ==========================================
 // INTERACTIVE SETTINGS EDITOR COMPONENT
 // ==========================================
-function SettingsEditor({ activeTenant }) {
+function SettingsEditor({ activeTenant, activeRole }) {
   const { updateTenant } = useAuth();
   const [settings, setSettings] = useState({
     name: '',
@@ -441,6 +441,7 @@ export default function ModuleFallbackPage({ params }) {
         /* Render fully editable settings interface */
         <SettingsEditor 
           activeTenant={activeTenant} 
+          activeRole={activeRole} 
         />
       ) : (
         /* Render standard localized module summary cards */
