@@ -439,33 +439,34 @@ export default function FinanceFeesPage() {
         </div>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Expected', value: `₹${metrics.totalExpected.toLocaleString('en-IN')}`, icon: Landmark, desc: 'Projected receipts', color: 'text-accent', bg: 'bg-accent/10' },
-          { label: 'Total Collected', value: `₹${metrics.totalCollected.toLocaleString('en-IN')}`, icon: CheckCircle2, desc: 'Direct credits', color: 'text-success', bg: 'bg-success/10' },
-          { label: 'Outstanding', value: `₹${metrics.totalOutstanding.toLocaleString('en-IN')}`, icon: Wallet, desc: 'Dues remaining', color: 'text-warning', bg: 'bg-warning/10' },
-          { label: 'Overdue Students', value: metrics.overdueStudentsCount, icon: AlertCircle, desc: 'Accounts with balance', color: 'text-danger', bg: 'bg-danger/10' }
-        ].map((kpi, idx) => (
-          <div key={idx} className="p-6 bg-bg-sidebar border border-border rounded-3xl relative overflow-hidden group hover:border-accent/20 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{kpi.label}</span>
-              <div className={`p-2 ${kpi.bg} rounded-xl ${kpi.color}`}><kpi.icon size={16} /></div>
-            </div>
-            <p className="text-3xl font-black font-outfit text-text-primary mt-4">{kpi.value}</p>
-            <p className="text-[11px] text-text-secondary mt-1 opacity-65">{kpi.desc}</p>
-            {/* Collection percentage bar for first two cards */}
-            {idx === 0 && metrics.totalExpected > 0 && (
-              <div className="mt-3">
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-accent to-success rounded-full transition-all duration-700" style={{ width: `${Math.min(100, (metrics.totalCollected / metrics.totalExpected) * 100)}%` }} />
-                </div>
-                <span className="text-[9px] text-text-secondary mt-1 block">{((metrics.totalCollected / metrics.totalExpected) * 100).toFixed(1)}% collected</span>
+      {/* KPI Stats Cards — Overview only */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[
+            { label: 'Total Expected', value: `₹${metrics.totalExpected.toLocaleString('en-IN')}`, icon: Landmark, desc: 'Projected receipts', color: 'text-accent', bg: 'bg-accent/10' },
+            { label: 'Total Collected', value: `₹${metrics.totalCollected.toLocaleString('en-IN')}`, icon: CheckCircle2, desc: 'Direct credits', color: 'text-success', bg: 'bg-success/10' },
+            { label: 'Outstanding', value: `₹${metrics.totalOutstanding.toLocaleString('en-IN')}`, icon: Wallet, desc: 'Dues remaining', color: 'text-warning', bg: 'bg-warning/10' },
+            { label: 'Overdue Students', value: metrics.overdueStudentsCount, icon: AlertCircle, desc: 'Accounts with balance', color: 'text-danger', bg: 'bg-danger/10' }
+          ].map((kpi, idx) => (
+            <div key={idx} className="p-6 bg-bg-sidebar border border-border rounded-3xl relative overflow-hidden group hover:border-accent/20 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{kpi.label}</span>
+                <div className={`p-2 ${kpi.bg} rounded-xl ${kpi.color}`}><kpi.icon size={16} /></div>
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+              <p className="text-3xl font-black font-outfit text-text-primary mt-4">{kpi.value}</p>
+              <p className="text-[11px] text-text-secondary mt-1 opacity-65">{kpi.desc}</p>
+              {idx === 0 && metrics.totalExpected > 0 && (
+                <div className="mt-3">
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-accent to-success rounded-full transition-all duration-700" style={{ width: `${Math.min(100, (metrics.totalCollected / metrics.totalExpected) * 100)}%` }} />
+                  </div>
+                  <span className="text-[9px] text-text-secondary mt-1 block">{((metrics.totalCollected / metrics.totalExpected) * 100).toFixed(1)}% collected</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ===== OVERVIEW TAB ===== */}
       {activeTab === 'overview' && (
