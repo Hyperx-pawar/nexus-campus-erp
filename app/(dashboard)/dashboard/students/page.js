@@ -5,7 +5,7 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
-  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus
+  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus, Edit
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ export default function StudentRegistryPage() {
     sharedStudents, 
     setSharedStudents,
     sharedParents, 
+    setSharedParents,
     addStudentAndParent,
     sharedClasses,
     sharedTransportRoutes,
@@ -31,11 +32,48 @@ export default function StudentRegistryPage() {
 
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentForDossier, setSelectedStudentForDossier] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [parsedStudents, setParsedStudents] = useState([]);
+
+  const handleOpenEditForm = (student) => {
+    const parent = sharedParents.find(p => p.id === student.parent_id) || {};
+    setEditingStudentId(student.id);
+    const rawAadhaar = student.aadhaar_no ? student.aadhaar_no.replace(/\s+/g, '') : '';
+    setFormData({
+      firstName: student.first_name || '',
+      lastName: student.last_name || '',
+      admissionNo: student.admission_no || '',
+      rollNo: student.roll_no || '',
+      dateOfBirth: student.date_of_birth || '',
+      gender: student.gender || 'MALE',
+      bloodGroup: student.blood_group || 'O+',
+      address: student.address || '',
+      aadhaarNo: rawAadhaar,
+      category: student.category || 'GENERAL',
+      classId: student.class_id || '',
+      enableTransport: student.enableTransport || false,
+      transportRouteId: student.transportRouteId || sharedTransportRoutes?.[0]?.id || '',
+      customTransportFee: student.transportFee || '',
+      enableHostel: student.enableHostel || false,
+      hostelBlockId: student.hostelBlockId || sharedHostelBlocks?.[0]?.id || '',
+      customHostelFee: student.hostelFee || '',
+      parentFirstName: parent.first_name || '',
+      parentLastName: parent.last_name || '',
+      parentEmail: parent.email || '',
+      parentPhone: parent.phone || '',
+      parentOccupation: parent.occupation || 'Business Owner',
+      totalFee: student.totalFee || 0,
+      paidFee: student.paidFee || 0,
+      initialAttendance: student.initialAttendance || '85.0%',
+      avatar: student.profile_picture_url || '',
+      avatarFile: null
+    });
+    setShowAddForm(true);
+  };
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -181,7 +219,7 @@ export default function StudentRegistryPage() {
       let profilePicUrl = formData.avatar || '';
       if (formData.avatarFile) {
         const fileExt = formData.avatarFile.name.split('.').pop();
-        const fileName = `${studentId}-${Date.now()}.${fileExt}`;
+        const fileName = `${editingStudentId || studentId}-${Date.now()}.${fileExt}`;
         const filePath = `${activeTenant.id}/avatars/${fileName}`;
         const uploadedUrl = await uploadFileToBucket(supabase, 'avatars', filePath, formData.avatarFile);
         if (uploadedUrl) {
@@ -211,42 +249,93 @@ export default function StudentRegistryPage() {
         }
       }
 
-      const student = {
-        id: studentId,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        admission_no: formData.admissionNo,
-        roll_no: formData.rollNo,
-        date_of_birth: formData.dateOfBirth || new Date().toISOString().split('T')[0],
-        gender: formData.gender,
-        category: formData.category,
-        aadhaar_no: formattedAadhaar,
-        address: formData.address,
-        totalFee: Number(formData.totalFee),
-        paidFee: Number(formData.paidFee),
-        initialAttendance: formData.initialAttendance,
-        class_id: formData.classId,
-        tenant_id: activeTenant.id,
-        enableTransport: formData.enableTransport,
-        transportRouteId: formData.transportRouteId,
-        transportFee: transportFeeValue,
-        enableHostel: formData.enableHostel,
-        hostelBlockId: formData.hostelBlockId,
-        hostelFee: hostelFeeValue,
-        profile_picture_url: profilePicUrl
-      };
+      if (editingStudentId) {
+        // --- EDIT MODE ---
+        const existingStudent = sharedStudents.find(s => s.id === editingStudentId);
+        if (!existingStudent) throw new Error('Student record not found');
 
-      const parent = {
-        id: parentId,
-        first_name: formData.parentFirstName,
-        last_name: formData.parentLastName,
-        email: formData.parentEmail,
-        phone: formData.parentPhone || '+91 99999 88888',
-        occupation: formData.parentOccupation
-      };
+        const updatedStudent = {
+          ...existingStudent,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          admission_no: formData.admissionNo,
+          roll_no: formData.rollNo,
+          date_of_birth: formData.dateOfBirth || new Date().toISOString().split('T')[0],
+          gender: formData.gender,
+          category: formData.category,
+          aadhaar_no: formattedAadhaar,
+          address: formData.address,
+          totalFee: Number(formData.totalFee),
+          paidFee: Number(formData.paidFee),
+          initialAttendance: formData.initialAttendance,
+          class_id: formData.classId,
+          enableTransport: formData.enableTransport,
+          transportRouteId: formData.transportRouteId,
+          transportFee: transportFeeValue,
+          enableHostel: formData.enableHostel,
+          hostelBlockId: formData.hostelBlockId,
+          hostelFee: hostelFeeValue,
+          profile_picture_url: profilePicUrl
+        };
 
-      addStudentAndParent(student, parent);
-      toast.success(`Student "${formData.firstName}" and Parent "${formData.parentFirstName}" linked successfully! (Term Fee: ₹${(formData.totalFee || 0).toLocaleString('en-IN')})`);
+        const updatedParents = sharedParents.map(p => {
+          if (p.id === existingStudent.parent_id) {
+            return {
+              ...p,
+              first_name: formData.parentFirstName,
+              last_name: formData.parentLastName,
+              email: formData.parentEmail,
+              phone: formData.parentPhone,
+              occupation: formData.parentOccupation
+            };
+          }
+          return p;
+        });
+
+        const updatedStudents = sharedStudents.map(s => s.id === editingStudentId ? updatedStudent : s);
+
+        setSharedStudents(updatedStudents);
+        setSharedParents(updatedParents);
+        toast.success(`Student "${formData.firstName}" updated successfully!`);
+      } else {
+        // --- ADD MODE ---
+        const student = {
+          id: studentId,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          admission_no: formData.admissionNo,
+          roll_no: formData.rollNo,
+          date_of_birth: formData.dateOfBirth || new Date().toISOString().split('T')[0],
+          gender: formData.gender,
+          category: formData.category,
+          aadhaar_no: formattedAadhaar,
+          address: formData.address,
+          totalFee: Number(formData.totalFee),
+          paidFee: Number(formData.paidFee),
+          initialAttendance: formData.initialAttendance,
+          class_id: formData.classId,
+          tenant_id: activeTenant.id,
+          enableTransport: formData.enableTransport,
+          transportRouteId: formData.transportRouteId,
+          transportFee: transportFeeValue,
+          enableHostel: formData.enableHostel,
+          hostelBlockId: formData.hostelBlockId,
+          hostelFee: hostelFeeValue,
+          profile_picture_url: profilePicUrl
+        };
+
+        const parent = {
+          id: parentId,
+          first_name: formData.parentFirstName,
+          last_name: formData.parentLastName,
+          email: formData.parentEmail,
+          phone: formData.parentPhone || '+91 99999 88888',
+          occupation: formData.parentOccupation
+        };
+
+        addStudentAndParent(student, parent);
+        toast.success(`Student "${formData.firstName}" and Parent "${formData.parentFirstName}" linked successfully! (Term Fee: ₹${(formData.totalFee || 0).toLocaleString('en-IN')})`);
+      }
       
       // Reset form
       setFormData({
@@ -259,6 +348,7 @@ export default function StudentRegistryPage() {
         totalFee: 0, paidFee: 0, initialAttendance: '85.0%',
         avatar: '', avatarFile: null
       });
+      setEditingStudentId(null);
       setShowAddForm(false);
       setLoading(false);
     } catch (err) {
@@ -732,9 +822,12 @@ export default function StudentRegistryPage() {
 
       <Modal
         open={showAddForm}
-        onClose={() => setShowAddForm(false)}
-        title="New Student & Parent Enrollment"
-        icon={<UserPlus size={18} />}
+        onClose={() => {
+          setShowAddForm(false);
+          setEditingStudentId(null);
+        }}
+        title={editingStudentId ? "Edit Student & Parent Details" : "New Student & Parent Enrollment"}
+        icon={editingStudentId ? <Edit size={18} /> : <UserPlus size={18} />}
         size="lg"
       >
         <form onSubmit={handleOnboard} className="space-y-6">
@@ -1185,8 +1278,8 @@ export default function StudentRegistryPage() {
               disabled={loading}
               className="w-full py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all mt-4 flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
-              <span>Link Profiles & Register Admission Record</span>
+              {loading ? <Loader2 className="animate-spin" size={16} /> : (editingStudentId ? <Edit size={16} /> : <UserPlus size={16} />)}
+              <span>{editingStudentId ? 'Save Student & Parent Changes' : 'Link Profiles & Register Admission Record'}</span>
             </button>
           </form>
       </Modal>
@@ -1358,13 +1451,24 @@ export default function StudentRegistryPage() {
                     {getParentContact(student.parent_id)}
                   </td>
                   <td className="py-4 text-right pr-2">
-                    <button 
-                      onClick={() => setSelectedStudentForDossier(student)}
-                      className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
-                      title="Student Documents & Dossier"
-                    >
-                      <FileText size={14} />
-                    </button>
+                    <div className="flex justify-end gap-1.5">
+                      {isAdmin && (
+                        <button 
+                          onClick={() => handleOpenEditForm(student)}
+                          className="p-1.5 text-text-secondary hover:text-accent rounded-lg hover:bg-slate-100 transition-all"
+                          title="Edit Student & Parent Details"
+                        >
+                          <Edit size={14} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setSelectedStudentForDossier(student)}
+                        className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
+                        title="Student Documents & Dossier"
+                      >
+                        <FileText size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
