@@ -2,11 +2,11 @@
 
 import RoleGate from '@/components/RoleGate';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Wallet, Search, CreditCard, CheckCircle2, 
-  ArrowRight, Plus, Receipt, Landmark, HelpCircle, ShieldCheck, Download, AlertCircle, BellRing,
-  Trash2, Edit3, Bus, Home as HomeIcon, ChevronDown, ChevronUp, Eye, X, Filter, Printer
+  ArrowRight, Plus, Receipt, Landmark, ShieldCheck, Download, AlertCircle, BellRing,
+  Trash2, Edit3, Bus, Home as HomeIcon, Eye, X, Printer, Bell, Building2, User
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ export default function FinanceFeesPage() {
   const {
     activeTenant, 
     sharedStudents, 
+    sharedParents,
     sharedFeeRecords, 
     setSharedFeeRecords,
     sharedClasses,
@@ -25,7 +26,10 @@ export default function FinanceFeesPage() {
     setSharedStudentFeeAddons,
     sharedTransportRoutes,
     sharedHostelBlocks,
-    activeRole
+    sharedNotices,
+    setSharedNotices,
+    activeRole,
+    activeUser
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState('overview');
@@ -35,6 +39,16 @@ export default function FinanceFeesPage() {
   const [paymentMethod, setPaymentMethod] = useState('Razorpay UPI');
   const [classFilter, setClassFilter] = useState('all');
   
+  // Collect Fee modal quick-search
+  const [showCollectModal, setShowCollectModal] = useState(false);
+  const [collectSearch, setCollectSearch] = useState('');
+  const [collectClassFilter, setCollectClassFilter] = useState('all');
+
+  // Receipt modal
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [lastReceipt, setLastReceipt] = useState(null);
+  const receiptRef = useRef(null);
+
   // Fee structure form
   const [showAddStructure, setShowAddStructure] = useState(false);
   const [newStructure, setNewStructure] = useState({ class_id: '', name: '', code: '', amount: '', period: 'Per Term', type: 'Academic' });
@@ -152,12 +166,28 @@ export default function FinanceFeesPage() {
     const newPaid = currentFee.paid + payAmt;
     const newRemaining = currentFee.total - newPaid;
     const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
-    
+    const student = sharedStudents.find(s => s.id === selectedStudentId);
+    const now = new Date();
+    const receiptId = `RCPT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
     const receipt = {
-      id: `rcpt-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: new Date().toISOString().split('T')[0],
+      id: receiptId,
+      date: now.toISOString().split('T')[0],
+      dateDisplay: dateStr,
+      time: timeStr,
       amount: payAmt,
-      method: paymentMethod
+      method: paymentMethod,
+      studentName: `${student.first_name} ${student.last_name}`,
+      admissionNo: student.admission_no,
+      className: getClassName(student.class_id),
+      schoolName: activeTenant.name,
+      totalFee: currentFee.total,
+      newPaid,
+      newRemaining,
+      newStatus,
+      collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier'
     };
 
     setSharedFeeRecords(prev => ({
@@ -167,15 +197,37 @@ export default function FinanceFeesPage() {
         paid: newPaid,
         remaining: newRemaining,
         status: newStatus,
-        history: [receipt, ...currentFee.history]
+        history: [{ id: receiptId, date: receipt.date, amount: payAmt, method: paymentMethod }, ...currentFee.history]
       }
     }));
 
-    const student = sharedStudents.find(s => s.id === selectedStudentId);
-    toast.success(`Receipt ${receipt.id} generated! ₹${payAmt.toLocaleString('en-IN')} credited for ${student.first_name} ${student.last_name}.`);
-    
+    // ---- Notifications ----
+    const notifBase = { date: dateStr, author: `Fee Counter — ${activeTenant.name}`, tenant_id: activeTenant.id };
+    const parent = sharedParents?.find(p => p.id === student.parent_id && p.tenant_id === activeTenant.id);
+
+    // Toast chain: Admin → Student → Parent
+    toast.success(`✅ Receipt ${receiptId} generated! ₹${payAmt.toLocaleString('en-IN')} collected from ${student.first_name} ${student.last_name}.`);
+    setTimeout(() => toast.info(`📨 School Admin notified: Fee of ₹${payAmt.toLocaleString('en-IN')} received for ${student.first_name}.`), 600);
+    setTimeout(() => toast.success(`📲 Notification sent to student: ${student.first_name} — Payment of ₹${payAmt.toLocaleString('en-IN')} confirmed!`), 1200);
+    if (parent) setTimeout(() => toast.success(`👨‍👩‍👧 Parent (${parent.first_name} ${parent.last_name}) notified of fee payment.`), 1800);
+
+    // Add to shared notices board
+    if (setSharedNotices) {
+      setSharedNotices(prev => [{
+        id: Date.now(),
+        title: `Fee Receipt: ${student.first_name} ${student.last_name}`,
+        body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} collected via ${paymentMethod}. Balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
+        ...notifBase
+      }, ...prev]);
+    }
+
+    // Show receipt
+    setLastReceipt(receipt);
+    setShowReceiptModal(true);
+    setShowCollectModal(false);
     setPaymentAmount('');
     setSelectedStudentId(null);
+    setCollectSearch('');
   };
 
   const handleCreateFeeStructure = (e) => {
@@ -317,6 +369,22 @@ export default function FinanceFeesPage() {
     toast.success('Compiling campus financial ledger. PDF report download started!');
   };
 
+  // Quick collect filtered students
+  const collectFilteredStudents = useMemo(() => {
+    const term = collectSearch.toLowerCase();
+    return tenantStudents.filter(s => {
+      const className = getClassName(s.class_id).toLowerCase();
+      const matchSearch = !term ||
+        s.first_name.toLowerCase().includes(term) ||
+        s.last_name.toLowerCase().includes(term) ||
+        s.admission_no.toLowerCase().includes(term) ||
+        className.includes(term);
+      const matchClass = collectClassFilter === 'all' || s.class_id === collectClassFilter;
+      const hasDues = (sharedFeeRecords[s.id]?.remaining || 0) > 0;
+      return matchSearch && matchClass && hasDues;
+    });
+  }, [tenantStudents, collectSearch, collectClassFilter, sharedFeeRecords]);
+
   return (
     <div className="space-y-8 animate-slide-up">
       {/* Header */}
@@ -338,15 +406,7 @@ export default function FinanceFeesPage() {
           </button>
           
           <button 
-            onClick={() => {
-              setActiveTab('overview');
-              if (tenantStudents.length > 0) {
-                setSelectedStudentId(tenantStudents[0].id);
-                const fee = sharedFeeRecords[tenantStudents[0].id];
-                if (fee) setPaymentAmount(fee.remaining);
-              }
-              toast.info('Select a student to record payment.');
-            }}
+            onClick={() => { setShowCollectModal(true); setCollectSearch(''); setCollectClassFilter('all'); setSelectedStudentId(null); setPaymentAmount(''); }}
             className="px-5 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
           >
             <CreditCard size={14} />
@@ -557,55 +617,7 @@ export default function FinanceFeesPage() {
                 )}
               </div>
 
-              {/* Collect Payment Modal */}
-              <Modal
-                open={!!selectedStudentId}
-                onClose={() => { setSelectedStudentId(null); setPaymentAmount(''); }}
-                title={`Record Payment: ${sharedStudents.find(s => s.id === selectedStudentId)?.first_name || ''} ${sharedStudents.find(s => s.id === selectedStudentId)?.last_name || ''}`}
-                icon={<Receipt size={16} />}
-                size="md"
-              >
-                {selectedStudentId && (
-                  <form onSubmit={handleCollectPayment} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Amount (₹) *</label>
-                        <input 
-                          type="number" 
-                          placeholder="e.g. 5000"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="w-full text-xs font-mono"
-                          max={sharedFeeRecords[selectedStudentId]?.remaining || 0}
-                          min={1}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Payment Method *</label>
-                        <select 
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="w-full text-xs bg-bg-sidebar text-text-primary"
-                        >
-                          <option value="Razorpay UPI">Razorpay UPI Gateway</option>
-                          <option value="Cash Counter">Cash Counter Receipt</option>
-                          <option value="RTGS Bank Transfer">RTGS / NEFT Bank Transfer</option>
-                          <option value="Demand Draft">Demand Draft (DD)</option>
-                          <option value="Cheque">Cheque Deposit</option>
-                        </select>
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-                    >
-                      <Receipt size={14} />
-                      <span>Settle Dues & Issue Receipt</span>
-                    </button>
-                  </form>
-                )}
-              </Modal>
+              {/* (Collect Fee modal moved to top-level) */}
             </div>
           </div>
 
@@ -1080,6 +1092,265 @@ export default function FinanceFeesPage() {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* ===== COLLECT FEE MODAL (with quick search + class filter) ===== */}
+      <Modal
+        open={showCollectModal}
+        onClose={() => { setShowCollectModal(false); setSelectedStudentId(null); setPaymentAmount(''); }}
+        title="Collect Fee Payment"
+        icon={<CreditCard size={16} />}
+        size="lg"
+      >
+        <div className="space-y-5">
+          {/* Step 1: Search + Select Student */}
+          {!selectedStudentId ? (
+            <div className="space-y-4">
+              <p className="text-[11px] text-text-secondary">Search for a student with pending dues to collect payment.</p>
+
+              {/* Quick Search + Class Filter */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Name, Admission No..."
+                    value={collectSearch}
+                    onChange={e => setCollectSearch(e.target.value)}
+                    autoFocus
+                    className="w-full text-xs pl-10 py-3 bg-bg-sidebar border border-border rounded-xl outline-none focus:border-accent/40 text-text-primary placeholder:text-text-secondary"
+                  />
+                </div>
+                <select
+                  value={collectClassFilter}
+                  onChange={e => setCollectClassFilter(e.target.value)}
+                  className="text-xs bg-bg-main text-text-primary py-3 px-4 rounded-xl border border-border"
+                >
+                  <option value="all">All Classes</option>
+                  {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Student list with dues */}
+              <div className="space-y-2 max-h-[45vh] overflow-y-auto custom-scrollbar pr-1">
+                {collectFilteredStudents.map(s => {
+                  const fee = sharedFeeRecords[s.id] || {};
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => { setSelectedStudentId(s.id); setPaymentAmount(fee.remaining || ''); }}
+                      className="w-full p-4 bg-bg-main border border-border hover:border-accent/40 hover:bg-accent/5 rounded-2xl flex items-center justify-between gap-4 text-left transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black shrink-0">
+                          {s.first_name[0]}{s.last_name[0]}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-text-primary">{s.first_name} {s.last_name}</p>
+                          <p className="text-[9px] text-text-secondary">{getClassName(s.class_id)} &bull; {s.admission_no}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-black text-warning font-mono">Due: ₹{(fee.remaining || 0).toLocaleString('en-IN')}</p>
+                        <p className="text-[9px] text-success font-mono">Paid: ₹{(fee.paid || 0).toLocaleString('en-IN')}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+                {collectFilteredStudents.length === 0 && (
+                  <div className="text-center py-8">
+                    <CheckCircle2 size={28} className="text-success/40 mx-auto mb-2" />
+                    <p className="text-xs text-text-secondary">{collectSearch || collectClassFilter !== 'all' ? 'No matching students with dues found.' : 'All fees are settled! No pending dues.'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (() => {
+            /* Step 2: Record Payment */
+            const stud = sharedStudents.find(s => s.id === selectedStudentId);
+            const fee = sharedFeeRecords[selectedStudentId] || {};
+            return (
+              <div className="space-y-4">
+                {/* Student context chip */}
+                <div className="p-4 bg-accent/5 border border-accent/20 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center text-accent text-[11px] font-black">
+                      {stud?.first_name[0]}{stud?.last_name[0]}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-text-primary">{stud?.first_name} {stud?.last_name}</p>
+                      <p className="text-[9px] text-text-secondary">{getClassName(stud?.class_id)} &bull; {stud?.admission_no}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setSelectedStudentId(null); setPaymentAmount(''); }} className="text-[10px] text-text-secondary hover:text-accent font-bold underline">
+                    Change
+                  </button>
+                </div>
+
+                {/* Fee summary */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { label: 'Total Fee', val: `₹${(fee.total || 0).toLocaleString('en-IN')}`, color: 'text-text-primary' },
+                    { label: 'Already Paid', val: `₹${(fee.paid || 0).toLocaleString('en-IN')}`, color: 'text-success' },
+                    { label: 'Outstanding', val: `₹${(fee.remaining || 0).toLocaleString('en-IN')}`, color: 'text-warning' },
+                  ].map((item, i) => (
+                    <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
+                      <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
+                      <p className={`text-sm font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <form onSubmit={handleCollectPayment} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Amount to Collect (₹) *</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5000"
+                        value={paymentAmount}
+                        onChange={e => setPaymentAmount(e.target.value)}
+                        className="w-full text-xs font-mono"
+                        max={fee.remaining || 0}
+                        min={1}
+                        required
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Method *</label>
+                      <select
+                        value={paymentMethod}
+                        onChange={e => setPaymentMethod(e.target.value)}
+                        className="w-full text-xs bg-bg-sidebar text-text-primary"
+                      >
+                        <option value="Razorpay UPI">Razorpay UPI Gateway</option>
+                        <option value="Cash Counter">Cash Counter Receipt</option>
+                        <option value="RTGS Bank Transfer">RTGS / NEFT Bank Transfer</option>
+                        <option value="Demand Draft">Demand Draft (DD)</option>
+                        <option value="Cheque">Cheque Deposit</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Notification recipients */}
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl space-y-1.5">
+                    <p className="text-[9px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1"><Bell size={10} /> Notifications will be sent to</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { icon: Building2, label: 'School Admin' },
+                        { icon: User, label: `Student: ${stud?.first_name}` },
+                        { icon: User, label: 'Parent / Guardian' },
+                      ].map((r, i) => (
+                        <span key={i} className="flex items-center gap-1 text-[9px] font-bold text-blue-600 bg-white border border-blue-200 px-2 py-1 rounded-lg">
+                          <r.icon size={9} />{r.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-success hover:bg-success/90 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                  >
+                    <Receipt size={14} />
+                    <span>Collect & Generate Receipt</span>
+                  </button>
+                </form>
+              </div>
+            );
+          })()}
+        </div>
+      </Modal>
+
+      {/* ===== RECEIPT MODAL ===== */}
+      <Modal
+        open={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        title="Payment Receipt"
+        icon={<Receipt size={16} />}
+        size="md"
+      >
+        {lastReceipt && (
+          <div className="space-y-5">
+            {/* Printable receipt card */}
+            <div ref={receiptRef} className="p-6 border-2 border-dashed border-border rounded-2xl space-y-4 bg-white">
+              {/* Header */}
+              <div className="text-center space-y-1 border-b border-border pb-4">
+                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Official Fee Receipt</p>
+                <h3 className="text-lg font-black font-outfit text-text-primary">{lastReceipt.schoolName}</h3>
+                <p className="text-[10px] text-success font-black">✓ Payment Confirmed</p>
+              </div>
+
+              {/* Receipt details grid */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                {[
+                  { label: 'Receipt No.', val: lastReceipt.id, mono: true },
+                  { label: 'Date & Time', val: `${lastReceipt.dateDisplay} ${lastReceipt.time}` },
+                  { label: 'Student Name', val: lastReceipt.studentName, bold: true },
+                  { label: 'Admission No.', val: lastReceipt.admissionNo, mono: true },
+                  { label: 'Class', val: lastReceipt.className },
+                  { label: 'Payment Mode', val: lastReceipt.method },
+                  { label: 'Collected By', val: lastReceipt.collectedBy },
+                  { label: 'Status', val: lastReceipt.newStatus },
+                ].map((row, i) => (
+                  <div key={i}>
+                    <p className="text-[9px] text-text-secondary uppercase tracking-widest">{row.label}</p>
+                    <p className={`text-text-primary mt-0.5 ${row.bold ? 'font-bold' : ''} ${row.mono ? 'font-mono' : ''}`}>{row.val}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Amount box */}
+              <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-text-secondary uppercase tracking-widest">Amount Collected</p>
+                <p className="text-3xl font-black font-outfit text-success mt-1">₹{lastReceipt.amount.toLocaleString('en-IN')}</p>
+              </div>
+
+              {/* Balance summary */}
+              <div className="flex justify-between text-[11px] font-mono border-t border-border pt-3">
+                <span className="text-text-secondary">Total Fee: ₹{lastReceipt.totalFee.toLocaleString('en-IN')}</span>
+                <span className="text-success font-bold">Paid: ₹{lastReceipt.newPaid.toLocaleString('en-IN')}</span>
+                <span className={lastReceipt.newRemaining > 0 ? 'text-warning font-bold' : 'text-success font-bold'}>
+                  {lastReceipt.newRemaining > 0 ? `Due: ₹${lastReceipt.newRemaining.toLocaleString('en-IN')}` : 'CLEARED'}
+                </span>
+              </div>
+
+              <p className="text-[9px] text-center text-text-secondary opacity-50">This is a computer-generated receipt and does not require a signature.</p>
+            </div>
+
+            {/* Notification confirmation */}
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl space-y-1.5">
+              <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1"><Bell size={10} /> Notifications Dispatched</p>
+              <div className="flex flex-wrap gap-2">
+                {['School Admin', `Student: ${lastReceipt.studentName.split(' ')[0]}`, 'Parent / Guardian'].map((r, i) => (
+                  <span key={i} className="flex items-center gap-1 text-[9px] font-bold text-success bg-success/10 border border-success/20 px-2 py-1 rounded-lg">
+                    <CheckCircle2 size={9} />{r}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200/60 border border-border text-text-primary text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                <Printer size={14} />
+                <span>Print Receipt</span>
+              </button>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="flex-1 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Manage Add-ons Modal */}
