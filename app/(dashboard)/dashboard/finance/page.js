@@ -1481,6 +1481,8 @@ export default function FinanceFeesPage() {
                   <span className="text-[10px] text-slate-700 font-medium italic">Rupees {numberToWords(lastReceipt.amount)} Only</span>
                 </div>
 
+
+
                 {/* ── Signature Section ── */}
                 <div className="grid grid-cols-3 gap-6 pt-4">
                   {[
@@ -1489,7 +1491,18 @@ export default function FinanceFeesPage() {
                     { label: 'Principal / Authorised Signatory', sub: lastReceipt.schoolName },
                   ].map((sig, i) => (
                     <div key={i} className="text-center space-y-2">
-                      <div className="h-14 border-b-2 border-slate-300 border-dashed" />
+                      <div className="h-14 border-b-2 border-slate-300 border-dashed flex items-end justify-center pb-1 relative">
+                        {sig.label === 'Cashier / Accountant' && (
+                          <span className="text-2xl text-blue-600 font-bold select-none transform -rotate-2 tracking-wide font-signature block" style={{ fontFamily: 'var(--font-caveat), cursive' }}>
+                            {sig.sub}
+                          </span>
+                        )}
+                        {sig.label === 'Principal / Authorised Signatory' && (
+                          <span className="text-xl text-slate-700 font-bold select-none absolute bottom-1 font-signature opacity-80" style={{ fontFamily: 'var(--font-caveat), cursive' }}>
+                            {sig.sub.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        )}
+                      </div>
                       <div>
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{sig.label}</p>
                         <p className="text-[8px] text-slate-400 mt-0.5 truncate">{sig.sub}</p>
