@@ -47,12 +47,7 @@ export default function CertificateGeneratorPage() {
 
   const certificateRef = useRef(null);
 
-  // Authenticate role
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'];
-  if (!allowedRoles.includes(activeRole)) {
-    return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Certificate Hub" />;
-  }
-
+  const allowedRoles = useMemo(() => ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'], []);
   const isAdminOrTeacher = activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'TEACHER';
 
   // Helper: Get class name
@@ -114,6 +109,11 @@ export default function CertificateGeneratorPage() {
     const admPart = currentStudent.admission_no.split('/').pop() || currentStudent.id;
     return `${initials}/2026/${typeCode}/${admPart}`;
   }, [currentStudent, certType, activeTenant.subdomain]);
+
+  // Authenticate role AFTER hooks are declared
+  if (!allowedRoles.includes(activeRole)) {
+    return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Certificate Hub" />;
+  }
 
   const handlePrint = () => {
     if (!selectedStudentId) {
