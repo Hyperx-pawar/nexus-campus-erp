@@ -5,11 +5,13 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState } from 'react';
 import { 
   Library, Search, Plus, BookOpen, UserCheck, Wallet, 
-  CheckCircle2, ShieldCheck, ArrowRight, Book, Receipt, Trash2, Calendar, BellRing
+  CheckCircle2, ShieldCheck, ArrowRight, Book, Receipt, Trash2, Calendar, BellRing,
+  FileSpreadsheet, Globe, RefreshCw, Upload
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Modal from '@/components/Modal';
+import * as XLSX from 'xlsx';
 
 export default function LibraryPage() {
   const {
@@ -29,6 +31,13 @@ export default function LibraryPage() {
   const [showAddBookModal, setShowAddBookModal] = useState(false);
   const [showIssueBookModal, setShowIssueBookModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Catalog book addition modes and states
+  const [addMode, setAddMode] = useState('manual'); // 'manual' | 'digital'
+  const [isbnQuery, setIsbnQuery] = useState('');
+  const [fetchingIsbn, setFetchingIsbn] = useState(false);
+  const [parsedBooks, setParsedBooks] = useState([]);
+  const [csvText, setCsvText] = useState('');
   
   // Form states
   const [newBook, setNewBook] = useState({ title: '', author: '', category: 'Physics', isbn: '', stock: 5 });
@@ -111,6 +120,127 @@ export default function LibraryPage() {
     setSharedBooks([...sharedBooks, created]);
     toast.success(`Book "${newBook.title}" added to the library catalog!`);
     setNewBook({ title: '', author: '', category: 'Physics', isbn: '', stock: 5 });
+    setShowAddBookModal(false);
+  };
+
+  // Digital ISBN Lookup Handler
+  const handleIsbnLookup = async () => {
+    if (!isbnQuery.trim()) {
+      toast.error('Please enter a valid ISBN code.');
+      return;
+    }
+    const cleanIsbn = isbnQuery.trim().replace(/-/g, '');
+    setFetchingIsbn(true);
+    toast.loading(`Querying digital library for ISBN ${cleanIsbn}...`);
+
+    try {
+      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanIsbn}&format=json&jscmd=data`);
+      const data = await res.json();
+      toast.dismiss();
+
+      const key = `ISBN:${cleanIsbn}`;
+      if (data && data[key]) {
+        const info = data[key];
+        const title = info.title || '';
+        const author = info.authors && info.authors.length > 0 ? info.authors[0].name : 'Unknown Author';
+        
+        setNewBook({
+          title,
+          author,
+          category: 'Physics',
+          isbn: cleanIsbn,
+          stock: 5
+        });
+        setAddMode('manual');
+        toast.success(`Book details loaded successfully!`);
+      } else {
+        const mocks = {
+          '9788177091878': { title: 'Concepts of Physics (Vol I & II)', author: 'Dr. H.C. Verma', category: 'Physics' },
+          '9788193328491': { title: 'Higher Engineering Mathematics', author: 'Dr. B.S. Grewal', category: 'Mathematics' },
+          '9788122413557': { title: 'Modern Organic Chemistry Practicals', author: 'Prof. R.K. Bansal', category: 'Chemistry' }
+        };
+        if (mocks[cleanIsbn]) {
+          setNewBook({
+            title: mocks[cleanIsbn].title,
+            author: mocks[cleanIsbn].author,
+            category: mocks[cleanIsbn].category,
+            isbn: cleanIsbn,
+            stock: 5
+          });
+          setAddMode('manual');
+          toast.success(`Demo book loaded successfully!`);
+        } else {
+          toast.error(`ISBN not found. Switched to manual form so you can fill details.`);
+          setNewBook(prev => ({ ...prev, isbn: cleanIsbn }));
+          setAddMode('manual');
+        }
+      }
+    } catch (err) {
+      toast.dismiss();
+      toast.error('Network lookup failed. Please enter details manually.');
+      setNewBook(prev => ({ ...prev, isbn: cleanIsbn }));
+      setAddMode('manual');
+    } finally {
+      setFetchingIsbn(false);
+    }
+  };
+
+  // Excel / CSV File parser for library catalog
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        if (data.length <= 1) {
+          toast.error('Excel sheet is empty or contains no records.');
+          return;
+        }
+
+        const rows = data.slice(1);
+        const imported = rows.map((r, i) => {
+          return {
+            id: `book-parsed-${Date.now()}-${i}`,
+            title: r[0] || '',
+            author: r[1] || 'Unknown Author',
+            category: r[2] || 'Physics',
+            isbn: String(r[3] || `ISBN-MOCK-${Date.now()}-${i}`),
+            stock: Number(r[4]) || 5
+          };
+        }).filter(b => b.title);
+
+        setParsedBooks(imported);
+        toast.success(`Successfully parsed ${imported.length} book records!`);
+      } catch (err) {
+        toast.error('Error reading Excel spreadsheet.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Bulk import parsed list
+  const handleImportParsedBooks = () => {
+    if (parsedBooks.length === 0) {
+      toast.error('No parsed books to import.');
+      return;
+    }
+    
+    const formatted = parsedBooks.map(b => ({
+      ...b,
+      id: `book-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      tenant_id: activeTenant.id
+    }));
+
+    setSharedBooks([...sharedBooks, ...formatted]);
+    toast.success(`Bulk imported ${formatted.length} books to the library catalog!`);
+    setParsedBooks([]);
     setShowAddBookModal(false);
   };
 
@@ -367,78 +497,211 @@ export default function LibraryPage() {
       {/* Catalog Book Modal */}
       <Modal
         open={showAddBookModal}
-        onClose={() => setShowAddBookModal(false)}
+        onClose={() => {
+          setShowAddBookModal(false);
+          setParsedBooks([]);
+          setIsbnQuery('');
+        }}
         title="Catalog New Volume"
         icon={<Book size={18} />}
         size="md"
       >
-        <form onSubmit={handleAddBook} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Volume Title *</label>
-            <input 
-              type="text" 
-              placeholder="Volume Title"
-              value={newBook.title}
-              onChange={(e) => setNewBook({...newBook, title: e.target.value})}
-              className="w-full text-xs"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Author Name *</label>
-            <input 
-              type="text" 
-              placeholder="Author Name"
-              value={newBook.author}
-              onChange={(e) => setNewBook({...newBook, author: e.target.value})}
-              className="w-full text-xs"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Category Subject</label>
-            <select
-              value={newBook.category}
-              onChange={(e) => setNewBook({...newBook, category: e.target.value})}
-              className="w-full bg-bg-main border border-border rounded-xl py-3 px-3 text-xs text-text-primary"
-            >
-              <option value="Physics">Physics (Science)</option>
-              <option value="Chemistry">Chemistry (Science)</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="Commerce">Commerce & Accounts</option>
-              <option value="Literature">Literature & Language</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">ISBN Identifiers *</label>
-            <input 
-              type="text" 
-              placeholder="ISBN barcoded identifier"
-              value={newBook.isbn}
-              onChange={(e) => setNewBook({...newBook, isbn: e.target.value})}
-              className="w-full text-xs font-mono"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Initial Stock Count *</label>
-            <input 
-              type="number" 
-              placeholder="Initial Stock Count"
-              value={newBook.stock}
-              onChange={(e) => setNewBook({...newBook, stock: e.target.value})}
-              className="w-full text-xs font-mono"
-              required
-            />
-          </div>
-          <button 
-            type="submit"
-            className="w-full py-4 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-4"
+        {/* Toggle buttons for addMode */}
+        <div className="flex gap-2 p-1 bg-slate-100/50 border border-border rounded-2xl mb-5 w-full">
+          <button
+            type="button"
+            onClick={() => setAddMode('manual')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              addMode === 'manual' 
+                ? 'bg-slate-200/60 text-text-primary border border-border shadow-sm' 
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
           >
-            <Plus size={14} />
-            <span>Catalog Volume</span>
+            Manual Entry Form
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setAddMode('digital')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              addMode === 'digital' 
+                ? 'bg-slate-200/60 text-text-primary border border-border shadow-sm' 
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Digital Catalog Tools
+          </button>
+        </div>
+
+        {addMode === 'manual' ? (
+          <form onSubmit={handleAddBook} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Volume Title *</label>
+              <input 
+                type="text" 
+                placeholder="Volume Title"
+                value={newBook.title}
+                onChange={(e) => setNewBook({...newBook, title: e.target.value})}
+                className="w-full text-xs"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Author Name *</label>
+              <input 
+                type="text" 
+                placeholder="Author Name"
+                value={newBook.author}
+                onChange={(e) => setNewBook({...newBook, author: e.target.value})}
+                className="w-full text-xs"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Category Subject</label>
+              <select
+                value={newBook.category}
+                onChange={(e) => setNewBook({...newBook, category: e.target.value})}
+                className="w-full bg-bg-main border border-border rounded-xl py-3 px-3 text-xs text-text-primary"
+              >
+                <option value="Physics">Physics (Science)</option>
+                <option value="Chemistry">Chemistry (Science)</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Commerce">Commerce & Accounts</option>
+                <option value="Literature">Literature & Language</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">ISBN Identifiers *</label>
+              <input 
+                type="text" 
+                placeholder="ISBN barcoded identifier"
+                value={newBook.isbn}
+                onChange={(e) => setNewBook({...newBook, isbn: e.target.value})}
+                className="w-full text-xs font-mono"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Initial Stock Count *</label>
+              <input 
+                type="number" 
+                placeholder="Initial Stock Count"
+                value={newBook.stock}
+                onChange={(e) => setNewBook({...newBook, stock: e.target.value})}
+                className="w-full text-xs font-mono"
+                required
+              />
+            </div>
+            <button 
+              type="submit"
+              className="w-full py-4 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-4"
+            >
+              <Plus size={14} />
+              <span>Catalog Volume</span>
+            </button>
+          </form>
+        ) : (
+          <div className="space-y-6">
+            {/* ISBN Lookup */}
+            <div className="p-5 border border-border rounded-2xl bg-bg-main/30 space-y-3">
+              <div className="flex items-center gap-2 text-text-primary">
+                <Globe size={16} className="text-accent animate-pulse" />
+                <h4 className="text-xs font-bold">1. Digital ISBN Metadata Fetcher</h4>
+              </div>
+              <p className="text-[10px] text-text-secondary leading-relaxed">
+                Enter a 10 or 13 digit ISBN code. The system will query open digital databases to fetch title, author, and catalog information automatically.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. 9788177091878"
+                  value={isbnQuery}
+                  onChange={(e) => setIsbnQuery(e.target.value)}
+                  className="flex-1 text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleIsbnLookup}
+                  disabled={fetchingIsbn}
+                  className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0"
+                >
+                  {fetchingIsbn ? <RefreshCw className="animate-spin" size={12} /> : <Search size={12} />}
+                  <span>Fetch Details</span>
+                </button>
+              </div>
+              <p className="text-[9px] text-text-secondary">
+                Try: <span className="font-mono text-accent cursor-pointer" onClick={() => setIsbnQuery('978-8177091878')}>978-8177091878</span> (Physics) or <span className="font-mono text-accent cursor-pointer" onClick={() => setIsbnQuery('978-8193328491')}>978-8193328491</span> (Maths).
+              </p>
+            </div>
+
+            {/* Excel spreadsheet upload */}
+            <div className="p-5 border border-border rounded-2xl bg-bg-main/30 space-y-4">
+              <div className="flex items-center gap-2 text-text-primary">
+                <FileSpreadsheet size={16} className="text-success" />
+                <h4 className="text-xs font-bold">2. Excel/CSV Catalog Spreadsheet Parser</h4>
+              </div>
+              <p className="text-[10px] text-text-secondary leading-relaxed">
+                Upload a spreadsheet table containing book records. Columns: <strong>Title, Author, Category, ISBN, Stock</strong>.
+              </p>
+              
+              <input
+                type="file"
+                id="library-excel-input"
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleFileUpload}
+              />
+              
+              <div
+                onClick={() => document.getElementById('library-excel-input')?.click()}
+                className="border border-dashed border-border rounded-xl p-6 text-center hover:border-accent/30 transition-all cursor-pointer bg-slate-50/50"
+              >
+                <Upload size={20} className="mx-auto mb-2 text-text-secondary" />
+                <span className="text-[10px] text-text-secondary font-bold block">Choose Excel or CSV sheet</span>
+                <span className="text-[9px] text-text-secondary opacity-60">Reads first sheet, header row ignored</span>
+              </div>
+
+              {parsedBooks.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-text-primary">{parsedBooks.length} records parsed:</span>
+                    <button
+                      type="button"
+                      onClick={() => setParsedBooks([])}
+                      className="text-[9px] text-danger hover:underline font-bold"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  
+                  <div className="max-h-36 overflow-y-auto border border-border rounded-xl text-[10px] divide-y divide-border bg-white custom-scrollbar">
+                    {parsedBooks.map((b, idx) => (
+                      <div key={idx} className="p-2.5 flex justify-between gap-4">
+                        <div className="min-w-0">
+                          <span className="font-bold text-text-primary truncate block">{b.title}</span>
+                          <span className="text-text-secondary text-[9px] block">Author: {b.author} | Category: {b.category}</span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono text-text-secondary block">ISBN: {b.isbn}</span>
+                          <span className="font-bold text-text-primary block">Stock: {b.stock}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleImportParsedBooks}
+                    className="w-full py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Import Parsed Books ({parsedBooks.length})</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Issue Book Modal */}

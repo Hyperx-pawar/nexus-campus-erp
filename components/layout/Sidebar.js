@@ -27,7 +27,8 @@ import {
   MapPin,
   TrendingUp,
   Award,
-  CreditCard
+  CreditCard,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 
@@ -46,7 +47,6 @@ const sidebarLinks = [
       { name: 'Staff Directory', icon: UserSquare2, href: '/dashboard/staff', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'Daily Attendance', icon: CheckCircle, href: '/dashboard/attendance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
       { name: 'Syllabus & LMS', icon: BookOpen, href: '/dashboard/courses', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
-      { name: 'Classes & Subjects', icon: BookOpen, href: '/dashboard/courses?tab=classes', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'Exams & Marksheets', icon: ClipboardList, href: '/dashboard/exams', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
       { name: 'Timetable', icon: Calendar, href: '/dashboard/timetable', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
     ]
@@ -58,6 +58,7 @@ const sidebarLinks = [
       { name: 'Hostels & Boarding', icon: Home, href: '/dashboard/hostel', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'HOSTEL_WARDEN', 'STUDENT'] },
       { name: 'School Bus & Transport', icon: Bus, href: '/dashboard/transport', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT'] },
       { name: 'ID Card Generator', icon: CreditCard, href: '/dashboard/idcards', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
+      { name: 'Certificate Hub', icon: FileText, href: '/dashboard/certificates', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
       { name: 'Career Portal (Placements)', icon: Briefcase, href: '/dashboard/placement', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'TEACHER'] },
       { name: 'Online Admissions', icon: Award, href: '/dashboard/admissions', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
     ]

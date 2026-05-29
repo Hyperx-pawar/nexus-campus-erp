@@ -5,11 +5,40 @@ import {
   Users, BookOpen, Calendar, ClipboardList, Library, Home, Bus, 
   Briefcase, Wallet, FileBox, Settings, Activity, CheckCircle2, 
   Clock, Plus, ArrowRight, ShieldCheck, Star, Sparkles, BookOpenCheck,
-  AlertTriangle, CreditCard, ChevronRight, UserCheck, Megaphone, Package
+  AlertTriangle, CreditCard, ChevronRight, UserCheck, Megaphone, Package,
+  BellRing, Receipt, Printer
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import Modal from '@/components/Modal';
+
+// ── Number → Words helper (Indian system) ──────────────────────────────────
+const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function numToWords(n) {
+  if (n === 0) return 'Zero';
+  if (n < 0) return 'Minus ' + numToWords(-n);
+  let words = '';
+  if (n >= 10000000) { words += numToWords(Math.floor(n / 10000000)) + ' Crore '; n %= 10000000; }
+  if (n >= 100000)   { words += numToWords(Math.floor(n / 100000)) + ' Lakh '; n %= 100000; }
+  if (n >= 1000)     { words += numToWords(Math.floor(n / 1000)) + ' Thousand '; n %= 1000; }
+  if (n >= 100)      { words += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+  if (n >= 20)       { words += tens[Math.floor(n / 10)] + ' '; n %= 10; }
+  if (n > 0)         { words += ones[n] + ' '; }
+  return words.trim();
+}
+
+function numberToWords(amount) {
+  const rupees = Math.floor(amount);
+  const paise  = Math.round((amount - rupees) * 100);
+  let result = numToWords(rupees);
+  if (paise > 0) result += ` and ${numToWords(paise)} Paise`;
+  return result;
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 // ==========================================
 // 1. TEACHER DASHBOARD
@@ -287,8 +316,17 @@ function ParentDashboard() {
     sharedNotices,
     activeParentId,
     sharedHostelInventoryAllocations,
-    activeTenant
+    activeTenant,
+    sharedNotifications,
+    setSharedNotifications,
+    sharedClasses,
+    sharedFeeStructures,
+    sharedStudentFeeAddons
   } = useAuth();
+
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const receiptRef = React.useRef(null);
 
   // Find simulated parent profile restricted to active tenant
   const tenantParents = sharedParents.filter(p => p.tenant_id === activeTenant.id);
@@ -296,6 +334,53 @@ function ParentDashboard() {
 
   // Find linked children
   const linkedStudents = sharedStudents.filter(s => s.parent_id === (parentProfile?.id || '') && s.tenant_id === activeTenant.id);
+
+  const parentNotifications = React.useMemo(() => {
+    return (sharedNotifications || []).filter(
+      n => n.tenant_id === activeTenant.id && n.recipient_id === (parentProfile?.id || '')
+    );
+  }, [sharedNotifications, activeTenant.id, parentProfile]);
+
+  const handleViewReceiptFromHistory = (child, payment) => {
+    const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
+    const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+    const feeBreakdown = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+    if (addons.transport.enabled && addons.transport.fee > 0) feeBreakdown.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+    if (addons.hostel.enabled && addons.hostel.fee > 0) feeBreakdown.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+
+    const totalFee = classStructures.reduce((sum, fs) => sum + fs.amount, 0) + 
+      (addons.transport.enabled ? addons.transport.fee : 0) + 
+      (addons.hostel.enabled ? addons.hostel.fee : 0);
+
+    const receipt = {
+      id: payment.id,
+      date: payment.date,
+      dateDisplay: new Date(payment.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: '12:00 PM',
+      amount: payment.amount,
+      method: payment.method,
+      studentName: `${child.first_name} ${child.last_name}`,
+      admissionNo: child.admission_no,
+      className: sharedClasses.find(c => c.id === child.class_id)?.name || 'General Class',
+      schoolName: activeTenant.name,
+      totalFee,
+      newPaid: totalFee - (sharedFeeRecords[child.id]?.remaining || 0),
+      newRemaining: sharedFeeRecords[child.id]?.remaining || 0,
+      newStatus: sharedFeeRecords[child.id]?.status || 'PAID',
+      collectedBy: 'Authorized Cashier',
+      schoolAddress: activeTenant.address || '',
+      schoolPhone: activeTenant.phone || '',
+      schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
+      schoolAffiliation: activeTenant.affiliation || '',
+      schoolEstYear: activeTenant.estYear || '',
+      schoolLogo: activeTenant.logo || '',
+      schoolSubdomain: activeTenant.subdomain || '',
+      feeBreakdown
+    };
+
+    setSelectedReceipt(receipt);
+    setShowReceiptModal(true);
+  };
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -319,6 +404,56 @@ function ParentDashboard() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Parent Alert Center */}
+          {parentNotifications.length > 0 && (
+            <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+              <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                <BellRing size={16} className="text-accent animate-bounce" />
+                <span>Real-Time Alerts & Notifications</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {parentNotifications.map((notif) => (
+                  <div 
+                    key={notif.id} 
+                    className={`p-4 border rounded-2xl flex flex-col justify-between gap-3 transition-all ${
+                      notif.type === 'ABSENCE'
+                        ? 'bg-red-50/50 border-red-100 hover:border-red-200 dark:bg-red-950/15 dark:border-red-900/35'
+                        : 'bg-emerald-50/50 border-emerald-100 hover:border-emerald-200 dark:bg-emerald-950/15 dark:border-emerald-900/35'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          notif.type === 'ABSENCE'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        }`}>
+                          {notif.type === 'ABSENCE' ? 'Absent Alert' : 'Payment Alert'}
+                        </span>
+                        <span className="text-[9px] text-text-secondary opacity-50 font-bold font-mono">{notif.date}</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-text-primary mt-2">{notif.title}</h4>
+                      <p className="text-[11px] text-text-secondary mt-1">{notif.body}</p>
+                    </div>
+
+                    {notif.type === 'FEE_PAYMENT' && notif.metadata?.receiptDetails && (
+                      <button
+                        onClick={() => {
+                          setSelectedReceipt(notif.metadata.receiptDetails);
+                          setShowReceiptModal(true);
+                        }}
+                        className="mt-2 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <FileBox size={12} />
+                        <span>View & Print Receipt</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Children Profiles Roster */}
           <div className="space-y-4">
             <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider">Linked Children Profiles</h3>
@@ -422,14 +557,22 @@ function ParentDashboard() {
                         </div>
                       ) : (
                         fees.history.map((h, i) => (
-                          <div key={i} className="p-3.5 bg-bg-main border border-border rounded-xl flex items-center justify-between">
+                          <div 
+                            key={i} 
+                            onClick={() => handleViewReceiptFromHistory(child, h)}
+                            className="p-3.5 bg-bg-main border border-border rounded-xl flex items-center justify-between cursor-pointer hover:border-accent/20 transition-all group/receipt"
+                            title="Click to view and print official receipt"
+                          >
                             <div>
-                              <p className="text-xs font-mono font-bold text-text-primary">Receipt ID: #{h.id}</p>
+                              <p className="text-xs font-mono font-bold text-text-primary group-hover/receipt:text-accent transition-colors">Receipt ID: #{h.id}</p>
                               <span className="text-[9px] text-text-secondary font-semibold">Settled via: {h.method} • {h.date}</span>
                             </div>
-                            <div className="text-right">
-                              <span className="text-sm font-black text-success font-mono">₹{h.amount.toLocaleString('en-IN')}</span>
-                              <span className="text-[8px] bg-success/15 border border-success/35 text-success font-black px-1 rounded ml-1.5 uppercase block mt-0.5">Paid</span>
+                            <div className="text-right flex items-center gap-3">
+                              <div>
+                                <span className="text-sm font-black text-success font-mono">₹{h.amount.toLocaleString('en-IN')}</span>
+                                <span className="text-[8px] bg-success/15 border border-success/35 text-success font-black px-1 rounded ml-1.5 uppercase block mt-0.5 text-center">Paid</span>
+                              </div>
+                              <ChevronRight size={14} className="text-text-secondary opacity-0 group-hover/receipt:opacity-100 group-hover/receipt:translate-x-0.5 transition-all" />
                             </div>
                           </div>
                         ))
@@ -571,6 +714,275 @@ function ParentDashboard() {
           </div>
         </div>
       )}
+
+      {/* ===== RECEIPT MODAL FOR PARENTS ===== */}
+      <style>{`
+        @media print {
+          /* Hide main app shell components */
+          main, aside, header, nav, .no-print, button {
+            display: none !important;
+          }
+          
+          /* Target React Portal backdrop overlay */
+          div[class*="backdrop-blur-md"] {
+            position: absolute !important;
+            inset: 0 !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important;
+            z-index: auto !important;
+          }
+          
+          /* Expand modal card container to cover page */
+          div[class*="bg-bg-card"][class*="rounded-"] {
+            max-width: 100% !important;
+            width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            transform: none !important;
+          }
+          
+          /* Hide modal title header */
+          div[class*="border-b"][class*="flex"][class*="justify-between"] {
+            display: none !important;
+          }
+          
+          /* Expand modal scrollable content wrapper */
+          div[class*="max-h-"][class*="overflow-y-auto"] {
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          /* Reset receipt card container */
+          #fee-receipt-print-root {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+
+      <Modal
+        open={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        title="Official Fee Receipt"
+        icon={<Receipt size={16} />}
+        size="lg"
+      >
+        {selectedReceipt && (
+          <div className="space-y-4 text-black">
+            {/* === PRINTABLE RECEIPT === */}
+            <div
+              id="fee-receipt-print-root"
+              ref={receiptRef}
+              className="print-receipt bg-white border border-slate-200 rounded-2xl overflow-hidden"
+              style={{ fontFamily: "'Outfit', 'Inter', sans-serif" }}
+            >
+              {/* ── Institution Header ── */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-700 text-white px-8 py-6">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Logo + Name */}
+                  <div className="flex items-center gap-4">
+                    {selectedReceipt.schoolLogo ? (
+                      <img src={selectedReceipt.schoolLogo} alt="logo" className="w-16 h-16 rounded-xl object-cover bg-white" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-white text-2xl font-black">
+                        {selectedReceipt.schoolName[0]}
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="text-xl font-black leading-tight">{selectedReceipt.schoolName}</h2>
+                      {selectedReceipt.schoolAffiliation && (
+                        <p className="text-white/70 text-[10px] mt-0.5 font-medium">{selectedReceipt.schoolAffiliation}</p>
+                      )}
+                      {selectedReceipt.schoolEstYear && (
+                        <p className="text-white/50 text-[9px] mt-0.5">Est. {selectedReceipt.schoolEstYear}</p>
+                      )}
+                    </div>
+                  </div>
+                  {/* Receipt label */}
+                  <div className="text-right shrink-0">
+                    <p className="text-white/50 text-[9px] uppercase tracking-widest font-black">Official Receipt</p>
+                    <p className="text-white font-mono font-black text-sm mt-0.5">{selectedReceipt.id}</p>
+                    <p className="text-white/60 text-[10px] mt-0.5">{selectedReceipt.dateDisplay} {selectedReceipt.time}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Institution Contact Strip ── */}
+              <div className="bg-slate-50 border-b border-slate-200 px-8 py-2.5 flex flex-wrap gap-x-6 gap-y-1">
+                {selectedReceipt.schoolAddress && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {selectedReceipt.schoolAddress}
+                  </span>
+                )}
+                {selectedReceipt.schoolPhone && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.58 3.42 2 2 0 0 1 3.54 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 6 6l.87-.87a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16z"/></svg>
+                    {selectedReceipt.schoolPhone}
+                  </span>
+                )}
+                {selectedReceipt.schoolEmail && (
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    {selectedReceipt.schoolEmail}
+                  </span>
+                )}
+              </div>
+
+              <div className="px-8 py-6 space-y-6">
+                {/* ── Student Details Row ── */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">Student Information</p>
+                    {[
+                      { label: 'Student Name', val: selectedReceipt.studentName },
+                      { label: 'Admission No.', val: selectedReceipt.admissionNo },
+                      { label: 'Class / Section', val: selectedReceipt.className },
+                    ].map((row, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <span className="text-[10px] text-slate-400">{row.label}</span>
+                        <span className="text-[11px] font-bold text-slate-800">{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">Payment Information</p>
+                    {[
+                      { label: 'Receipt No.', val: selectedReceipt.id },
+                      { label: 'Payment Date', val: selectedReceipt.dateDisplay },
+                      { label: 'Payment Mode', val: selectedReceipt.method },
+                      { label: 'Collected By', val: selectedReceipt.collectedBy },
+                    ].map((row, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <span className="text-[10px] text-slate-400">{row.label}</span>
+                        <span className="text-[11px] font-bold text-slate-800 font-mono">{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Fee Breakdown Table ── */}
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Fee Breakdown</p>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider rounded-tl-lg">#</th>
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider">Fee Component</th>
+                        <th className="text-left py-2 px-3 text-[9px] font-black uppercase tracking-wider">Code</th>
+                        <th className="text-right py-2 px-3 text-[9px] font-black uppercase tracking-wider rounded-tr-lg">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedReceipt.feeBreakdown || []).map((row, i) => (
+                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          <td className="py-2 px-3 text-slate-400 font-mono">{String(i + 1).padStart(2, '0')}</td>
+                          <td className="py-2 px-3 text-slate-700 font-medium">{row.label}</td>
+                          <td className="py-2 px-3 text-slate-400 font-mono text-[10px] uppercase">{row.code}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">₹{row.amount.toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Totals */}
+                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
+                    {[
+                      { label: 'Total Fee', val: selectedReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' },
+                      { label: 'Previously Paid', val: selectedReceipt.newPaid - selectedReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
+                      { label: 'Amount Paid Now', val: selectedReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
+                      { label: 'Balance Remaining', val: selectedReceipt.newRemaining, color: selectedReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true },
+                    ].map((r, i) => (
+                      <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+                        <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
+                        <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
+                          {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Amount in Words ── */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="text-[9px] text-slate-400 uppercase tracking-widest font-black">Amount in Words: </span>
+                  <span className="text-[10px] text-slate-700 font-medium italic">Rupees {numberToWords(selectedReceipt.amount)} Only</span>
+                </div>
+
+                {/* ── Signature Section ── */}
+                <div className="grid grid-cols-3 gap-6 pt-4">
+                  {[
+                    { label: 'Student / Parent Signature', sub: 'Received by' },
+                    { label: 'Cashier / Accountant', sub: selectedReceipt.collectedBy },
+                    { label: 'Principal / Authorised Signatory', sub: selectedReceipt.schoolName },
+                  ].map((sig, i) => (
+                    <div key={i} className="text-center space-y-2">
+                      <div className="h-14 border-b-2 border-slate-300 border-dashed flex items-end justify-center pb-1 relative">
+                        {sig.label === 'Cashier / Accountant' && (
+                          <span className="text-2xl text-blue-600 font-bold select-none transform -rotate-2 tracking-wide block" style={{ fontFamily: 'var(--font-caveat), cursive' }}>
+                            {sig.sub}
+                          </span>
+                        )}
+                        {sig.label === 'Principal / Authorised Signatory' && (
+                          <span className="text-xl text-slate-700 font-bold select-none absolute bottom-1 opacity-80" style={{ fontFamily: 'var(--font-caveat), cursive' }}>
+                            {sig.sub.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{sig.label}</p>
+                        <p className="text-[8px] text-slate-400 mt-0.5 truncate">{sig.sub}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Status Badge + Footer Note ── */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                    selectedReceipt.newStatus === 'PAID' 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                      : selectedReceipt.newStatus === 'PARTIAL'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      selectedReceipt.newStatus === 'PAID' ? 'bg-emerald-500' : selectedReceipt.newStatus === 'PARTIAL' ? 'bg-amber-500' : 'bg-red-500'
+                    }`} />
+                    Account Status: {selectedReceipt.newStatus}
+                  </div>
+                  <p className="text-[8px] text-slate-300 italic">This is a computer-generated receipt. No physical signature required.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Print Action Bar */}
+            <div className="flex justify-end gap-3 no-print">
+              <button
+                onClick={() => window.print()}
+                className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2"
+              >
+                <Printer size={14} />
+                <span>Print Receipt</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -579,7 +991,11 @@ function ParentDashboard() {
 // 4. ACCOUNTANT DASHBOARD
 // ==========================================
 function AccountantDashboard() {
-  const { activeTenant, sharedStudents, sharedFeeRecords, setSharedFeeRecords, sharedClasses } = useAuth();
+  const { 
+    activeTenant, sharedStudents, sharedFeeRecords, setSharedFeeRecords, 
+    sharedClasses, sharedParents, setSharedNotifications, sharedFeeStructures, 
+    sharedStudentFeeAddons 
+  } = useAuth();
 
   const feeInvoices = useMemo(() => {
     return sharedStudents
@@ -604,12 +1020,17 @@ function AccountantDashboard() {
     const currentFee = sharedFeeRecords[studentId] || { total: s.totalFee || 32000, paid: s.paidFee || 0, remaining: (s.totalFee || 32000) - (s.paidFee || 0), status: 'UNPAID', history: [] };
     const payAmt = currentFee.remaining;
 
-    const newHistory = [...(currentFee.history || []), {
-      id: `tx-${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+    const receiptId = `RCPT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowStr = new Date().toISOString().split('T')[0];
+    const dateDisplay = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    const newHistory = [{
+      id: receiptId,
+      date: nowStr,
       amount: payAmt,
       method: 'Cash/UPI Counter'
-    }];
+    }, ...currentFee.history];
 
     setSharedFeeRecords(prev => ({
       ...prev,
@@ -622,7 +1043,64 @@ function AccountantDashboard() {
       }
     }));
 
-    toast.success(`Fee settled for ${s.first_name}. Receipt generated.`);
+    // Generate full receipt details for parent notification
+    const cls = sharedClasses.find(c => c.id === s.class_id);
+    const structures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === s.class_id);
+    const addons = sharedStudentFeeAddons[studentId] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+    const feeBreakdown = structures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+    if (addons.transport.enabled && addons.transport.fee > 0) feeBreakdown.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+    if (addons.hostel.enabled && addons.hostel.fee > 0) feeBreakdown.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+
+    const receipt = {
+      id: receiptId,
+      date: nowStr,
+      dateDisplay,
+      time: timeStr,
+      amount: payAmt,
+      method: 'Cash/UPI Counter',
+      studentName: `${s.first_name} ${s.last_name}`,
+      admissionNo: s.admission_no,
+      className: cls ? cls.name : 'General Class',
+      schoolName: activeTenant.name,
+      totalFee: currentFee.total,
+      newPaid: currentFee.paid + payAmt,
+      newRemaining: 0,
+      newStatus: 'PAID',
+      collectedBy: 'Accountant Counter',
+      schoolAddress: activeTenant.address || '',
+      schoolPhone: activeTenant.phone || '',
+      schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
+      schoolAffiliation: activeTenant.affiliation || '',
+      schoolEstYear: activeTenant.estYear || '',
+      schoolLogo: activeTenant.logo || '',
+      schoolSubdomain: activeTenant.subdomain || '',
+      feeBreakdown
+    };
+
+    const parent = sharedParents?.find(p => p.id === s.parent_id);
+    if (parent && setSharedNotifications) {
+      setSharedNotifications(prev => [
+        {
+          id: `notif-${Date.now()}-${s.id}`,
+          tenant_id: activeTenant.id,
+          recipient_id: parent.id,
+          title: `📄 Fee Receipt Confirmed: ${s.first_name} ${s.last_name}`,
+          body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} paid via Cash/UPI Counter. Outstanding balance: ₹0.`,
+          type: 'FEE_PAYMENT',
+          date: nowStr,
+          read: false,
+          metadata: {
+            receiptId,
+            amount: payAmt,
+            studentId: s.id,
+            receiptDetails: receipt
+          }
+        },
+        ...prev
+      ]);
+    }
+
+    toast.success(`Fee settled for ${s.first_name}. Receipt generated and sent to parent.`);
   };
 
   const totalExpected = useMemo(() => {

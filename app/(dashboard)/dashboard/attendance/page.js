@@ -15,7 +15,7 @@ import Modal from '@/components/Modal';
 export default function AttendancePage() {
   const {
     activeTenant, sharedStudents, sharedStaff, sharedClasses, sharedParents,
-    activeRole, activeUser, sharedSubjects
+    activeRole, activeUser, sharedSubjects, sharedNotifications, setSharedNotifications
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'staff'
@@ -206,6 +206,24 @@ export default function AttendancePage() {
   // Send absentee notification to parent
   const handleSendAbsenteeReminder = (student) => {
     const parent = sharedParents.find(p => p.id === student.parent_id);
+    
+    if (parent && setSharedNotifications) {
+      const notifId = `notif-${Date.now()}-${student.id}`;
+      setSharedNotifications(prev => [
+        {
+          id: notifId,
+          tenant_id: activeTenant.id,
+          recipient_id: parent.id,
+          title: `🚨 Absence Alert: ${student.first_name} ${student.last_name}`,
+          body: `${student.first_name} was marked ABSENT on ${formatHumanDate(selectedDate)} for ${selectedSubject !== 'ALL' ? selectedSubject : 'daily schedule'}.`,
+          type: 'ABSENCE',
+          date: selectedDate,
+          read: false
+        },
+        ...prev
+      ]);
+    }
+
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 800)),
       {

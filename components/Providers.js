@@ -226,6 +226,62 @@ export default function Providers({ children }) {
     { id: 'adm-app-2', first_name: 'Siddharth', last_name: 'Roy', email: 'siddharth.roy@yahoo.com', phone: '+91 82345 67890', class_id: 'class-2', board_score: 88.5, category: 'GENERAL', status: 'PENDING', aadhaar_no: '228392841029', date: '2026-05-22', tenant_id: 'demo-tenant-1' }
   ]);
 
+  // Shared notification alerts scoped to parents (e.g. absences & receipts)
+  const [sharedNotifications, setSharedNotifications] = useState([
+    {
+      id: 'notif-1',
+      tenant_id: 'demo-tenant-1',
+      recipient_id: 'parent-1',
+      title: '🚨 Absence Alert: Aarav Patel',
+      body: 'Aarav Patel was marked ABSENT for daily schedule on May 24th, 2026.',
+      type: 'ABSENCE',
+      date: '2026-05-24',
+      read: false
+    },
+    {
+      id: 'notif-2',
+      tenant_id: 'demo-tenant-1',
+      recipient_id: 'parent-1',
+      title: '📄 Fee Receipt Confirmed: Aarav Patel',
+      body: 'Receipt RCPT-2026-8492: ₹45,000 paid via Razorpay UPI. Outstanding balance is now ₹0.',
+      type: 'FEE_PAYMENT',
+      date: '2026-05-15',
+      read: true,
+      metadata: { 
+        receiptId: 'rcpt-101', 
+        amount: 45000, 
+        studentId: 'stud-1',
+        receiptDetails: {
+          id: 'rcpt-101',
+          date: '2026-05-15',
+          dateDisplay: '15-May-2026',
+          time: '11:30 AM',
+          amount: 45000,
+          method: 'Razorpay UPI',
+          studentName: 'Aarav Patel',
+          admissionNo: 'ADM2026/049',
+          className: 'Class XII - Science (CBSE)',
+          schoolName: 'Indian Institute of Technology (IIT) Delhi',
+          totalFee: 45000,
+          newPaid: 45000,
+          newRemaining: 0,
+          newStatus: 'PAID',
+          collectedBy: 'Anjali Sharma',
+          schoolAddress: 'Hauz Khas, New Delhi – 110016, Delhi, India',
+          schoolPhone: '+91-11-2659-1777',
+          schoolEmail: 'admin@iitd.edu.in',
+          schoolAffiliation: 'UGC / AICTE Approved • NAAC A++ Accredited',
+          schoolEstYear: '1961',
+          feeBreakdown: [
+            { label: 'Base Tuition Fee', code: 'TUIT', amount: 35000 },
+            { label: 'Science Laboratory Fee', code: 'LAB', amount: 5000 },
+            { label: 'Board Examination Fee', code: 'EXAM', amount: 5000 }
+          ]
+        }
+      }
+    }
+  ]);
+
   const [sharedSubjects, setSharedSubjects] = useState([
     { id: 'subj-1', class_id: 'class-1', code: 'PH-121', name: 'Physics Core theory', teacher_id: 'staff-1', units: 4, tenant_id: 'demo-tenant-1' },
     { id: 'subj-2', class_id: 'class-1', code: 'MA-122', name: 'Advanced Calculus math', teacher_id: 'staff-2', units: 5, tenant_id: 'demo-tenant-1' },
@@ -238,6 +294,120 @@ export default function Providers({ children }) {
     // Demo Tenant 3 (St. Stephen's) subjects
     { id: 'subj-8', class_id: 'class-9', code: 'ENG-301', name: 'Victorian Literature & Poetry', teacher_id: '', units: 5, tenant_id: 'demo-tenant-3' },
     { id: 'subj-9', class_id: 'class-10', code: 'PHY-301', name: 'Classical Mechanics & Relativity', teacher_id: '', units: 6, tenant_id: 'demo-tenant-3' }
+  ]);
+
+  const [sharedQuestions, setSharedQuestions] = useState([
+    {
+      id: 'q-1',
+      text: 'What is the SI unit of electric potential difference?',
+      textSec: '',
+      language: 'English',
+      languageSec: 'None',
+      type: 'MCQ',
+      options: ['Volt', 'Ampere', 'Ohm', 'Watt'],
+      optionsSec: [],
+      correct_answer: 'Volt',
+      marks: 1,
+      difficulty: 'EASY',
+      subject: 'Physics Core theory',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    },
+    {
+      id: 'q-2',
+      text: "State Faraday's law of electromagnetic induction.",
+      textSec: '',
+      language: 'English',
+      languageSec: 'None',
+      type: 'SHORT',
+      options: [],
+      optionsSec: [],
+      correct_answer: 'The induced electromotive force in any closed circuit is equal to the negative of the time rate of change of the magnetic flux enclosed by the circuit.',
+      marks: 3,
+      difficulty: 'MEDIUM',
+      subject: 'Physics Core theory',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    },
+    {
+      id: 'q-3',
+      text: 'Describe the construction and working of a cyclotron with a neat diagram.',
+      textSec: '',
+      language: 'English',
+      languageSec: 'None',
+      type: 'LONG',
+      options: [],
+      optionsSec: [],
+      correct_answer: 'Cyclotron working principles include magnetic field deflection, electric field acceleration, and resonant frequency synchronization.',
+      marks: 5,
+      difficulty: 'HARD',
+      subject: 'Physics Core theory',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    },
+    {
+      id: 'q-4',
+      text: 'Which of the following is a transition element?',
+      textSec: '',
+      language: 'English',
+      languageSec: 'None',
+      type: 'MCQ',
+      options: ['Iron', 'Sodium', 'Calcium', 'Magnesium'],
+      optionsSec: [],
+      correct_answer: 'Iron',
+      marks: 1,
+      difficulty: 'EASY',
+      subject: 'Organic Chemistry practical',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    },
+    {
+      id: 'q-5',
+      text: 'Find the value of integral ∫ (3x^2 + 2x) dx from 0 to 1.',
+      textSec: '',
+      language: 'Mathematics',
+      languageSec: 'None',
+      type: 'MCQ',
+      options: ['2', '3', '1', '4'],
+      optionsSec: [],
+      correct_answer: '2',
+      marks: 2,
+      difficulty: 'MEDIUM',
+      subject: 'Advanced Calculus math',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    },
+    {
+      id: 'q-6',
+      text: "Identify the correct passive voice of: 'She is writing a letter.'",
+      textSec: '',
+      language: 'English',
+      languageSec: 'None',
+      type: 'MCQ',
+      options: ['A letter is being written by her.', 'A letter was written by her.', 'A letter is written by her.', 'A letter will be written by her.'],
+      optionsSec: [],
+      correct_answer: 'A letter is being written by her.',
+      marks: 1,
+      difficulty: 'EASY',
+      subject: 'Physics Core theory',
+      class_id: 'class-1',
+      tenant_id: 'demo-tenant-1'
+    }
+  ]);
+
+  const [sharedExamPapers, setSharedExamPapers] = useState([
+    {
+      id: 'paper-1',
+      title: 'Physics Mid-Sem Exam 2026',
+      class_id: 'class-1',
+      subject: 'Physics Core theory',
+      duration: '2 Hours',
+      instructions: 'Section A contains Multiple Choice Questions. Section B contains Subjective Questions. Non-programmable calculators are allowed.',
+      languageLayout: 'primary',
+      question_ids: ['q-1', 'q-2', 'q-3', 'q-6'],
+      created_by: 'Prof. Rajesh Iyer',
+      tenant_id: 'demo-tenant-1'
+    }
   ]);
 
   const [sharedHostelInventoryAllocations, setSharedHostelInventoryAllocations] = useState([
@@ -622,7 +792,13 @@ export default function Providers({ children }) {
       sharedFeeStructures,
       setSharedFeeStructures,
       sharedStudentFeeAddons,
-      setSharedStudentFeeAddons
+      setSharedStudentFeeAddons,
+      sharedNotifications,
+      setSharedNotifications,
+      sharedQuestions,
+      setSharedQuestions,
+      sharedExamPapers,
+      setSharedExamPapers
     }}>
       {children}
     </AuthContext.Provider>

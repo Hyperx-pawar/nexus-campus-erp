@@ -56,7 +56,9 @@ export default function FinanceFeesPage() {
     sharedNotices,
     setSharedNotices,
     activeRole,
-    activeUser
+    activeUser,
+    sharedNotifications,
+    setSharedNotifications
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState('overview');
@@ -256,6 +258,30 @@ export default function FinanceFeesPage() {
     setTimeout(() => toast.info(`📨 School Admin notified: Fee of ₹${payAmt.toLocaleString('en-IN')} received for ${student.first_name}.`), 600);
     setTimeout(() => toast.success(`📲 Notification sent to student: ${student.first_name} — Payment of ₹${payAmt.toLocaleString('en-IN')} confirmed!`), 1200);
     if (parent) setTimeout(() => toast.success(`👨‍👩‍👧 Parent (${parent.first_name} ${parent.last_name}) notified of fee payment.`), 1800);
+
+    // Add to sharedNotifications
+    if (parent && setSharedNotifications) {
+      const notifId = `notif-${Date.now()}-${student.id}`;
+      setSharedNotifications(prev => [
+        {
+          id: notifId,
+          tenant_id: activeTenant.id,
+          recipient_id: parent.id,
+          title: `📄 Fee Receipt Confirmed: ${student.first_name} ${student.last_name}`,
+          body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} paid via ${paymentMethod}. Outstanding balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
+          type: 'FEE_PAYMENT',
+          date: now.toISOString().split('T')[0],
+          read: false,
+          metadata: { 
+            receiptId, 
+            amount: payAmt, 
+            studentId: student.id,
+            receiptDetails: receipt 
+          }
+        },
+        ...prev
+      ]);
+    }
 
     // Add to shared notices board
     if (setSharedNotices) {
@@ -1314,14 +1340,31 @@ export default function FinanceFeesPage() {
 
       {/* ===== RECEIPT MODAL ===== */}
       <style>{`
+        @page {
+          size: portrait;
+          margin: 8mm 6mm;
+        }
         @media print {
+          /* General resets for printer */
+          body, html {
+            background: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100% !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
           /* Hide main app shell components */
-          main, aside, header, nav, .no-print, button {
+          main, aside, header, nav, .no-print, button, footer {
             display: none !important;
           }
           
           /* Target React Portal backdrop overlay */
-          div[class*="backdrop-blur-md"] {
+          div[class*="backdrop-blur-md"],
+          div[class*="fixed"][class*="inset-0"] {
             position: absolute !important;
             inset: 0 !important;
             background: transparent !important;
@@ -1368,12 +1411,66 @@ export default function FinanceFeesPage() {
             margin: 0 !important;
             padding: 0 !important;
             position: relative !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           
           .print-receipt {
             border: none !important;
             box-shadow: none !important;
             background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Compress vertical spacing and elements for single-page print */
+          .print-receipt .bg-gradient-to-r {
+            padding: 12px 16px !important;
+          }
+          .print-receipt .px-8 {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+          .print-receipt .py-6 {
+            padding-top: 12px !important;
+            padding-bottom: 12px !important;
+          }
+          .print-receipt .py-2.5 {
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+          }
+          .print-receipt .space-y-6 > * + * {
+            margin-top: 10px !important;
+          }
+          .print-receipt .grid {
+            gap: 12px !important;
+          }
+          .print-receipt table th,
+          .print-receipt table td {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            font-size: 9px !important;
+          }
+          .print-receipt .h-14 {
+            height: 36px !important;
+          }
+          .print-receipt .text-xl {
+            font-size: 14px !important;
+          }
+          .print-receipt .text-lg {
+            font-size: 11px !important;
+          }
+          .print-receipt .text-sm {
+            font-size: 11px !important;
+          }
+          .print-receipt .text-[11px] {
+            font-size: 9px !important;
+          }
+          .print-receipt .p-3 {
+            padding: 6px 10px !important;
+          }
+          .print-receipt .pt-4 {
+            padding-top: 8px !important;
           }
         }
       `}</style>
