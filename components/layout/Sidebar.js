@@ -58,7 +58,7 @@ const sidebarLinks = [
       { name: 'Hostels & Boarding', icon: Home, href: '/dashboard/hostel', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'HOSTEL_WARDEN', 'STUDENT'] },
       { name: 'School Bus & Transport', icon: Bus, href: '/dashboard/transport', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT'] },
       { name: 'ID Card Generator', icon: CreditCard, href: '/dashboard/idcards', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
-      { name: 'Certificate Hub', icon: FileText, href: '/dashboard/certificates', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
+      { name: 'Certificate Hub', icon: FileText, href: '/dashboard/certificates', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'] },
       { name: 'Career Portal (Placements)', icon: Briefcase, href: '/dashboard/placement', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'TEACHER'] },
       { name: 'Online Admissions', icon: Award, href: '/dashboard/admissions', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
     ]

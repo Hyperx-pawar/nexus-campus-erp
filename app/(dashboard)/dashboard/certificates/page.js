@@ -47,8 +47,8 @@ export default function CertificateGeneratorPage() {
 
   const certificateRef = useRef(null);
 
-  const allowedRoles = useMemo(() => ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'], []);
-  const isAdminOrTeacher = activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'TEACHER';
+  const allowedRoles = useMemo(() => ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'], []);
+  const isAdminOrTeacher = activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ACCOUNTANT';
 
   // Helper: Get class name
   const getClassName = (classId) => {
