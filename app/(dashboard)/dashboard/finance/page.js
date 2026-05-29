@@ -173,6 +173,22 @@ export default function FinanceFeesPage() {
     return grouped;
   }, [tenantFeeStructures, structureClassFilter]);
 
+  // Quick collect filtered students
+  const collectFilteredStudents = useMemo(() => {
+    const term = collectSearch.toLowerCase();
+    return tenantStudents.filter(s => {
+      const className = getClassName(s.class_id).toLowerCase();
+      const matchSearch = !term ||
+        s.first_name.toLowerCase().includes(term) ||
+        s.last_name.toLowerCase().includes(term) ||
+        s.admission_no.toLowerCase().includes(term) ||
+        className.includes(term);
+      const matchClass = collectClassFilter === 'all' || s.class_id === collectClassFilter;
+      const hasDues = (sharedFeeRecords[s.id]?.remaining || 0) > 0;
+      return matchSearch && matchClass && hasDues;
+    });
+  }, [tenantStudents, collectSearch, collectClassFilter, sharedFeeRecords]);
+
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Fees & Finance" />;
@@ -440,22 +456,6 @@ export default function FinanceFeesPage() {
   const handleDownloadReport = () => {
     toast.success('Compiling campus financial ledger. PDF report download started!');
   };
-
-  // Quick collect filtered students
-  const collectFilteredStudents = useMemo(() => {
-    const term = collectSearch.toLowerCase();
-    return tenantStudents.filter(s => {
-      const className = getClassName(s.class_id).toLowerCase();
-      const matchSearch = !term ||
-        s.first_name.toLowerCase().includes(term) ||
-        s.last_name.toLowerCase().includes(term) ||
-        s.admission_no.toLowerCase().includes(term) ||
-        className.includes(term);
-      const matchClass = collectClassFilter === 'all' || s.class_id === collectClassFilter;
-      const hasDues = (sharedFeeRecords[s.id]?.remaining || 0) > 0;
-      return matchSearch && matchClass && hasDues;
-    });
-  }, [tenantStudents, collectSearch, collectClassFilter, sharedFeeRecords]);
 
   return (
     <div className="space-y-8 animate-slide-up">
