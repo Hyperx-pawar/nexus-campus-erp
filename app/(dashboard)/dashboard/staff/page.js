@@ -36,6 +36,8 @@ export default function StaffRegistryPage() {
     designation: 'Lecturer',
     department: 'Science',
     basic: 55000,
+    allowances: 0,
+    deductions: 0,
     panNo: '',
     phone: '',
     email: '',
@@ -134,6 +136,8 @@ export default function StaffRegistryPage() {
         designation: formData.designation,
         department: formData.department,
         basic: Number(formData.basic),
+        allowances: Number(formData.allowances || 0),
+        deductions: Number(formData.deductions || 0),
         pan_no: uppercasePan,
         phone: formData.phone || '+91 98765 43210',
         email: formData.email,
@@ -151,6 +155,8 @@ export default function StaffRegistryPage() {
         designation: 'Lecturer',
         department: 'Science',
         basic: 55000,
+        allowances: 0,
+        deductions: 0,
         panNo: '',
         phone: '',
         email: '',
@@ -324,20 +330,11 @@ export default function StaffRegistryPage() {
     setShowBulkModal(false);
   };
 
-  // Indian Salary calculations
-  // HRA = 24% of basic (Class A cities rate)
-  // DA = 50% of basic
-  // PF = 12% of basic (Employees Provident Fund)
-  // TDS = 10% average tax deduction
-  const calculateSalary = (basic) => {
-    const hra = basic * 0.24;
-    const da = basic * 0.50;
-    const pf = basic * 0.12;
-    const tds = basic * 0.10;
-    const gross = basic + hra + da;
-    const deductions = pf + tds;
-    const net = gross - deductions;
-    return { hra, da, pf, tds, gross, deductions, net };
+  // Manual Salary calculations (Strictly Basic + manual allowances - manual deductions)
+  const calculateSalary = (basic, allowances = 0, deductions = 0) => {
+    const gross = Number(basic) + Number(allowances);
+    const net = gross - Number(deductions);
+    return { hra: 0, da: 0, pf: 0, tds: 0, allowances: Number(allowances), deductions: Number(deductions), gross, net };
   };
 
   // Multi-tenant filter: Only show staff belonging to active school/campus
@@ -687,15 +684,33 @@ export default function StaffRegistryPage() {
                 required
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Allowances (₹ / month)</label>
+              <input 
+                type="number" 
+                value={formData.allowances}
+                onChange={(e) => setFormData({...formData, allowances: e.target.value})}
+                className="w-full text-xs font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Deductions (₹ / month)</label>
+              <input 
+                type="number" 
+                value={formData.deductions}
+                onChange={(e) => setFormData({...formData, deductions: e.target.value})}
+                className="w-full text-xs font-mono"
+              />
+            </div>
 
             {/* Calculations Breakdown */}
             <div className="md:col-span-2 p-4 bg-bg-main border border-border rounded-2xl space-y-2 text-xs">
               <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Monthly Payroll Estimate</span>
               <div className="grid grid-cols-2 gap-2 text-text-secondary font-medium">
-                <div>Basic Pay: <span className="text-text-primary font-bold font-mono">₹{Number(formData.basic).toLocaleString('en-IN')}</span></div>
-                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{calculateSalary(Number(formData.basic) || 0).net.toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Allowances (HRA+DA): <span className="text-success font-mono">+ ₹{ ( (Number(formData.basic) || 0) * 0.74 ).toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Deductions (PF+TDS): <span className="text-danger font-mono">- ₹{ ( (Number(formData.basic) || 0) * 0.22 ).toLocaleString('en-IN')}</span></div>
+                <div>Basic Pay: <span className="text-text-primary font-bold font-mono">₹{Number(formData.basic || 0).toLocaleString('en-IN')}</span></div>
+                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{calculateSalary(Number(formData.basic) || 0, Number(formData.allowances) || 0, Number(formData.deductions) || 0).net.toLocaleString('en-IN')}</span></div>
+                <div className="text-[10px]">Allowances: <span className="text-success font-mono">+ ₹{(Number(formData.allowances) || 0).toLocaleString('en-IN')}</span></div>
+                <div className="text-[10px]">Deductions: <span className="text-danger font-mono">- ₹{(Number(formData.deductions) || 0).toLocaleString('en-IN')}</span></div>
               </div>
             </div>
 
@@ -837,7 +852,7 @@ export default function StaffRegistryPage() {
                 <th className="pb-3">Department</th>
                 <th className="pb-3">PAN Code</th>
                 <th className="pb-3">Basic Pay</th>
-                <th className="pb-3">Gross Salary</th>
+                <th className="pb-3">Allowances</th>
                 <th className="pb-3">Deductions</th>
                 <th className="pb-3">Net Payout</th>
                 <th className="pb-3 text-right pr-2">Action</th>
@@ -845,7 +860,7 @@ export default function StaffRegistryPage() {
             </thead>
             <tbody className="divide-y divide-border text-xs">
               {filteredStaff.map((staff) => {
-                const sal = calculateSalary(staff.basic);
+                const sal = calculateSalary(staff.basic, staff.allowances, staff.deductions);
                 return (
                   <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2.5">
@@ -868,8 +883,8 @@ export default function StaffRegistryPage() {
                     <td className="py-4 font-semibold text-slate-700">{staff.department}</td>
                     <td className="py-4 font-mono text-text-secondary">{staff.pan_no || 'N/A'}</td>
                     <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
-                    <td className="py-4 font-mono text-success">₹{sal.gross.toLocaleString('en-IN')}</td>
-                    <td className="py-4 font-mono text-danger">₹{sal.deductions.toLocaleString('en-IN')}</td>
+                    <td className="py-4 font-mono text-success">₹{(sal.allowances || 0).toLocaleString('en-IN')}</td>
+                    <td className="py-4 font-mono text-danger">₹{(sal.deductions || 0).toLocaleString('en-IN')}</td>
                     <td className="py-4 font-mono text-accent font-black">₹{sal.net.toLocaleString('en-IN')}</td>
                     <td className="py-4 text-right pr-2">
                       <button 

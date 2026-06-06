@@ -195,9 +195,9 @@ export default function Providers({ children }) {
 
   // Shared Roster for employees
   const [sharedStaff, setSharedStaff] = useState([
-    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', basic: 75000, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', basic: 90000, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', basic: 50000, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2' }
+    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', basic: 75000, allowances: 0, deductions: 0, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1' },
+    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', basic: 90000, allowances: 0, deductions: 0, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1' },
+    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', basic: 50000, allowances: 0, deductions: 0, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2' }
   ]);
 
   // Shared fleet maintenance logs

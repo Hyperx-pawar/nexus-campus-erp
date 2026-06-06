@@ -32,6 +32,8 @@ export default function HRPayrollPage() {
     designation: 'Lecturer',
     department: 'Science',
     basic: 55000,
+    allowances: 0,
+    deductions: 0,
     panNo: '',
     phone: '',
     email: '',
@@ -46,20 +48,11 @@ export default function HRPayrollPage() {
 
   const isAdmin = activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ACCOUNTANT';
 
-  // Indian Salary calculations
-  // HRA = 24% of basic (Class A cities rate)
-  // DA = 50% of basic
-  // PF = 12% of basic (Employees Provident Fund)
-  // TDS = 10% average tax deduction
-  const calculateSalary = (basic) => {
-    const hra = basic * 0.24;
-    const da = basic * 0.50;
-    const pf = basic * 0.12;
-    const tds = basic * 0.10;
-    const gross = basic + hra + da;
-    const deductions = pf + tds;
-    const net = gross - deductions;
-    return { hra, da, pf, tds, gross, deductions, net };
+  // Manual Salary calculations (Strictly Basic + manual allowances - manual deductions)
+  const calculateSalary = (basic, allowances = 0, deductions = 0) => {
+    const gross = Number(basic) + Number(allowances);
+    const net = gross - Number(deductions);
+    return { hra: 0, da: 0, pf: 0, tds: 0, allowances: Number(allowances), deductions: Number(deductions), gross, net };
   };
 
   // Sync with sharedStaff as the single source of truth, and restrict based on activeRole
@@ -78,6 +71,8 @@ export default function HRPayrollPage() {
     employee_id: s.employee_id,
     designation: s.designation,
     basic: s.basic || 50000,
+    allowances: s.allowances || 0,
+    deductions: s.deductions || 0,
     pan: s.pan_no || 'N/A',
     status: s.status || 'UNPAID',
     paid_at: s.paid_at || null,
@@ -143,6 +138,8 @@ export default function HRPayrollPage() {
         designation: formData.designation,
         department: formData.department,
         basic: Number(formData.basic),
+        allowances: Number(formData.allowances || 0),
+        deductions: Number(formData.deductions || 0),
         pan_no: uppercasePan,
         phone: formData.phone || '+91 98765 43210',
         email: formData.email,
@@ -161,6 +158,8 @@ export default function HRPayrollPage() {
         designation: 'Lecturer',
         department: 'Science',
         basic: 55000,
+        allowances: 0,
+        deductions: 0,
         panNo: '',
         phone: '',
         email: '',
@@ -187,8 +186,8 @@ export default function HRPayrollPage() {
   // Calculate aggregate payroll metrics dynamically
   const totalEmployeesCount = employees.length;
   const totalBasicSalaries = employees.reduce((sum, emp) => sum + Number(emp.basic), 0);
-  const totalNetPayouts = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic).net, 0);
-  const totalDeductions = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic).deductions, 0);
+  const totalNetPayouts = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic, emp.allowances, emp.deductions).net, 0);
+  const totalDeductions = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic, emp.allowances, emp.deductions).deductions, 0);
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -212,9 +211,9 @@ export default function HRPayrollPage() {
       {/* Overview stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: 'Staff Count', value: totalEmployeesCount, desc: 'EPF active members', icon: Users },
+          { label: 'Staff Count', value: totalEmployeesCount, desc: 'Active staff members', icon: Users },
           { label: 'Basic Salaries (Month)', value: `₹${(totalBasicSalaries / 100000).toFixed(2)} Lakh`, desc: 'Base institutional pay', icon: Wallet },
-          { label: 'PF & Tax Deductions', value: `₹${(totalDeductions / 100000).toFixed(2)} Lakh`, desc: 'Disbursed to Govt accounts', icon: FileBox },
+          { label: 'Manual Deductions', value: `₹${(totalDeductions / 100000).toFixed(2)} Lakh`, desc: 'Total monthly deductions', icon: FileBox },
           { label: 'Net Payouts', value: `₹${(totalNetPayouts / 100000).toFixed(2)} Lakh`, desc: 'Direct bank settlement', icon: CreditCard }
         ].map((k, i) => (
           <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
@@ -253,15 +252,15 @@ export default function HRPayrollPage() {
                 <th className="pb-3 pl-2">Staff Member</th>
                 <th className="pb-3">PAN Code</th>
                 <th className="pb-3">Basic Pay</th>
-                <th className="pb-3">Allowances (HRA+DA)</th>
-                <th className="pb-3">Deductions (PF+TDS)</th>
+                <th className="pb-3">Allowances</th>
+                <th className="pb-3">Deductions</th>
                 <th className="pb-3">Net Payout</th>
                 <th className="pb-3 text-right pr-2">Disbursement</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-xs">
               {filteredEmployees.map((emp) => {
-                const sal = calculateSalary(emp.basic);
+                const sal = calculateSalary(emp.basic, emp.allowances, emp.deductions);
                 return (
                   <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2.5">
@@ -284,12 +283,10 @@ export default function HRPayrollPage() {
                     <td className="py-4 font-mono text-text-secondary">{emp.pan || 'N/A'}</td>
                     <td className="py-4 font-mono font-bold text-text-primary">₹{emp.basic.toLocaleString('en-IN')}</td>
                     <td className="py-4 font-mono text-success">
-                      ₹{(sal.hra + sal.da).toLocaleString('en-IN')}
-                      <span className="text-[8px] text-text-secondary block font-normal">HRA: {sal.hra.toLocaleString('en-IN')} • DA: {sal.da.toLocaleString('en-IN')}</span>
+                      ₹{emp.allowances.toLocaleString('en-IN')}
                     </td>
                     <td className="py-4 font-mono text-danger">
-                      ₹{(sal.pf + sal.tds).toLocaleString('en-IN')}
-                      <span className="text-[8px] text-text-secondary block font-normal">PF: {sal.pf.toLocaleString('en-IN')} • TDS: {sal.tds.toLocaleString('en-IN')}</span>
+                      ₹{emp.deductions.toLocaleString('en-IN')}
                     </td>
                     <td className="py-4 font-mono text-accent font-black">₹{sal.net.toLocaleString('en-IN')}</td>
                     <td className="py-4 text-right pr-2">
@@ -518,15 +515,33 @@ export default function HRPayrollPage() {
                 required
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Allowances (₹ / month)</label>
+              <input 
+                type="number" 
+                value={formData.allowances}
+                onChange={(e) => setFormData({...formData, allowances: e.target.value})}
+                className="w-full text-xs font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Deductions (₹ / month)</label>
+              <input 
+                type="number" 
+                value={formData.deductions}
+                onChange={(e) => setFormData({...formData, deductions: e.target.value})}
+                className="w-full text-xs font-mono"
+              />
+            </div>
 
             {/* Calculations Breakdown */}
             <div className="md:col-span-2 p-4 bg-bg-main border border-border rounded-2xl space-y-2 text-xs">
               <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Monthly Payroll Estimate</span>
               <div className="grid grid-cols-2 gap-2 text-text-secondary font-medium">
-                <div>Basic Pay: <span className="text-text-primary font-bold font-mono">₹{Number(formData.basic).toLocaleString('en-IN')}</span></div>
-                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{calculateSalary(Number(formData.basic) || 0).net.toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Allowances (HRA+DA): <span className="text-success font-mono">+ ₹{ ( (Number(formData.basic) || 0) * 0.74 ).toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Deductions (PF+TDS): <span className="text-danger font-mono">- ₹{ ( (Number(formData.basic) || 0) * 0.22 ).toLocaleString('en-IN')}</span></div>
+                <div>Basic Pay: <span className="text-text-primary font-bold font-mono">₹{Number(formData.basic || 0).toLocaleString('en-IN')}</span></div>
+                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{calculateSalary(Number(formData.basic) || 0, Number(formData.allowances) || 0, Number(formData.deductions) || 0).net.toLocaleString('en-IN')}</span></div>
+                <div className="text-[10px]">Allowances: <span className="text-success font-mono">+ ₹{(Number(formData.allowances) || 0).toLocaleString('en-IN')}</span></div>
+                <div className="text-[10px]">Deductions: <span className="text-danger font-mono">- ₹{(Number(formData.deductions) || 0).toLocaleString('en-IN')}</span></div>
               </div>
             </div>
 
@@ -550,7 +565,7 @@ export default function HRPayrollPage() {
         size="md"
       >
         {viewingSlipEmployee && (() => {
-          const sal = calculateSalary(viewingSlipEmployee.basic);
+          const sal = calculateSalary(viewingSlipEmployee.basic, viewingSlipEmployee.allowances, viewingSlipEmployee.deductions);
           return (
             <div className="space-y-6">
               {/* Header */}
@@ -592,17 +607,13 @@ export default function HRPayrollPage() {
                       <span className="font-mono text-text-primary font-bold">₹{viewingSlipEmployee.basic.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-text-secondary">House Rent Allowance (HRA)</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.hra.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Dearness Allowance (DA)</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.da.toLocaleString('en-IN')}</span>
+                      <span className="text-text-secondary">Allowances</span>
+                      <span className="font-mono text-text-primary font-bold">₹{sal.allowances.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="h-px bg-slate-100 my-1" />
                     <div className="flex justify-between text-success font-bold">
                       <span>Gross Earnings</span>
-                      <span className="font-mono">₹{(viewingSlipEmployee.basic + sal.hra + sal.da).toLocaleString('en-IN')}</span>
+                      <span className="font-mono">₹{sal.gross.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -612,17 +623,13 @@ export default function HRPayrollPage() {
                   <h4 className="text-[10px] font-black text-danger uppercase tracking-widest border-b border-danger/20 pb-1">Deductions</h4>
                   <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-text-secondary">Provident Fund (PF)</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.pf.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Tax Deducted at Source (TDS)</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.tds.toLocaleString('en-IN')}</span>
+                      <span className="text-text-secondary">Deductions</span>
+                      <span className="font-mono text-text-primary font-bold">₹{sal.deductions.toLocaleString('en-IN')}</span>
                     </div>
                     <div className="h-px bg-slate-100 my-1" />
                     <div className="flex justify-between text-danger font-bold">
                       <span>Total Deductions</span>
-                      <span className="font-mono">₹{(sal.pf + sal.tds).toLocaleString('en-IN')}</span>
+                      <span className="font-mono">₹{sal.deductions.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
