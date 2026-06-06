@@ -24,7 +24,8 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
     phone: '+91 98765 43210',
     aadhaar: '',
     pan: '',
-    newPassword: ''
+    newPassword: '',
+    avatar: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -37,7 +38,8 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
         phone: activeUser.phone || '+91 98765 43210',
         aadhaar: activeUser.aadhaar || (activeRole === 'STUDENT' || activeRole === 'PARENT' ? '4839 2840 9283' : ''),
         pan: activeUser.pan || (activeRole === 'TEACHER' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ACCOUNTANT' ? 'ABCPI1234F' : ''),
-        newPassword: ''
+        newPassword: '',
+        avatar: activeUser.avatar || ''
       });
     }
   }, [activeUser, activeRole]);
@@ -62,9 +64,69 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
           
           {/* Left Column: Avatar & Overview */}
           <div className="flex flex-col items-center justify-center p-6 bg-bg-main/50 border border-border rounded-2xl text-center space-y-4">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-accent to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-lg border border-border shrink-0">
-               {profile.name[0] || 'U'}
+            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-accent to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-lg border border-border shrink-0 overflow-hidden">
+               {profile.avatar ? (
+                 <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+               ) : (
+                 profile.name[0] || 'U'
+               )}
             </div>
+
+            <div className="flex flex-col gap-2 w-full items-center">
+              <label className="px-3.5 py-2 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-accent/10">
+                <Upload size={12} />
+                <span>Upload Photo</span>
+                <input type="file" accept="image/*" onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    try {
+                      toast.loading("Compressing image...");
+                      const compressedFile = await compressImage(file, 200, 200, 0.7); // 200x200 max size
+                      toast.dismiss();
+
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setProfile(prev => ({
+                          ...prev,
+                          avatar: reader.result
+                        }));
+                        
+                        const savings = Math.round((1 - compressedFile.size / file.size) * 100);
+                        const origSizeStr = file.size > 1024 * 1024 
+                          ? `${(file.size / 1024 / 1024).toFixed(2)} MB` 
+                          : `${(file.size / 1024).toFixed(1)} KB`;
+                        const newSizeStr = compressedFile.size > 1024 * 1024 
+                          ? `${(compressedFile.size / 1024 / 1024).toFixed(2)} MB` 
+                          : `${(compressedFile.size / 1024).toFixed(1)} KB`;
+
+                        toast.success(`📷 Photo optimized: ${origSizeStr} ➔ ${newSizeStr} (Saved ${savings}%). Click save to apply.`);
+                      };
+                      reader.readAsDataURL(compressedFile);
+                    } catch (err) {
+                      toast.dismiss();
+                      console.error(err);
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setProfile(prev => ({ ...prev, avatar: reader.result }));
+                        toast.success("Photo loaded. Click save to apply.");
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }
+                }} className="hidden" />
+              </label>
+
+              {profile.avatar && (
+                <button 
+                  type="button" 
+                  onClick={() => setProfile(prev => ({ ...prev, avatar: '' }))}
+                  className="text-[9px] text-danger hover:underline font-bold uppercase"
+                >
+                  Remove Photo
+                </button>
+              )}
+            </div>
+
             <div>
               <h4 className="text-sm font-bold text-text-primary">{profile.name}</h4>
               <span className="text-[10px] text-text-secondary font-black uppercase tracking-widest block mt-1">{activeRole}</span>

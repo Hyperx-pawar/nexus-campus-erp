@@ -452,7 +452,8 @@ export default function Providers({ children }) {
               ? `${session.user.user_metadata.first_name} ${session.user.user_metadata.last_name || ''}`
               : session.user.email.split('@')[0],
             email: session.user.email,
-            role: role
+            role: role,
+            avatar: session.user.user_metadata?.avatar || ''
           });
         }
       } catch (err) {
@@ -474,7 +475,8 @@ export default function Providers({ children }) {
             ? `${session.user.user_metadata.first_name} ${session.user.user_metadata.last_name || ''}`
             : session.user.email.split('@')[0],
           email: session.user.email,
-          role: role
+          role: role,
+          avatar: session.user.user_metadata?.avatar || ''
         });
       } else {
         // Fallback to dev mode default if logged out
@@ -677,7 +679,8 @@ export default function Providers({ children }) {
       name: profileData.name,
       phone: profileData.phone,
       aadhaar: profileData.aadhaar,
-      pan: profileData.pan
+      pan: profileData.pan,
+      avatar: profileData.avatar
     }));
 
     if (session?.user) {
@@ -686,7 +689,8 @@ export default function Providers({ children }) {
           data: {
             first_name: profileData.name.split(' ')[0] || '',
             last_name: profileData.name.split(' ').slice(1).join(' ') || '',
-            phone: profileData.phone
+            phone: profileData.phone,
+            avatar: profileData.avatar
           }
         });
         if (error) throw error;

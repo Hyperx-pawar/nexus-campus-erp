@@ -255,8 +255,12 @@ export default function Header() {
                isProfileOpen ? 'bg-accent/10 border-accent/30' : 'bg-transparent border-transparent hover:bg-slate-100'
              }`}
            >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-[11px] shadow-lg border border-border shrink-0">
-                 {activeUser?.name?.[0] || 'U'}
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-[11px] shadow-lg border border-border shrink-0 overflow-hidden">
+                 {activeUser?.avatar ? (
+                   <img src={activeUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                 ) : (
+                   activeUser?.name?.[0] || 'U'
+                 )}
               </div>
               <div className="hidden md:flex flex-col items-start translate-y-[1px] text-left">
                  <span className="text-[12px] font-bold text-text-primary leading-none mb-1">{activeUser?.name.split(' (')[0]}</span>
