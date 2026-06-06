@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Bell, 
@@ -15,22 +15,71 @@ import {
   Activity,
   School,
   Sun,
-  Moon
+  Moon,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
-
+import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Header() {
-  const { activeUser, activeRole, activeTenant, logout, theme, toggleTheme } = useAuth();
+  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const notificationsMock = [
-    { id: 1, title: 'Exam Date Sheet Out', msg: 'CBSE Term 1 date sheet has been published.', time: '2 hours ago' },
-    { id: 2, title: 'Fee Invoice Generated', msg: 'Quarter 3 fee invoice ₹14,500 generated.', time: '5 hours ago' },
-    { id: 3, title: 'Library Book Overdue', msg: 'Book "Concept of Physics" is overdue by 2 days.', time: '1 day ago' },
-  ];
+  const unreadCount = (sharedSchoolAlerts || []).filter(a => !a.read).length;
+
+  const markAllRead = () => {
+    setSharedSchoolAlerts(prev => prev.map(a => ({ ...a, read: true })));
+  };
+
+  const dismissAlert = (id) => {
+    setSharedSchoolAlerts(prev => prev.filter(a => a.id !== id));
+  };
+
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  useEffect(() => {
+    const handlePrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    
+    // Check if running in standalone (installed) mode
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallBtn(false);
+    } else {
+      // Also show for mobile clients as a helper
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        setShowInstallBtn(true);
+      }
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setShowInstallBtn(false);
+        toast.success("Thank you for installing Campus ERP!");
+      }
+    } else {
+      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isiOS) {
+        toast.info("To install: Tap the Share button in Safari, then select 'Add to Home Screen' 📲");
+      } else {
+        toast.info("To install: Open your browser menu and select 'Install' or 'Add to Home Screen' 📲");
+      }
+    }
+  };
 
   return (
     <header className="h-20 px-8 border-b border-border bg-bg-main/60 backdrop-blur-3xl flex items-center justify-between sticky top-0 z-[50] font-inter">
@@ -45,19 +94,53 @@ export default function Header() {
           )}
         </div>
         <div className="flex flex-col">
-          <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Active Campus</span>
-          <span className="text-sm font-bold text-text-primary truncate max-w-[280px] sm:max-w-xs md:max-w-md">{activeTenant?.name || 'Main Campus'}</span>
+          <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest flex items-center gap-1.5">
+            Active Campus
+            {activeRole === 'SUPER_ADMIN' && (
+              <span className="px-1.5 py-0.5 bg-accent/10 border border-accent/20 rounded-md text-[8px] font-bold text-accent">Switcher</span>
+            )}
+          </span>
+          {activeRole === 'SUPER_ADMIN' ? (
+            <select
+              value={activeTenant?.id || ''}
+              onChange={(e) => switchTenant(e.target.value)}
+              className="text-sm font-black text-text-primary bg-transparent border-0 p-0 pr-6 outline-none focus:ring-0 cursor-pointer max-w-[280px] sm:max-w-xs md:max-w-md appearance-none"
+              style={{
+                backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+                backgroundPosition: 'right center',
+                backgroundSize: '1.25rem',
+                backgroundRepeat: 'no-repeat',
+              }}
+            >
+              {(availableTenants || []).map((t) => (
+                <option key={t.id} value={t.id} className="bg-bg-sidebar text-text-primary text-xs">
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-sm font-bold text-text-primary truncate max-w-[280px] sm:max-w-xs md:max-w-md">
+              {activeTenant?.name || 'Main Campus'}
+            </span>
+          )}
         </div>
       </div>
 
       {/* Action Center */}
       <div className="flex items-center gap-5">
         
-        {/* Institutional Status Indicator */}
-        <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-slate-100/50 border border-border rounded-xl">
-           <Activity size={12} className="text-success animate-pulse" />
-           <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Zone: IND-NORTH</span>
-        </div>
+        {/* Install Mobile App PWA Button */}
+        {showInstallBtn && (
+          <button
+            onClick={handleInstallApp}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 border border-accent/20 hover:bg-accent hover:text-white rounded-xl text-[10px] font-bold text-accent transition-all animate-pulse cursor-pointer"
+            title="Download Mobile App"
+          >
+            <Smartphone size={12} />
+            <span>Install App</span>
+          </button>
+        )}
+
 
         {/* Theme Mode Toggle Button */}
         <button 
@@ -75,30 +158,92 @@ export default function Header() {
              className="p-2.5 text-text-secondary hover:text-text-primary hover:bg-slate-100 rounded-xl transition-all relative"
            >
              <Bell size={18} />
-             <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-bg-main shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+             {unreadCount > 0 ? (
+               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-accent text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 border-2 border-bg-main shadow-lg shadow-accent/30 animate-pulse">
+                 {unreadCount > 9 ? '9+' : unreadCount}
+               </span>
+             ) : (
+               <span className="absolute top-2 right-2 w-2 h-2 bg-slate-300 rounded-full border-2 border-bg-main"></span>
+             )}
            </button>
 
            {showNotifications && (
              <>
                <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)}></div>
-               <div className="absolute right-0 top-full mt-3 w-80 glass p-4 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl">
-                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-border">
-                   <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Campus Alerts</h4>
-                   <span className="text-[9px] font-bold text-accent">Mark all read</span>
+               <div className="absolute right-0 top-full mt-3 w-96 glass p-4 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-border shrink-0">
+                   <div>
+                     <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">School Alerts</h4>
+                     <p className="text-[9px] text-text-secondary mt-0.5">{unreadCount} unread • Online payment notifications</p>
+                   </div>
+                   {unreadCount > 0 && (
+                     <button onClick={markAllRead} className="text-[9px] font-black text-accent hover:text-accent/80 transition-colors px-2 py-1 bg-accent/10 rounded-lg">
+                       Mark all read
+                     </button>
+                   )}
                  </div>
-                 <div className="space-y-3">
-                   {notificationsMock.map(n => (
-                     <div key={n.id} className="p-2.5 bg-slate-50/50 hover:bg-slate-100 border border-border rounded-xl transition-all">
-                       <p className="text-xs font-bold text-text-primary leading-tight">{n.title}</p>
-                       <p className="text-[10px] text-text-secondary mt-1">{n.msg}</p>
-                       <span className="text-[9px] text-text-secondary opacity-40 mt-1 block">{n.time}</span>
+
+                 <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
+                   {(sharedSchoolAlerts || []).length === 0 ? (
+                     <div className="py-8 text-center">
+                       <Bell size={24} className="text-text-secondary mx-auto mb-2 opacity-30" />
+                       <p className="text-xs font-bold text-text-secondary">No alerts yet</p>
+                       <p className="text-[10px] text-text-secondary opacity-60 mt-1">Online payments from parents will appear here.</p>
                      </div>
-                   ))}
+                   ) : (
+                     (sharedSchoolAlerts || []).map(alert => (
+                       <div key={alert.id} className={`p-3 rounded-xl border transition-all group relative ${
+                         !alert.read
+                           ? alert.type === 'ONLINE_PAYMENT'
+                             ? 'bg-accent/8 border-accent/25 hover:border-accent/40'
+                             : 'bg-slate-50/80 border-border'
+                           : 'bg-bg-main border-border/50 opacity-60'
+                       }`}>
+                         <div className="flex items-start gap-2.5">
+                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                             alert.type === 'ONLINE_PAYMENT' ? 'bg-accent/15 text-accent' :
+                             alert.type === 'HOSTEL_PAYMENT' ? 'bg-purple-500/15 text-purple-500' :
+                             'bg-slate-100 text-text-secondary'
+                           }`}>
+                             <span className="text-sm">{alert.icon || '🔔'}</span>
+                           </div>
+                           <div className="flex-1 min-w-0">
+                             <div className="flex items-start justify-between gap-1">
+                               <p className="text-[11px] font-black text-text-primary leading-tight">{alert.title}</p>
+                               {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
+                             </div>
+                             <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">{alert.body}</p>
+                             <div className="flex items-center justify-between mt-1.5">
+                               <span className="text-[9px] text-text-secondary opacity-50 font-mono">{alert.time}</span>
+                               <button
+                                 onClick={() => dismissAlert(alert.id)}
+                                 className="text-[8px] text-text-secondary opacity-0 group-hover:opacity-100 hover:text-danger transition-all font-bold px-1.5 py-0.5 rounded hover:bg-danger/10"
+                               >
+                                 Dismiss
+                               </button>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     ))
+                   )}
                  </div>
+
+                 {(sharedSchoolAlerts || []).length > 0 && (
+                   <div className="pt-3 mt-2 border-t border-border shrink-0">
+                     <button
+                       onClick={() => setSharedSchoolAlerts([])}
+                       className="w-full py-2 text-[10px] font-bold text-text-secondary hover:text-danger hover:bg-danger/5 rounded-xl transition-all"
+                     >
+                       Clear all alerts
+                     </button>
+                   </div>
+                 )}
                </div>
              </>
            )}
         </div>
+
 
         <div className="h-8 w-[1px] bg-slate-100"></div>
 

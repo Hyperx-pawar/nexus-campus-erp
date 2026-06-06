@@ -166,6 +166,71 @@ export default function TransportLogisticsPage() {
     );
   });
 
+  if (activeRole === 'STUDENT') {
+    return (
+      <div className="space-y-8 animate-slide-up">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Transport Desk</h2>
+            <p className="text-text-secondary text-sm font-medium mt-1">
+              View your assigned school bus route, driver details, and monthly corridor fees.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
+            <ShieldCheck size={14} />
+            <span>Transit Registry Secured</span>
+          </div>
+        </div>
+
+        {/* Assigned Route details */}
+        <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
+          <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+            <Bus size={16} className="text-accent" />
+            <span>My School Bus Route Assignment</span>
+          </h3>
+          {myRoute ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-medium">
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase block">Route Corridor</span>
+                <span className="font-bold text-text-primary text-sm mt-1 block">{myRoute.name}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase block">Bus Number Plate</span>
+                <span className="font-bold text-text-primary font-mono text-sm mt-1 block">{myRoute.bus}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase block">Driver Name</span>
+                <span className="font-bold text-text-primary text-sm mt-1 block">{myRoute.driver}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase block">Driver Contact</span>
+                <span className="font-bold text-text-primary font-mono text-sm mt-1 block">{myRoute.phone || '+91 99999 88888'}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-text-secondary italic py-6 text-center border border-dashed border-border rounded-xl">
+              You are currently registered as a day scholar. No transport route or bus assignment found for your profile.
+            </p>
+          )}
+        </div>
+
+        {/* Dynamic fee statement if assigned */}
+        {myRoute && (
+          <div className="p-6 bg-bg-sidebar border border-border rounded-[2.5rem] space-y-4 max-w-md">
+            <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider">Transport Fee Statement</h3>
+            <div className="p-4 bg-bg-main/50 border border-border rounded-2xl flex justify-between items-center text-xs">
+              <span className="text-text-secondary font-bold">Monthly Corridor Charge:</span>
+              <span className="font-mono font-black text-text-primary text-sm">
+                ₹{myRoute.fee.toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-slide-up">
       {/* Header */}

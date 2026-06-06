@@ -416,6 +416,28 @@ export default function Providers({ children }) {
     { id: 'all-inv-3', studentId: 'stud-2', item: 'Study Desk Lamp', cost: 450, paid: 0, status: 'UNPAID', date: '2026-05-18', tenant_id: 'demo-tenant-1', payments: [] }
   ]);
 
+  const [sharedFinalExamsPublished, setSharedFinalExamsPublished] = useState(true);
+
+  // School-staff real-time payment alert feed (populated when parents pay online)
+  const [sharedSchoolAlerts, setSharedSchoolAlerts] = useState([]);
+  const [sharedClassTestRecords, setSharedClassTestRecords] = useState({
+    'stud-1': [
+      { subject: 'Physics Class Test', marks: '22 / 25', grade: 'A1', desc: 'Class Avg: 19' },
+      { subject: 'Advanced Calculus Class Test', marks: '18 / 25', grade: 'B1', desc: 'Class Avg: 16' },
+      { subject: 'Organic Chemistry Class Test', marks: '24 / 25', grade: 'A1', desc: 'Class Avg: 20' }
+    ],
+    'stud-2': [
+      { subject: 'Physics Class Test', marks: '19 / 25', grade: 'B1', desc: 'Class Avg: 19' },
+      { subject: 'Advanced Calculus Class Test', marks: '23 / 25', grade: 'A1', desc: 'Class Avg: 16' },
+      { subject: 'Organic Chemistry Class Test', marks: '20 / 25', grade: 'B2', desc: 'Class Avg: 20' }
+    ],
+    'stud-3': [
+      { subject: 'Physics Class Test', marks: '21 / 25', grade: 'A2', desc: 'Class Avg: 19' },
+      { subject: 'Advanced Calculus Class Test', marks: '15 / 25', grade: 'C1', desc: 'Class Avg: 16' },
+      { subject: 'Organic Chemistry Class Test', marks: '22 / 25', grade: 'A2', desc: 'Class Avg: 20' }
+    ]
+  });
+
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -798,7 +820,13 @@ export default function Providers({ children }) {
       sharedQuestions,
       setSharedQuestions,
       sharedExamPapers,
-      setSharedExamPapers
+      setSharedExamPapers,
+      sharedFinalExamsPublished,
+      setSharedFinalExamsPublished,
+      sharedClassTestRecords,
+      setSharedClassTestRecords,
+      sharedSchoolAlerts,
+      setSharedSchoolAlerts
     }}>
       {children}
     </AuthContext.Provider>

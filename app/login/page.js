@@ -29,6 +29,10 @@ export default function LoginPage() {
   };
 
   const handleDevLogin = (role) => {
+    if (process.env.NODE_ENV === 'production') {
+      toast.error('Simulation profiles are disabled in production.');
+      return;
+    }
     switchRole(role);
     toast.success(`Dev session configured as: ${role}`);
     setIsDemoOpen(false);
@@ -124,19 +128,21 @@ export default function LoginPage() {
         {/* Footer controls & subtle demo switch anchor */}
         <div className="flex flex-col items-center justify-center gap-2 pt-2 border-t border-slate-100">
           <p className="text-[10px] text-slate-500 font-medium">Secured by Enterprise SSL Encryption</p>
-          <button 
-            type="button"
-            onClick={() => setIsDemoOpen(true)}
-            className="text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-all mt-1"
-          >
-            Access Demo Accounts
-          </button>
+          {process.env.NODE_ENV !== 'production' && (
+            <button 
+              type="button"
+              onClick={() => setIsDemoOpen(true)}
+              className="text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-all mt-1"
+            >
+              Access Demo Accounts
+            </button>
+          )}
         </div>
 
       </div>
 
       {/* Hidden Side Drawer for Demo Switcher (Developer Portal) */}
-      {isDemoOpen && (
+      {isDemoOpen && process.env.NODE_ENV !== 'production' && (
         <div className="fixed inset-0 z-[100] flex justify-end">
           {/* Overlay */}
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDemoOpen(false)}></div>

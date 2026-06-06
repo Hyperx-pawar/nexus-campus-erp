@@ -27,7 +27,11 @@ export default function ExamsPage() {
     sharedQuestions,
     setSharedQuestions,
     sharedExamPapers,
-    setSharedExamPapers
+    setSharedExamPapers,
+    sharedFinalExamsPublished,
+    setSharedFinalExamsPublished,
+    sharedClassTestRecords,
+    setSharedClassTestRecords
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState('reportcard'); // Initialized to reportcard, updated in useEffect
@@ -686,6 +690,7 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
   // Report Card generation helper
   const reportCardStudent = tenantStudents.find(s => s.id === selectedStudentId);
   const reportCardRecords = reportCardStudent ? (sharedAcademicRecords[reportCardStudent.id] || []) : [];
+  const reportCardClassTests = reportCardStudent ? (sharedClassTestRecords[reportCardStudent.id] || []) : [];
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -2174,23 +2179,46 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
                 <div className="flex flex-wrap gap-4 items-center">
                   {/* Mode Selector */}
                   {(activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'TEACHER') && (
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Print Mode</span>
-                      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 border border-border rounded-xl">
-                        <button 
-                          onClick={() => setIsBulkReportMode(false)}
-                          className={`px-3 py-1.5 text-center text-[10px] font-black uppercase rounded-lg transition-all ${!isBulkReportMode ? 'bg-white dark:bg-slate-700 text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
+                    <>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Print Mode</span>
+                        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 border border-border rounded-xl">
+                          <button 
+                            onClick={() => setIsBulkReportMode(false)}
+                            className={`px-3 py-1.5 text-center text-[10px] font-black uppercase rounded-lg transition-all ${!isBulkReportMode ? 'bg-white dark:bg-slate-700 text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
+                          >
+                            Single Student
+                          </button>
+                          <button 
+                            onClick={() => setIsBulkReportMode(true)}
+                            className={`px-3 py-1.5 text-center text-[10px] font-black uppercase rounded-lg transition-all ${isBulkReportMode ? 'bg-white dark:bg-slate-700 text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
+                          >
+                            Bulk Class Print
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Student Access</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSharedFinalExamsPublished(!sharedFinalExamsPublished);
+                            toast.success(
+                              `Final exams marksheet access ${!sharedFinalExamsPublished ? 'ENABLED' : 'DISABLED'} for students and parents.`
+                            );
+                          }}
+                          className={`px-3 py-2 text-center text-[10px] font-black uppercase rounded-xl border flex items-center gap-2 transition-all ${
+                            sharedFinalExamsPublished 
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800/50 dark:text-emerald-400' 
+                              : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:border-amber-800/50 dark:text-amber-400'
+                          }`}
                         >
-                          Single Student
-                        </button>
-                        <button 
-                          onClick={() => setIsBulkReportMode(true)}
-                          className={`px-3 py-1.5 text-center text-[10px] font-black uppercase rounded-lg transition-all ${isBulkReportMode ? 'bg-white dark:bg-slate-700 text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}
-                        >
-                          Bulk Class Print
+                          <div className={`w-1.5 h-1.5 rounded-full ${sharedFinalExamsPublished ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                          <span>{sharedFinalExamsPublished ? 'Published' : 'Restricted (Draft)'}</span>
                         </button>
                       </div>
-                    </div>
+                    </>
                   )}
 
                   {!isBulkReportMode ? (
@@ -2282,18 +2310,20 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
                   )}
                 </div>
                 
-                <button
-                  onClick={handlePrint}
-                  className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 self-end"
-                >
-                  <Printer size={14} />
-                  <span>{isBulkReportMode ? `Print Class Roster (${classStudents.length})` : 'Print Report Card'}</span>
-                </button>
+                {(activeRole !== 'PARENT' || sharedFinalExamsPublished) && (
+                  <button
+                    onClick={handlePrint}
+                    className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 self-end"
+                  >
+                    <Printer size={14} />
+                    <span>{isBulkReportMode ? `Print Class Roster (${classStudents.length})` : 'Print Report Card'}</span>
+                  </button>
+                )}
               </div>
             )}
 
             {/* If Student, show a simple header with a print button */}
-            {activeRole === 'STUDENT' && (
+            {activeRole === 'STUDENT' && sharedFinalExamsPublished && (
               <div className="flex justify-between items-center bg-bg-sidebar/55 border border-border p-6 rounded-3xl no-print">
                 <div>
                   <h4 className="text-sm font-bold text-text-primary">Your Term 1 Academic Performance Summary</h4>
@@ -2312,80 +2342,173 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
             {/* Printable Report Cards Area */}
             {!isBulkReportMode ? (
               reportCardStudent ? (
-                /* Single Report Card preview */
-                <div className="max-w-2xl mx-auto p-8 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:border-none print:shadow-none">
-                  {/* Institutional Header */}
-                  <div className="text-center pb-6 border-b border-border space-y-2 print:border-black/10">
-                    <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] block print:text-blue-600">Academic Roster Certificate</span>
-                    <h4 className="text-2xl font-black font-outfit text-text-primary tracking-tight print:text-black">{activeTenant.name}</h4>
-                    <p className="text-[10px] text-text-secondary uppercase tracking-widest font-mono">Affiliation: CBSE Core Board Registration • Q1 Term Evaluation</p>
-                  </div>
+                !sharedFinalExamsPublished && (activeRole === 'STUDENT' || activeRole === 'PARENT') ? (
+                  /* Lock Screen for Students/Parents when final exams not published */
+                  <div className="max-w-2xl mx-auto p-12 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-dashed border-border rounded-[2.5rem] text-center space-y-6 shadow-2xl relative overflow-hidden">
+                    <div className="mx-auto w-16 h-16 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-3xl animate-pulse">
+                      <ClipboardList size={32} />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-xl font-black font-outfit text-text-primary">Final Exam Marksheet Pending Release</h4>
+                      <p className="text-xs text-text-secondary max-w-md mx-auto leading-relaxed">
+                        The official Term Final Exam report card has not been released yet by the school administration.
+                        It will become accessible here once final marks are officially published.
+                      </p>
+                    </div>
 
-                  {/* Student Metadata */}
-                  <div className="grid grid-cols-2 gap-4 text-xs p-4 bg-bg-main/50 border border-border rounded-2xl print:bg-slate-100 print:text-black print:border-black/15">
-                    <div>
-                      <p className="text-[9px] text-text-secondary uppercase">Student Name</p>
-                      <p className="font-bold text-text-primary print:text-black">{reportCardStudent.first_name} {reportCardStudent.last_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-text-secondary uppercase">Academic Class</p>
-                      <p className="font-bold text-text-primary print:text-black">{getClassName(reportCardStudent.class_id)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-text-secondary uppercase">Admission ID</p>
-                      <p className="font-bold text-text-primary font-mono print:text-black">{reportCardStudent.admission_no}</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-text-secondary uppercase">Aadhaar Card No</p>
-                      <p className="font-bold text-text-primary font-mono print:text-black">{reportCardStudent.aadhaar_no || 'N/A'}</p>
-                    </div>
-                  </div>
-
-                  {/* Marks Table */}
-                  <div className="space-y-2">
-                    <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Evaluated Course Modules</span>
-                    <div className="overflow-hidden border border-border rounded-2xl print:border-black/10">
-                      <table className="w-full text-left border-collapse text-xs print:text-black">
-                        <thead>
-                          <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest print:bg-slate-200">
-                            <th className="p-3">Course Module</th>
-                            <th className="p-3">Marks Obtained</th>
-                            <th className="p-3">Max Marks</th>
-                            <th className="p-3 text-right">CBSE Grade</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportCardRecords.map((score, i) => {
-                            const marksNum = Number(score.marks.split(' / ')[0]);
-                            return (
-                              <tr key={i} className="border-b border-border hover:bg-slate-50/50 last:border-none print:border-black/5">
-                                <td className="p-3 font-bold text-text-primary flex items-center gap-1.5 print:text-black">
-                                  <FileText size={12} className="text-accent" />
-                                  {score.subject}
-                                </td>
-                                <td className="p-3 font-mono font-bold text-slate-700 print:text-black">{marksNum}</td>
-                                <td className="p-3 font-mono text-text-secondary print:text-black">100</td>
-                                <td className="p-3 text-right font-mono font-black text-accent print:text-blue-600">{score.grade}</td>
+                    {reportCardClassTests.length > 0 ? (
+                      <div className="space-y-3 pt-6 border-t border-border text-left">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">
+                          Class Tests & Periodic Assessments (Available)
+                        </span>
+                        <div className="overflow-hidden border border-border rounded-2xl">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                                <th className="p-3">Assessment Subject</th>
+                                <th className="p-3">Marks Obtained</th>
+                                <th className="p-3">Max Marks</th>
+                                <th className="p-3 text-right">CBSE Grade</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                            </thead>
+                            <tbody>
+                              {reportCardClassTests.map((ct, idx) => {
+                                const marksNum = Number(ct.marks.split(' / ')[0]);
+                                const maxNum = Number(ct.marks.split(' / ')[1]) || 25;
+                                return (
+                                  <tr key={idx} className="border-b border-border last:border-none">
+                                    <td className="p-3 font-bold text-text-primary flex items-center gap-1.5">
+                                      <BookOpen size={12} className="text-accent" />
+                                      {ct.subject}
+                                    </td>
+                                    <td className="p-3 font-mono font-bold text-slate-700">{marksNum}</td>
+                                    <td className="p-3 font-mono text-text-secondary">{maxNum}</td>
+                                    <td className="p-3 text-right font-mono font-black text-accent">{ct.grade}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6 bg-slate-50 border border-border rounded-2xl text-center text-xs text-text-secondary italic">
+                        No periodic class tests recorded for this term.
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  /* Single Report Card preview */
+                  <div className="max-w-2xl mx-auto p-8 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:border-none print:shadow-none">
+                    {/* Institutional Header */}
+                    <div className="text-center pb-6 border-b border-border space-y-2 print:border-black/10">
+                      <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] block print:text-blue-600">Academic Roster Certificate</span>
+                      <h4 className="text-2xl font-black font-outfit text-text-primary tracking-tight print:text-black">{activeTenant.name}</h4>
+                      <p className="text-[10px] text-text-secondary uppercase tracking-widest font-mono">Affiliation: CBSE Core Board Registration • Q1 Term Evaluation</p>
+                    </div>
 
-                  {/* Signatures */}
-                  <div className="flex justify-between items-end pt-12 text-[10px] text-text-secondary font-bold font-mono">
-                    <div className="text-center space-y-1">
-                      <div className="w-32 border-b border-border print:border-black/20"></div>
-                      <span>HOD Core Academics</span>
+                    {/* Student Metadata */}
+                    <div className="grid grid-cols-2 gap-4 text-xs p-4 bg-bg-main/50 border border-border rounded-2xl print:bg-slate-100 print:text-black print:border-black/15">
+                      <div>
+                        <p className="text-[9px] text-text-secondary uppercase">Student Name</p>
+                        <p className="font-bold text-text-primary print:text-black">{reportCardStudent.first_name} {reportCardStudent.last_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-text-secondary uppercase">Academic Class</p>
+                        <p className="font-bold text-text-primary print:text-black">{getClassName(reportCardStudent.class_id)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-text-secondary uppercase">Admission ID</p>
+                        <p className="font-bold text-text-primary font-mono print:text-black">{reportCardStudent.admission_no}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-text-secondary uppercase">Aadhaar Card No</p>
+                        <p className="font-bold text-text-primary font-mono print:text-black">{reportCardStudent.aadhaar_no || 'N/A'}</p>
+                      </div>
                     </div>
-                    <div className="text-center space-y-1">
-                      <div className="w-32 border-b border-border print:border-black/20"></div>
-                      <span>Office Principal Stamp</span>
+
+                    {/* Marks Table */}
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Evaluated Course Modules</span>
+                      <div className="overflow-hidden border border-border rounded-2xl print:border-black/10">
+                        <table className="w-full text-left border-collapse text-xs print:text-black">
+                          <thead>
+                            <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest print:bg-slate-200">
+                              <th className="p-3">Course Module</th>
+                              <th className="p-3">Marks Obtained</th>
+                              <th className="p-3">Max Marks</th>
+                              <th className="p-3 text-right">CBSE Grade</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportCardRecords.map((score, i) => {
+                              const marksNum = Number(score.marks.split(' / ')[0]);
+                              return (
+                                <tr key={i} className="border-b border-border hover:bg-slate-50/50 last:border-none print:border-black/5">
+                                  <td className="p-3 font-bold text-text-primary flex items-center gap-1.5 print:text-black">
+                                    <FileText size={12} className="text-accent" />
+                                    {score.subject}
+                                  </td>
+                                  <td className="p-3 font-mono font-bold text-slate-700 print:text-black">{marksNum}</td>
+                                  <td className="p-3 font-mono text-text-secondary print:text-black">100</td>
+                                  <td className="p-3 text-right font-mono font-black text-accent print:text-blue-600">{score.grade}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Class Tests Table */}
+                    {reportCardClassTests.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Class Tests & Periodic Assessments</span>
+                        <div className="overflow-hidden border border-border rounded-2xl print:border-black/10">
+                          <table className="w-full text-left border-collapse text-xs print:text-black">
+                            <thead>
+                              <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest print:bg-slate-200">
+                                <th className="p-3">Assessment Subject</th>
+                                <th className="p-3">Marks Obtained</th>
+                                <th className="p-3">Max Marks</th>
+                                <th className="p-3 text-right">CBSE Grade</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reportCardClassTests.map((ct, idx) => {
+                                const marksNum = Number(ct.marks.split(' / ')[0]);
+                                const maxNum = Number(ct.marks.split(' / ')[1]) || 25;
+                                return (
+                                  <tr key={idx} className="border-b border-border hover:bg-slate-50/50 last:border-none print:border-black/5">
+                                    <td className="p-3 font-bold text-text-primary flex items-center gap-1.5 print:text-black">
+                                      <BookOpen size={12} className="text-accent" />
+                                      {ct.subject}
+                                    </td>
+                                    <td className="p-3 font-mono font-bold text-slate-700 print:text-black">{marksNum}</td>
+                                    <td className="p-3 font-mono text-text-secondary print:text-black">{maxNum}</td>
+                                    <td className="p-3 text-right font-mono font-black text-accent print:text-blue-600">{ct.grade}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Signatures */}
+                    <div className="flex justify-between items-end pt-12 text-[10px] text-text-secondary font-bold font-mono">
+                      <div className="text-center space-y-1">
+                        <div className="w-32 border-b border-border print:border-black/20"></div>
+                        <span>HOD Core Academics</span>
+                      </div>
+                      <div className="text-center space-y-1">
+                        <div className="w-32 border-b border-border print:border-black/20"></div>
+                        <span>Office Principal Stamp</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )
               ) : (
                 <p className="text-center py-8 text-xs text-text-secondary">Please select a student from the dropdown roster above.</p>
               )
@@ -2398,6 +2521,7 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
                   </span>
                   {classStudents.map((stud) => {
                     const studentRecords = sharedAcademicRecords[stud.id] || [];
+                    const studentClassTests = sharedClassTestRecords[stud.id] || [];
                     return (
                       <div key={stud.id} className="max-w-2xl mx-auto p-8 bg-bg-card/60 border border-border rounded-[2.5rem] space-y-6 shadow-2xl relative overflow-hidden print:bg-white print:text-black print:border-none print:shadow-none page-break">
                         {/* Institutional Header */}
@@ -2459,6 +2583,42 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
                             </table>
                           </div>
                         </div>
+
+                        {/* Class Tests Table */}
+                        {studentClassTests.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Class Tests & Periodic Assessments</span>
+                            <div className="overflow-hidden border border-border rounded-2xl print:border-black/10">
+                              <table className="w-full text-left border-collapse text-xs print:text-black">
+                                <thead>
+                                  <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest print:bg-slate-200">
+                                    <th className="p-3">Assessment Subject</th>
+                                    <th className="p-3">Marks Obtained</th>
+                                    <th className="p-3">Max Marks</th>
+                                    <th className="p-3 text-right">CBSE Grade</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {studentClassTests.map((ct, idx) => {
+                                    const marksNum = Number(ct.marks.split(' / ')[0]);
+                                    const maxNum = Number(ct.marks.split(' / ')[1]) || 25;
+                                    return (
+                                      <tr key={idx} className="border-b border-border hover:bg-slate-50/50 last:border-none print:border-black/5">
+                                        <td className="p-3 font-bold text-text-primary flex items-center gap-1.5 print:text-black">
+                                          <BookOpen size={12} className="text-accent" />
+                                          {ct.subject}
+                                        </td>
+                                        <td className="p-3 font-mono font-bold text-slate-700 print:text-black">{marksNum}</td>
+                                        <td className="p-3 font-mono text-text-secondary print:text-black">{maxNum}</td>
+                                        <td className="p-3 text-right font-mono font-black text-accent print:text-blue-600">{ct.grade}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Signatures */}
                         <div className="flex justify-between items-end pt-12 text-[10px] text-text-secondary font-bold font-mono">

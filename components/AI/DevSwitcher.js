@@ -10,6 +10,11 @@ import {
 import { toast } from 'sonner';
 
 export default function DevSwitcher() {
+  // Hide switcher in production environments
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
+
   const { 
     activeRole, 
     activeUser, 

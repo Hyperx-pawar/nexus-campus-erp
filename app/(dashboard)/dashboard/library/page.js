@@ -364,6 +364,71 @@ export default function LibraryPage() {
     );
   });
 
+  if (activeRole === 'STUDENT') {
+    return (
+      <div className="space-y-8 animate-slide-up">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Borrowed Books</h2>
+            <p className="text-text-secondary text-sm font-medium mt-1">
+              Active school library checkouts and upcoming return due dates.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
+            <ShieldCheck size={14} />
+            <span>Library Schema Secured</span>
+          </div>
+        </div>
+
+        <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-6">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border text-[10px] font-black uppercase text-text-secondary tracking-widest">
+                  <th className="pb-3 pl-4">Book Title</th>
+                  <th className="pb-3">Issued Date</th>
+                  <th className="pb-3 pr-4 text-right">Due Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {tenantCirculations.map(c => {
+                  const isOverdue = new Date() > new Date(c.dueDate);
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50/50">
+                      <td className="py-4 pl-4 font-bold text-text-primary flex items-center gap-2">
+                        <BookOpen size={14} className="text-accent" />
+                        {getBookTitle(c.bookId)}
+                      </td>
+                      <td className="py-4 font-mono text-text-secondary">{c.checkoutDate}</td>
+                      <td className="py-4 pr-4 font-mono text-right">
+                        <span className={isOverdue ? 'text-danger font-bold animate-pulse' : 'text-text-primary font-semibold'}>
+                          {c.dueDate}
+                        </span>
+                        {isOverdue && (
+                          <span className="ml-2 px-1.5 py-0.5 bg-danger/10 border border-danger/20 text-danger text-[8px] font-black uppercase rounded">
+                            Overdue
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {tenantCirculations.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="text-center py-8 text-xs text-text-secondary italic">
+                      You do not have any active library book checkouts.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-slide-up">
       {/* Header */}

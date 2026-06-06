@@ -6,7 +6,8 @@ import {
   Briefcase, Wallet, FileBox, Settings, Activity, CheckCircle2, 
   Clock, Plus, ArrowRight, ShieldCheck, Star, Sparkles, BookOpenCheck,
   AlertTriangle, CreditCard, ChevronRight, UserCheck, Megaphone, Package,
-  BellRing, Receipt, Printer
+  BellRing, Receipt, Printer, Smartphone, Globe, Lock, Zap, IndianRupee,
+  QrCode, Building2, X, RefreshCw, BadgeCheck
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -44,7 +45,8 @@ function numberToWords(amount) {
 // 1. TEACHER DASHBOARD
 // ==========================================
 function TeacherDashboard() {
-  const { activeUser, activeTenant, sharedClasses, sharedStaff, sharedSubjects, activeRole } = useAuth();
+  const { activeUser, activeTenant, sharedClasses, sharedStaff, sharedSubjects, activeRole, sharedNotices } = useAuth();
+
   
   // Resolve active teacher staff profile
   const myStaffRecord = React.useMemo(() => {
@@ -167,6 +169,41 @@ function TeacherDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Teacher Announcements Notice Board */}
+      <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+        <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+          <Megaphone size={16} className="text-accent" />
+          <span>Faculty & Staff Circulars</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(() => {
+            const staffNotices = (sharedNotices || []).filter(n => n.tenant_id === activeTenant.id && (n.target === 'ALL' || n.target === 'STAFF' || !n.target));
+            if (staffNotices.length === 0) {
+              return (
+                <p className="text-xs text-text-secondary italic py-8 text-center border border-dashed border-border rounded-2xl col-span-3">
+                  No active announcements today.
+                </p>
+              );
+            }
+            return staffNotices.map((notice) => (
+              <div key={notice.id} className="p-5 bg-bg-sidebar border border-border rounded-2xl space-y-3 hover:border-accent/10 transition-all flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xs font-bold text-text-primary">{notice.title}</h4>
+                    <span className="text-[9px] text-text-secondary opacity-50 font-bold">{notice.date}</span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">{notice.body}</p>
+                </div>
+                <div className="flex items-center justify-between text-[8px] text-text-secondary uppercase tracking-widest pt-2 border-t border-border/40 mt-2">
+                  <span className="font-black text-accent">{notice.author}</span>
+                  <span className="px-1.5 py-0.5 bg-accent/10 text-accent font-black rounded">{notice.target || 'ALL'}</span>
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
     </div>
   );
 }
@@ -175,12 +212,57 @@ function TeacherDashboard() {
 // 2. STUDENT DASHBOARD
 // ==========================================
 function StudentDashboard() {
-  const { activeUser, activeTenant, sharedStudents, sharedClasses, sharedSubjects, sharedCirculations, sharedFeeRecords } = useAuth();
+  const { 
+    activeUser, 
+    activeTenant, 
+    sharedStudents, 
+    sharedClasses, 
+    sharedSubjects, 
+    sharedCirculations, 
+    sharedFeeRecords,
+    sharedHostelInventoryAllocations,
+    sharedStudentFeeAddons,
+    sharedNotices,
+    sharedTransportRoutes,
+    sharedFinalExamsPublished,
+    sharedAcademicRecords,
+    sharedClassTestRecords
+  } = useAuth();
+
 
   // Find active student record
   const myStudentProfile = useMemo(() => {
     return sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
   }, [sharedStudents, activeTenant.id, activeUser]);
+
+  const myHostelItems = useMemo(() => {
+    if (!myStudentProfile) return [];
+    return (sharedHostelInventoryAllocations || []).filter(a => a.studentId === myStudentProfile.id);
+  }, [myStudentProfile, sharedHostelInventoryAllocations]);
+
+  const isHostelResident = useMemo(() => {
+    if (!myStudentProfile) return false;
+    const addons = sharedStudentFeeAddons?.[myStudentProfile.id];
+    return addons?.hostel?.enabled === true || myHostelItems.length > 0;
+  }, [myStudentProfile, sharedStudentFeeAddons, myHostelItems]);
+
+  const studentNotices = useMemo(() => {
+    return (sharedNotices || []).filter(n => {
+      if (n.tenant_id !== activeTenant.id) return false;
+      const target = n.target || 'ALL';
+      return target === 'ALL' || target === 'STUDENT';
+    });
+  }, [sharedNotices, activeTenant.id]);
+
+  const myTransportRoute = useMemo(() => {
+    if (!myStudentProfile) return null;
+    const addons = sharedStudentFeeAddons?.[myStudentProfile.id];
+    if (!addons?.transport?.enabled || !addons?.transport?.routeId) return null;
+    return (sharedTransportRoutes || []).find(r => r.id === addons.transport.routeId && r.tenant_id === activeTenant.id);
+  }, [myStudentProfile, sharedStudentFeeAddons, sharedTransportRoutes, activeTenant.id]);
+
+
+
 
   const studentClass = useMemo(() => {
     if (!myStudentProfile) return null;
@@ -219,6 +301,16 @@ function StudentDashboard() {
   }, [myStudentProfile, sharedCirculations, activeTenant.id]);
 
   const attendanceAvg = myStudentProfile ? myStudentProfile.initialAttendance || '85%' : '88.5%';
+
+  const myAcademicRecords = useMemo(() => {
+    if (!myStudentProfile) return [];
+    return sharedAcademicRecords[myStudentProfile.id] || [];
+  }, [myStudentProfile, sharedAcademicRecords]);
+
+  const myClassTests = useMemo(() => {
+    if (!myStudentProfile) return [];
+    return sharedClassTestRecords[myStudentProfile.id] || [];
+  }, [myStudentProfile, sharedClassTestRecords]);
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -298,6 +390,216 @@ function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Student Academic Marks Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Class Tests */}
+        <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+          <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+            <BookOpen size={14} className="text-accent" />
+            <span>My Class Test Marks</span>
+          </h3>
+          <div className="space-y-3">
+            {myClassTests.length === 0 ? (
+              <p className="text-xs text-text-secondary italic text-center py-6">No class test results recorded yet.</p>
+            ) : (
+              myClassTests.map((ct, idx) => (
+                <div key={idx} className="p-3.5 bg-bg-main/30 border border-border rounded-xl flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-text-primary">{ct.subject}</p>
+                    <span className="text-[9px] text-text-secondary">{ct.desc}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-text-primary">{ct.marks}</span>
+                    <span className="text-[9px] bg-accent/10 text-accent font-black px-1.5 py-0.5 rounded ml-2">{ct.grade}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Term Exam Marks */}
+        <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <BookOpenCheck size={14} className="text-accent" />
+              <span>Term Final Exam Marks</span>
+            </h3>
+            {!sharedFinalExamsPublished && (
+              <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase tracking-wider rounded-lg animate-pulse">
+                Pending Release
+              </span>
+            )}
+          </div>
+          
+          <div className="space-y-3">
+            {!sharedFinalExamsPublished ? (
+              <div className="p-8 border border-dashed border-border rounded-2xl text-center space-y-2">
+                <p className="text-xs font-bold text-text-primary">Final Marks Pending Publication</p>
+                <p className="text-[10px] text-text-secondary">Official term marksheet is restricted and will be unlocked once released by the school admin.</p>
+              </div>
+            ) : myAcademicRecords.length === 0 ? (
+              <p className="text-xs text-text-secondary italic text-center py-6">No final marks graded yet for this term.</p>
+            ) : (
+              myAcademicRecords.map((score, idx) => (
+                <div key={idx} className="p-3.5 bg-bg-main/30 border border-border rounded-xl flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-text-primary">{score.subject}</p>
+                    <span className="text-[9px] text-text-secondary">{score.desc}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-text-primary">{score.marks}</span>
+                    <span className="text-[9px] bg-accent/10 text-accent font-black px-1.5 py-0.5 rounded ml-2">{score.grade}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Notice Board & Hostel Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Notices Board */}
+        <div className={`${isHostelResident ? 'lg:col-span-1' : 'lg:col-span-3'} p-6 bg-bg-sidebar border border-border rounded-3xl space-y-4`}>
+          <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+            <Megaphone size={14} className="text-accent" />
+            <span>Campus Announcements</span>
+          </h3>
+          <div className="space-y-3 max-h-[380px] overflow-y-auto custom-scrollbar">
+            {studentNotices.map((notice) => (
+              <div key={notice.id} className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-2 hover:border-accent/10 transition-all">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-xs font-bold text-text-primary">{notice.title}</h4>
+                  <span className="text-[9px] text-text-secondary opacity-50 font-bold">{notice.date}</span>
+                </div>
+                <p className="text-[11px] text-text-secondary leading-relaxed">{notice.body}</p>
+                <div className="flex items-center gap-2 text-[8px] text-text-secondary uppercase tracking-widest">
+                  <span className="font-black text-accent">{notice.author}</span>
+                </div>
+              </div>
+            ))}
+            {studentNotices.length === 0 && (
+              <p className="text-xs text-text-secondary italic py-8 text-center border border-dashed border-border rounded-2xl">
+                No active announcements today.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Hostel Issued Items & Bills */}
+        {isHostelResident && (
+          <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+            <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <Package size={16} className="text-accent" />
+              <span>Hostel Issued Items & Bills Ledger</span>
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Equipment items */}
+              <div className="space-y-3">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Issued Items Ledger</span>
+                <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar">
+                  {myHostelItems.map((item, idx) => {
+                    const remaining = item.cost - item.paid;
+                    return (
+                      <div key={idx} className="p-3 bg-bg-main/40 border border-border rounded-xl flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-bold text-text-primary">{item.item}</p>
+                          <span className="text-[9px] text-text-secondary">Issued: {item.date}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-text-primary block">₹{item.cost}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase mt-1 inline-block ${
+                            item.status === 'PAID' 
+                              ? 'bg-success/15 text-success border border-success/35'
+                              : item.status === 'PARTIAL'
+                              ? 'bg-warning/15 text-warning border border-warning/35'
+                              : 'bg-danger/15 text-danger border border-danger/35'
+                          }`}>
+                            {item.status === 'PAID' ? 'Paid' : `₹${remaining} Outstanding`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {myHostelItems.length === 0 && (
+                    <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
+                      No hostel equipment issued.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Transaction receipts history */}
+              <div className="space-y-3">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Equipment Settlement Receipts</span>
+                <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar">
+                  {myHostelItems
+                    .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
+                    .map((pay, i) => (
+                      <div key={i} className="p-3 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-xl flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
+                          <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-black text-success">₹{pay.amount}</span>
+                          <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase ml-1.5">Paid</span>
+                        </div>
+                      </div>
+                    ))
+                  }
+                  {myHostelItems.flatMap(a => a.payments || []).length === 0 && (
+                    <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
+                      No equipment payments recorded.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* School Bus & Transport Details */}
+      {myTransportRoute && (
+        <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+          <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+            <Bus size={16} className="text-accent" />
+            <span>Assigned School Bus & Route</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
+              <div>
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Route Description</span>
+                <p className="text-sm font-bold text-text-primary mt-1">{myTransportRoute.name}</p>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-border/40 pt-2">
+                <span className="text-text-secondary">Monthly Corridor Fee:</span>
+                <span className="font-mono font-bold text-text-primary">₹{myTransportRoute.fee.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Bus License No.</span>
+                  <span className="text-xs font-mono font-black text-accent">{myTransportRoute.bus}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Driver Name</span>
+                  <span className="text-xs font-bold text-text-primary">{myTransportRoute.driver}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-border/40 pt-2">
+                <span className="text-text-secondary">Driver Contact:</span>
+                <span className="font-mono font-bold text-text-primary">{myTransportRoute.phone}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -305,28 +607,276 @@ function StudentDashboard() {
 // ==========================================
 // 3. PARENT DASHBOARD
 // ==========================================
+// ─────────────────────────────────────────────────────────────────
+// Online Payment Modal
+// ─────────────────────────────────────────────────────────────────
+function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSuccess }) {
+  const [step, setStep] = useState('method'); // method | detail | processing | success
+  const [method, setMethod] = useState(null); // UPI | CARD | NETBANKING
+  const [upiId, setUpiId] = useState('');
+  const [cardNo, setCardNo] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [bank, setBank] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [processingMsg, setProcessingMsg] = useState('Initiating secure payment...');
+  const amountToPay = fees.remaining;
+
+  const methods = [
+    { id: 'UPI', label: 'UPI / QR Code', desc: 'Pay via Google Pay, PhonePe, Paytm', icon: QrCode, color: 'indigo' },
+    { id: 'CARD', label: 'Debit / Credit Card', desc: 'Visa, Mastercard, RuPay accepted', icon: CreditCard, color: 'violet' },
+    { id: 'NETBANKING', label: 'Net Banking', desc: 'SBI, HDFC, ICICI, Axis & more', icon: Building2, color: 'sky' },
+  ];
+
+  const banks = ['State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra Bank', 'Punjab National Bank', 'Bank of Baroda', 'Canara Bank'];
+
+  const handleProceed = () => {
+    if (method === 'UPI' && !upiId.trim()) { toast.error('Please enter a valid UPI ID.'); return; }
+    if (method === 'CARD' && (!cardNo || !cardExpiry || !cardCvv || !cardName)) { toast.error('Please fill all card details.'); return; }
+    if (method === 'NETBANKING' && !bank) { toast.error('Please select your bank.'); return; }
+    setStep('processing');
+    runProcessingAnimation();
+  };
+
+  const runProcessingAnimation = () => {
+    const msgs = [
+      'Initiating secure payment...',
+      'Connecting to payment gateway...',
+      'Verifying payment credentials...',
+      'Processing with your bank...',
+      'Awaiting confirmation...',
+      'Settlement confirmed!'
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setProgress(Math.min(Math.round((i / msgs.length) * 100), 100));
+      setProcessingMsg(msgs[Math.min(i, msgs.length - 1)]);
+      if (i >= msgs.length) {
+        clearInterval(interval);
+        setTimeout(() => setStep('success'), 600);
+      }
+    }, 550);
+  };
+
+  const colorMap = { indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/25 dark:border-indigo-700/40 dark:text-indigo-300', violet: 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-950/25 dark:border-violet-700/40 dark:text-violet-300', sky: 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950/25 dark:border-sky-700/40 dark:text-sky-300' };
+  const ringMap = { indigo: 'ring-indigo-500', violet: 'ring-violet-500', sky: 'ring-sky-500' };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40" onClick={(e) => e.target === e.currentTarget && step !== 'processing' && onClose()}>
+      <div className="w-full max-w-lg bg-bg-card rounded-3xl border border-border shadow-2xl overflow-hidden animate-slide-up">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-accent/10 rounded-2xl flex items-center justify-center text-accent">
+              <Lock size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-black text-text-primary">Secure Online Payment</p>
+              <p className="text-[10px] text-text-secondary font-semibold flex items-center gap-1"><Lock size={8} /> 256-bit SSL encrypted</p>
+            </div>
+          </div>
+          {step !== 'processing' && <button onClick={onClose} className="p-2 hover:bg-bg-sidebar rounded-xl transition-all text-text-secondary"><X size={16} /></button>}
+        </div>
+
+        {/* Amount summary bar */}
+        <div className="px-6 py-3 bg-accent/5 border-b border-border flex items-center justify-between">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary">Payment for {child.first_name} {child.last_name}</p>
+            <p className="text-[10px] text-text-secondary">Adm: {child.admission_no} • Outstanding Fee Balance</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xl font-black text-accent font-outfit">₹{amountToPay.toLocaleString('en-IN')}</p>
+            <p className="text-[9px] text-text-secondary">Total payable amount</p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Step: Method Selection */}
+          {step === 'method' && (
+            <>
+              <p className="text-xs font-black text-text-primary uppercase tracking-wider">Choose Payment Method</p>
+              <div className="space-y-3">
+                {methods.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setMethod(m.id); setStep('detail'); }}
+                    className={`w-full p-4 rounded-2xl border-2 flex items-center gap-4 transition-all hover:scale-[1.01] ${
+                      colorMap[m.color]
+                    }`}
+                  >
+                    <div className="p-2.5 bg-white/50 dark:bg-black/20 rounded-xl"><m.icon size={20} /></div>
+                    <div className="text-left flex-1">
+                      <p className="text-sm font-bold">{m.label}</p>
+                      <p className="text-[10px] opacity-70 mt-0.5">{m.desc}</p>
+                    </div>
+                    <ArrowRight size={16} className="opacity-50" />
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 justify-center pt-2">
+                <ShieldCheck size={12} className="text-success" />
+                <span className="text-[10px] text-text-secondary">Secured by RazorpayX Payment Gateway • PCI-DSS Compliant</span>
+              </div>
+            </>
+          )}
+
+          {/* Step: Method Detail */}
+          {step === 'detail' && (
+            <>
+              <button onClick={() => setStep('method')} className="flex items-center gap-1 text-[10px] text-accent font-bold hover:underline mb-1">
+                <ArrowRight size={10} className="rotate-180" /> Back to methods
+              </button>
+
+              {method === 'UPI' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center gap-3 p-6 bg-bg-sidebar rounded-2xl border border-border">
+                    <div className="w-28 h-28 bg-white rounded-xl flex items-center justify-center border border-border">
+                      <QrCode size={80} className="text-text-primary opacity-80" />
+                    </div>
+                    <p className="text-[10px] text-text-secondary font-semibold text-center">Scan with any UPI app or enter ID below</p>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">UPI ID (e.g. name@upi)</label>
+                    <input
+                      className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all"
+                      placeholder="yourname@okicici"
+                      value={upiId}
+                      onChange={e => setUpiId(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {method === 'CARD' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Card Number</label>
+                    <input className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all font-mono" placeholder="•••• •••• •••• ••••" maxLength={19} value={cardNo} onChange={e => setCardNo(e.target.value.replace(/[^0-9]/g,'').replace(/(.{4})/g,'$1 ').trim())} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Expiry MM/YY</label>
+                      <input className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all font-mono" placeholder="MM/YY" maxLength={5} value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">CVV</label>
+                      <input className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all font-mono" placeholder="•••" maxLength={4} type="password" value={cardCvv} onChange={e => setCardCvv(e.target.value)} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Name on Card</label>
+                    <input className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all" placeholder="As printed on card" value={cardName} onChange={e => setCardName(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
+              {method === 'NETBANKING' && (
+                <div className="space-y-3">
+                  <p className="text-[10px] text-text-secondary">Select your bank to proceed to net banking portal:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {banks.map(b => (
+                      <button key={b} onClick={() => setBank(b)} className={`p-3 text-[10px] font-bold rounded-xl border-2 text-left transition-all ${
+                        bank === b ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-bg-sidebar text-text-primary hover:border-accent/40'
+                      }`}>{b}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={handleProceed}
+                className="w-full py-3.5 bg-accent hover:bg-accent/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm mt-2 shadow-lg shadow-accent/20"
+              >
+                <Lock size={14} />
+                Pay ₹{amountToPay.toLocaleString('en-IN')} Securely
+              </button>
+            </>
+          )}
+
+          {/* Step: Processing */}
+          {step === 'processing' && (
+            <div className="flex flex-col items-center gap-6 py-6">
+              <div className="relative w-20 h-20">
+                <div className="absolute inset-0 rounded-full border-4 border-accent/20"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-t-accent animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <IndianRupee size={24} className="text-accent" />
+                </div>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-bold text-text-primary">{processingMsg}</p>
+                <p className="text-[10px] text-text-secondary">Please do not close this window</p>
+              </div>
+              <div className="w-full bg-bg-sidebar rounded-full h-2 overflow-hidden border border-border">
+                <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+              </div>
+              <p className="text-[9px] text-text-secondary font-mono">{progress}% complete</p>
+            </div>
+          )}
+
+          {/* Step: Success */}
+          {step === 'success' && (
+            <div className="flex flex-col items-center gap-5 py-4">
+              <div className="w-20 h-20 bg-success/15 rounded-full flex items-center justify-center border-2 border-success/30">
+                <BadgeCheck size={40} className="text-success" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-lg font-black text-text-primary">Payment Successful!</p>
+                <p className="text-[11px] text-text-secondary">₹{amountToPay.toLocaleString('en-IN')} paid for {child.first_name} {child.last_name}</p>
+              </div>
+              <div className="w-full p-4 bg-bg-sidebar rounded-2xl border border-border space-y-2 text-xs">
+                <div className="flex justify-between"><span className="text-text-secondary">Payment Method</span><span className="font-bold text-text-primary">{method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`}</span></div>
+                <div className="flex justify-between"><span className="text-text-secondary">Transaction ID</span><span className="font-mono font-bold text-accent">TXN{Date.now().toString().slice(-10)}</span></div>
+                <div className="flex justify-between"><span className="text-text-secondary">Amount Settled</span><span className="font-black text-success">₹{amountToPay.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between"><span className="text-text-secondary">Status</span><span className="text-[9px] bg-success/15 text-success font-black px-2 py-0.5 rounded uppercase">Cleared</span></div>
+              </div>
+              <button onClick={() => {
+                const label = method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`;
+                onSuccess(label);
+              }} className="w-full py-3 bg-success hover:bg-success/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-success/20">
+                <Receipt size={14} /> View Official Receipt
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ParentDashboard() {
   const { 
     sharedStudents, 
     sharedParents, 
     sharedAcademicRecords, 
-    sharedFeeRecords, 
+    sharedFeeRecords,
+    setSharedFeeRecords,
     sharedAttendanceRecords, 
     sharedRemarks,
     sharedNotices,
     activeParentId,
     sharedHostelInventoryAllocations,
+    setSharedHostelInventoryAllocations,
     activeTenant,
     sharedNotifications,
     setSharedNotifications,
+    sharedSchoolAlerts,
+    setSharedSchoolAlerts,
     sharedClasses,
     sharedFeeStructures,
-    sharedStudentFeeAddons
+    sharedStudentFeeAddons,
+    sharedTransportRoutes,
+    sharedFinalExamsPublished,
+    sharedClassTestRecords
   } = useAuth();
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const receiptRef = React.useRef(null);
+  const [paymentTarget, setPaymentTarget] = useState(null); // { child, fees, feeBreakdown, totalFee }
+  const [hostelPayTarget, setHostelPayTarget] = useState(null); // { child, alloc }
 
   // Find simulated parent profile restricted to active tenant
   const tenantParents = sharedParents.filter(p => p.tenant_id === activeTenant.id);
@@ -334,6 +884,21 @@ function ParentDashboard() {
 
   // Find linked children
   const linkedStudents = sharedStudents.filter(s => s.parent_id === (parentProfile?.id || '') && s.tenant_id === activeTenant.id);
+
+  const isChildHostelResident = React.useCallback((childId) => {
+    const addons = sharedStudentFeeAddons?.[childId];
+    const hasHostelEnabled = addons?.hostel?.enabled === true;
+    const hasAllocations = (sharedHostelInventoryAllocations || []).some(a => a.studentId === childId);
+    return hasHostelEnabled || hasAllocations;
+  }, [sharedStudentFeeAddons, sharedHostelInventoryAllocations]);
+
+  const childTransportRoute = React.useCallback((childId) => {
+    const addons = sharedStudentFeeAddons?.[childId];
+    if (!addons?.transport?.enabled || !addons?.transport?.routeId) return null;
+    return (sharedTransportRoutes || []).find(r => r.id === addons.transport.routeId && r.tenant_id === activeTenant.id);
+  }, [sharedStudentFeeAddons, sharedTransportRoutes, activeTenant.id]);
+
+
 
   const parentNotifications = React.useMemo(() => {
     return (sharedNotifications || []).filter(
@@ -380,6 +945,155 @@ function ParentDashboard() {
 
     setSelectedReceipt(receipt);
     setShowReceiptModal(true);
+  };
+
+  const handleOnlinePaymentSuccess = (child, paymentMethodLabel) => {
+    const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
+    const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+    const feeBreakdown = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+    if (addons.transport.enabled && addons.transport.fee > 0) feeBreakdown.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+    if (addons.hostel.enabled && addons.hostel.fee > 0) feeBreakdown.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+
+    const totalFee = classStructures.reduce((sum, fs) => sum + fs.amount, 0)
+      + (addons.transport.enabled ? addons.transport.fee : 0)
+      + (addons.hostel.enabled ? addons.hostel.fee : 0);
+
+    const prevFees = sharedFeeRecords[child.id] || { total: totalFee, paid: 0, remaining: totalFee, status: 'UNPAID', history: [] };
+    const amountPaid = prevFees.remaining;
+    const newPaid = prevFees.paid + amountPaid;
+    const newRemaining = 0;
+    const receiptId = `ONL-${Date.now()}`;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Update fee records
+    const updatedRecord = {
+      total: totalFee,
+      paid: newPaid,
+      remaining: newRemaining,
+      status: 'PAID',
+      history: [
+        ...(prevFees.history || []),
+        { id: receiptId, date: today, amount: amountPaid, method: paymentMethodLabel }
+      ]
+    };
+    setSharedFeeRecords(prev => ({ ...prev, [child.id]: updatedRecord }));
+
+    // Build receipt object for modal
+    const receipt = {
+      id: receiptId,
+      date: today,
+      dateDisplay: new Date(today).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      amount: amountPaid,
+      method: paymentMethodLabel,
+      studentName: `${child.first_name} ${child.last_name}`,
+      admissionNo: child.admission_no,
+      className: sharedClasses.find(c => c.id === child.class_id)?.name || 'General Class',
+      schoolName: activeTenant.name,
+      totalFee,
+      newPaid,
+      newRemaining,
+      newStatus: 'PAID',
+      collectedBy: 'Online Payment Gateway',
+      schoolAddress: activeTenant.address || '',
+      schoolPhone: activeTenant.phone || '',
+      schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
+      schoolAffiliation: activeTenant.affiliation || '',
+      schoolEstYear: activeTenant.estYear || '',
+      schoolLogo: activeTenant.logo || '',
+      schoolSubdomain: activeTenant.subdomain || '',
+      feeBreakdown
+    };
+
+    // Push payment notification to parent
+    const notif = {
+      id: `notif-${Date.now()}`,
+      tenant_id: activeTenant.id,
+      recipient_id: parentProfile?.id || '',
+      type: 'FEE_PAYMENT',
+      title: `✅ Fee Payment Confirmed – ${child.first_name} ${child.last_name}`,
+      body: `₹${amountPaid.toLocaleString('en-IN')} successfully paid online via ${paymentMethodLabel}. Receipt ID: ${receiptId}.`,
+      date: today,
+      metadata: { receiptDetails: receipt }
+    };
+    setSharedNotifications(prev => [notif, ...(prev || [])]);
+
+    // Push real-time alert to school staff notification bell
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    setSharedSchoolAlerts(prev => [{
+      id: `school-alert-${Date.now()}`,
+      type: 'ONLINE_PAYMENT',
+      icon: '⚡',
+      title: `Online Fee Payment Received`,
+      body: `${child.first_name} ${child.last_name} paid ₹${amountPaid.toLocaleString('en-IN')} via ${paymentMethodLabel}. Receipt: ${receiptId}. Go to Finance → Online Payments to verify.`,
+      time: `Today at ${timeStr}`,
+      read: false,
+      receiptId,
+      studentId: child.id,
+      tenant_id: activeTenant.id
+    }, ...(prev || [])]);
+
+    // Close payment modal, show receipt
+    setPaymentTarget(null);
+    setSelectedReceipt(receipt);
+    setShowReceiptModal(true);
+    toast.success(`₹${amountPaid.toLocaleString('en-IN')} paid successfully! Receipt generated.`);
+  };
+
+  const handleHostelItemPaySuccess = (child, alloc, methodLabel) => {
+    const amountPaid = alloc.cost - alloc.paid;
+    const receiptId = `HINV-ONL-${Date.now()}`;
+    const today = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    // Update the hostel inventory allocation: mark as PAID, add payment entry
+    setSharedHostelInventoryAllocations(prev =>
+      prev.map(a =>
+        a.id === alloc.id
+          ? {
+              ...a,
+              paid: a.cost,
+              status: 'PAID',
+              payments: [
+                ...(a.payments || []),
+                { id: receiptId, date: today, amount: amountPaid, method: methodLabel }
+              ]
+            }
+          : a
+      )
+    );
+
+    // Push notification to parent
+    const notif = {
+      id: `notif-hinv-${Date.now()}`,
+      tenant_id: activeTenant.id,
+      recipient_id: parentProfile?.id || '',
+      type: 'FEE_PAYMENT',
+      title: `✅ Hostel Item Payment Confirmed – ${alloc.item}`,
+      body: `₹${amountPaid.toLocaleString('en-IN')} paid online via ${methodLabel} for "${alloc.item}". Receipt: ${receiptId}.`,
+      date: today,
+      metadata: {}
+    };
+    setSharedNotifications(prev => [notif, ...(prev || [])]);
+
+    // Push real-time alert to school staff notification bell
+    const alertTimeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    setSharedSchoolAlerts(prev => [{
+      id: `school-hostel-alert-${Date.now()}`,
+      type: 'HOSTEL_PAYMENT',
+      icon: '🏠',
+      title: `Hostel Item Payment Received`,
+      body: `${child.first_name} ${child.last_name} paid ₹${amountPaid.toLocaleString('en-IN')} for "${alloc.item}" via ${methodLabel}. Receipt: ${receiptId}. Verify in Finance → Online Payments.`,
+      time: `Today at ${alertTimeStr}`,
+      read: false,
+      receiptId,
+      studentId: child.id,
+      tenant_id: activeTenant.id
+    }, ...(prev || [])]);
+
+    setHostelPayTarget(null);
+    toast.success(`₹${amountPaid.toLocaleString('en-IN')} paid for "${alloc.item}"! Receipt ${receiptId} generated.`);
   };
 
   return (
@@ -508,6 +1222,7 @@ function ParentDashboard() {
           {/* Academic Records & Receipts for each child */}
           {linkedStudents.map((child) => {
             const marks = sharedAcademicRecords[child.id] || [];
+            const classTests = sharedClassTestRecords[child.id] || [];
             const remarks = sharedRemarks[child.id] || [];
             const fees = sharedFeeRecords[child.id] || { total: 15400, paid: 0, remaining: 15400, status: 'UNPAID', history: [] };
 
@@ -519,28 +1234,69 @@ function ParentDashboard() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Left Column: Academic Marks */}
-                  <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
-                    <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
-                      <BookOpenCheck size={14} className="text-accent" />
-                      <span>Term 1 Assessment Marks</span>
-                    </h3>
-                    <div className="space-y-3">
-                      {marks.length === 0 ? (
-                        <p className="text-xs text-text-secondary italic text-center py-4">No marks graded for this term.</p>
-                      ) : (
-                        marks.map((score, i) => (
-                          <div key={i} className="p-3.5 bg-bg-main/30 border border-border rounded-xl flex items-center justify-between gap-4">
-                            <div>
-                              <p className="text-xs font-bold text-text-primary">{score.subject}</p>
-                              <span className="text-[9px] text-text-secondary">{score.desc}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-xs font-black text-text-primary">{score.marks}</span>
-                              <span className="text-[9px] bg-accent/10 text-accent font-black px-1.5 py-0.5 rounded ml-2">{score.grade}</span>
-                            </div>
+                  <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
+                    {/* Term 1 Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                          <BookOpenCheck size={14} className="text-accent" />
+                          <span>Term 1 Assessment Marks</span>
+                        </h3>
+                        {!sharedFinalExamsPublished && (
+                          <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase tracking-wider rounded-lg animate-pulse">
+                            Pending Release
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {!sharedFinalExamsPublished ? (
+                          <div className="p-4 bg-slate-50 border border-dashed border-border rounded-2xl text-center">
+                            <p className="text-[11px] text-text-secondary font-medium">Final term marksheet has not been published yet.</p>
                           </div>
-                        ))
-                      )}
+                        ) : marks.length === 0 ? (
+                          <p className="text-xs text-text-secondary italic text-center py-4">No marks graded for this term.</p>
+                        ) : (
+                          marks.map((score, i) => (
+                            <div key={i} className="p-3.5 bg-bg-main/30 border border-border rounded-xl flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-bold text-text-primary">{score.subject}</p>
+                                <span className="text-[9px] text-text-secondary">{score.desc}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-black text-text-primary">{score.marks}</span>
+                                <span className="text-[9px] bg-accent/10 text-accent font-black px-1.5 py-0.5 rounded ml-2">{score.grade}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Class Tests Section */}
+                    <div className="space-y-4 pt-4 border-t border-border/60">
+                      <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                        <BookOpen size={14} className="text-accent" />
+                        <span>Class Tests & periodic marks</span>
+                      </h3>
+                      <div className="space-y-3">
+                        {classTests.length === 0 ? (
+                          <p className="text-xs text-text-secondary italic text-center py-4">No class tests recorded yet.</p>
+                        ) : (
+                          classTests.map((ct, i) => (
+                            <div key={i} className="p-3.5 bg-bg-main/30 border border-border rounded-xl flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-xs font-bold text-text-primary">{ct.subject}</p>
+                                <span className="text-[9px] text-text-secondary">{ct.desc}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs font-black text-text-primary">{ct.marks}</span>
+                                <span className="text-[9px] bg-accent/10 text-accent font-black px-1.5 py-0.5 rounded ml-2">{ct.grade}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -585,87 +1341,164 @@ function ParentDashboard() {
                           ₹{fees.remaining.toLocaleString('en-IN')}
                         </span>
                       </div>
+
+                      {/* Online Pay Now Button */}
+                      {fees.remaining > 0 ? (
+                        <button
+                          onClick={() => {
+                            const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
+                            const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+                            const bd = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+                            if (addons.transport.enabled && addons.transport.fee > 0) bd.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+                            if (addons.hostel.enabled && addons.hostel.fee > 0) bd.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+                            const tot = classStructures.reduce((s, f) => s + f.amount, 0) + (addons.transport.enabled ? addons.transport.fee : 0) + (addons.hostel.enabled ? addons.hostel.fee : 0);
+                            setPaymentTarget({ child, fees, feeBreakdown: bd, totalFee: tot });
+                          }}
+                          className="w-full py-3.5 bg-gradient-to-r from-accent to-indigo-500 hover:from-accent/90 hover:to-indigo-500/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-accent/20 active:scale-[0.98]"
+                        >
+                          <Zap size={15} className="fill-white" />
+                          Pay ₹{fees.remaining.toLocaleString('en-IN')} Online Now
+                        </button>
+                      ) : (
+                        <div className="w-full py-3 bg-success/10 border border-success/30 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-success">
+                          <BadgeCheck size={14} /> Fee Fully Settled — No Balance Due
+                        </div>
+                      )}
                     </div>
                   </div>
+
 
                   {/* Hostel Assets & Inventory Fees */}
-                  <div className="lg:col-span-2 p-6 bg-bg-sidebar/40 border border-border rounded-3xl space-y-4">
-                    <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
-                      <Package size={14} className="text-accent" />
-                      <span>Hostel Assets & Inventory Fees Ledger</span>
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {isChildHostelResident(child.id) && (
+                    <div className="lg:col-span-2 p-6 bg-bg-sidebar/40 border border-border rounded-3xl space-y-4">
+                      <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                        <Package size={14} className="text-accent" />
+                        <span>Hostel Assets & Inventory Fees Ledger</span>
+                      </h3>
                       
-                      {/* Equipment items */}
-                      <div className="space-y-3">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Issued Items Ledger</span>
-                        <div className="space-y-2">
-                          {(sharedHostelInventoryAllocations || [])
-                            .filter(a => a.studentId === child.id)
-                            .map((item, idx) => {
-                              const remaining = item.cost - item.paid;
-                              return (
-                                <div key={idx} className="p-3 bg-slate-50/50 border border-border rounded-xl flex justify-between items-center text-xs">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Equipment items */}
+                        <div className="space-y-3">
+                          <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Issued Items Ledger</span>
+                          <div className="space-y-2">
+                            {(sharedHostelInventoryAllocations || [])
+                              .filter(a => a.studentId === child.id)
+                              .map((item, idx) => {
+                                const remaining = item.cost - item.paid;
+                                return (
+                                  <div key={idx} className="p-3 bg-slate-50/50 border border-border rounded-xl flex justify-between items-center text-xs gap-3">
+                                    <div>
+                                      <p className="font-bold text-text-primary">{item.item}</p>
+                                      <span className="text-[9px] text-text-secondary">Issued: {item.date}</span>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <span className="font-mono font-bold text-text-primary block">₹{item.cost}</span>
+                                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase mt-1 inline-block ${
+                                        item.status === 'PAID' 
+                                          ? 'bg-success/15 text-success border border-success/35'
+                                          : item.status === 'PARTIAL'
+                                          ? 'bg-warning/15 text-warning border border-warning/35'
+                                          : 'bg-danger/15 text-danger border border-danger/35'
+                                      }`}>
+                                        {item.status === 'PAID' ? 'Paid' : `₹${remaining} Due`}
+                                      </span>
+                                      {item.status !== 'PAID' && (
+                                        <button
+                                          onClick={() => setHostelPayTarget({ child, alloc: item })}
+                                          className="mt-1.5 px-2 py-1 bg-gradient-to-r from-accent to-indigo-500 text-white text-[8px] font-black rounded-lg flex items-center gap-1 w-full justify-center hover:opacity-90 transition-all"
+                                        >
+                                          <Zap size={8} className="fill-white" /> Pay Online
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {(sharedHostelInventoryAllocations || []).filter(a => a.studentId === child.id).length === 0 && (
+                              <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
+                                No hostel equipment issued to child.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Transaction receipts history */}
+                        <div className="space-y-3">
+                          <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Equipment Settlement Receipts</span>
+                          <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar">
+                            {(sharedHostelInventoryAllocations || [])
+                              .filter(a => a.studentId === child.id)
+                              .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
+                              .map((pay, i) => (
+                                <div key={i} className="p-3.5 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-xl flex justify-between items-center text-xs">
                                   <div>
-                                    <p className="font-bold text-text-primary">{item.item}</p>
-                                    <span className="text-[9px] text-text-secondary">Issued: {item.date}</span>
+                                    <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
+                                    <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
                                   </div>
                                   <div className="text-right">
-                                    <span className="font-mono font-bold text-text-primary block">₹{item.cost}</span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase mt-1 inline-block ${
-                                      item.status === 'PAID' 
-                                        ? 'bg-success/15 text-success border border-success/35'
-                                        : item.status === 'PARTIAL'
-                                        ? 'bg-warning/15 text-warning border border-warning/35'
-                                        : 'bg-danger/15 text-danger border border-danger/35'
-                                    }`}>
-                                      {item.status === 'PAID' ? 'Paid' : `₹${remaining} Outstanding`}
-                                    </span>
+                                    <span className="font-mono font-black text-success">₹{pay.amount}</span>
+                                    <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase ml-1.5">Paid</span>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          {(sharedHostelInventoryAllocations || []).filter(a => a.studentId === child.id).length === 0 && (
-                            <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
-                              No hostel equipment issued to child.
-                            </p>
-                          )}
+                              ))
+                            }
+                            {(sharedHostelInventoryAllocations || [])
+                              .filter(a => a.studentId === child.id)
+                              .flatMap(a => a.payments || []).length === 0 && (
+                                <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
+                                  No equipment payments recorded.
+                                </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Transaction receipts history */}
-                      <div className="space-y-3">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Equipment Settlement Receipts</span>
-                        <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar">
-                          {(sharedHostelInventoryAllocations || [])
-                            .filter(a => a.studentId === child.id)
-                            .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
-                            .map((pay, i) => (
-                              <div key={i} className="p-3.5 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-xl flex justify-between items-center text-xs">
-                                <div>
-                                  <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
-                                  <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="font-mono font-black text-success">₹{pay.amount}</span>
-                                  <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase ml-1.5">Paid</span>
-                                </div>
-                              </div>
-                            ))
-                          }
-                          {(sharedHostelInventoryAllocations || [])
-                            .filter(a => a.studentId === child.id)
-                            .flatMap(a => a.payments || []).length === 0 && (
-                              <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
-                                No equipment payments recorded.
-                              </p>
-                          )}
-                        </div>
                       </div>
-
                     </div>
-                  </div>
+                  )}
+
+                  {/* Child School Bus & Transport Details */}
+                  {childTransportRoute(child.id) && (() => {
+                    const route = childTransportRoute(child.id);
+                    return (
+                      <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+                        <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                          <Bus size={14} className="text-accent" />
+                          <span>Assigned School Bus & Route</span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
+                            <div>
+                              <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Route Description</span>
+                              <p className="text-sm font-bold text-text-primary mt-1">{route.name}</p>
+                            </div>
+                            <div className="flex justify-between items-center text-xs border-t border-border/40 pt-2">
+                              <span className="text-text-secondary">Monthly Corridor Fee:</span>
+                              <span className="font-mono font-bold text-text-primary">₹{route.fee.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+                          <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Bus License No.</span>
+                                <span className="text-xs font-mono font-black text-accent">{route.bus}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Driver Name</span>
+                                <span className="text-xs font-bold text-text-primary">{route.driver}</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-xs border-t border-border/40 pt-2">
+                              <span className="text-text-secondary">Driver Contact:</span>
+                              <span className="font-mono font-bold text-text-primary">{route.phone}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+
 
                   {/* Remarks Row */}
                   <div className="lg:col-span-2 p-6 bg-slate-50/50 border border-border rounded-3xl space-y-4">
@@ -697,34 +1530,93 @@ function ParentDashboard() {
               <Megaphone size={18} className="text-accent" />
               <h3 className="text-lg font-black font-outfit">Circulars & Announcements</h3>
             </div>
-            <div className="space-y-4">
-              {sharedNotices.filter(n => n.tenant_id === activeTenant.id).map((notice) => (
-                <div key={notice.id} className="p-5 bg-bg-main/40 border border-border rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-sm font-black text-text-primary">{notice.title}</h4>
-                    <span className="text-[10px] text-text-secondary opacity-50 font-bold">{notice.date}</span>
+              {(() => {
+                const parentNotices = sharedNotices.filter(n => n.tenant_id === activeTenant.id && (n.target === 'ALL' || n.target === 'PARENT' || !n.target));
+                if (parentNotices.length === 0) {
+                  return (
+                    <p className="text-xs text-text-secondary italic py-8 text-center border border-dashed border-border rounded-2xl">
+                      No active announcements today.
+                    </p>
+                  );
+                }
+                return parentNotices.map((notice) => (
+                  <div key={notice.id} className="p-5 bg-bg-main/40 border border-border rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h4 className="text-sm font-black text-text-primary">{notice.title}</h4>
+                      <span className="text-[10px] text-text-secondary opacity-50 font-bold">{notice.date}</span>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed">{notice.body}</p>
+                    <div className="flex items-center gap-2 text-[9px] text-text-secondary uppercase tracking-widest">
+                      <span className="font-black text-accent">{notice.author}</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-text-secondary leading-relaxed">{notice.body}</p>
-                  <div className="flex items-center gap-2 text-[9px] text-text-secondary uppercase tracking-widest">
-                    <span className="font-black text-accent">{notice.author}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ));
+              })()}
+
           </div>
         </div>
       )}
 
+      {/* ===== ONLINE PAYMENT MODAL ===== */}
+      {paymentTarget && (
+        <OnlinePaymentModal
+          child={paymentTarget.child}
+          fees={paymentTarget.fees}
+          feeBreakdown={paymentTarget.feeBreakdown}
+          totalFee={paymentTarget.totalFee}
+          onClose={() => setPaymentTarget(null)}
+          onSuccess={(methodLabel) => handleOnlinePaymentSuccess(
+            paymentTarget.child,
+            methodLabel || paymentTarget._method || 'Online Payment'
+          )}
+        />
+      )}
+
+      {/* ===== HOSTEL ITEM ONLINE PAYMENT MODAL ===== */}
+      {hostelPayTarget && (() => {
+        const { child, alloc } = hostelPayTarget;
+        const outstanding = alloc.cost - alloc.paid;
+        const syntheticFees = { remaining: outstanding, total: alloc.cost, paid: alloc.paid, status: alloc.status, history: [] };
+        const syntheticBreakdown = [{ label: alloc.item, code: 'HINV', amount: alloc.cost }];
+        return (
+          <OnlinePaymentModal
+            child={{ ...child, admission_no: child.admission_no }}
+            fees={syntheticFees}
+            feeBreakdown={syntheticBreakdown}
+            totalFee={alloc.cost}
+            onClose={() => setHostelPayTarget(null)}
+            onSuccess={(methodLabel) => handleHostelItemPaySuccess(child, alloc, methodLabel || 'Online Payment')}
+          />
+        );
+      })()}
+
       {/* ===== RECEIPT MODAL FOR PARENTS ===== */}
       <style>{`
+        @page {
+          size: portrait;
+          margin: 8mm 6mm;
+        }
         @media print {
+          /* General resets for printer */
+          body, html {
+            background: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100% !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
           /* Hide main app shell components */
-          main, aside, header, nav, .no-print, button {
+          main, aside, header, nav, .no-print, button, footer {
             display: none !important;
           }
           
           /* Target React Portal backdrop overlay */
-          div[class*="backdrop-blur-md"] {
+          div[class*="backdrop-blur-md"],
+          div[class*="fixed"][class*="inset-0"] {
             position: absolute !important;
             inset: 0 !important;
             background: transparent !important;
@@ -770,9 +1662,71 @@ function ParentDashboard() {
             box-shadow: none !important;
             margin: 0 !important;
             padding: 0 !important;
+            position: relative !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          
+          .print-receipt {
+            border: none !important;
+            box-shadow: none !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Compress vertical spacing and elements for single-page print */
+          .print-receipt .bg-gradient-to-r {
+            padding: 12px 16px !important;
+          }
+          .print-receipt .px-8 {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+          .print-receipt .py-6 {
+            padding-top: 12px !important;
+            padding-bottom: 12px !important;
+          }
+          .print-receipt .py-2.5 {
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+          }
+          .print-receipt .space-y-6 > * + * {
+            margin-top: 10px !important;
+          }
+          .print-receipt .grid {
+            gap: 12px !important;
+          }
+          .print-receipt table th,
+          .print-receipt table td {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            font-size: 9px !important;
+          }
+          .print-receipt .h-14 {
+            height: 36px !important;
+          }
+          .print-receipt .text-xl {
+            font-size: 14px !important;
+          }
+          .print-receipt .text-lg {
+            font-size: 11px !important;
+          }
+          .print-receipt .text-sm {
+            font-size: 11px !important;
+          }
+          .print-receipt .text-[11px] {
+            font-size: 9px !important;
+          }
+          .print-receipt .p-3 {
+            padding: 6px 10px !important;
+          }
+          .print-receipt .pt-4 {
+            padding-top: 8px !important;
           }
         }
       `}</style>
+
 
       <Modal
         open={showReceiptModal}

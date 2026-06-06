@@ -6,7 +6,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { 
   Wallet, Search, CreditCard, CheckCircle2, 
   ArrowRight, Plus, Receipt, Landmark, ShieldCheck, Download, AlertCircle, BellRing,
-  Trash2, Edit3, Bus, Home as HomeIcon, Eye, X, Printer, Bell, Building2, User
+  Trash2, Edit3, Bus, Home as HomeIcon, Eye, X, Printer, Bell, Building2, User,
+  Zap, BadgeCheck, Clock, Filter, Globe
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -58,10 +59,14 @@ export default function FinanceFeesPage() {
     activeRole,
     activeUser,
     sharedNotifications,
-    setSharedNotifications
+    setSharedNotifications,
+    sharedHostelInventoryAllocations,
+    setSharedHostelInventoryAllocations
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState('overview');
+  const [verifiedPayments, setVerifiedPayments] = useState(new Set()); // set of tx IDs
+  const [onlineFilter, setOnlineFilter] = useState('all'); // all | pending | verified
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -489,18 +494,32 @@ export default function FinanceFeesPage() {
 
       {/* Tabs Selector */}
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <div className="flex gap-2 p-1 bg-slate-100/50 border border-border rounded-2xl w-fit">
-          {['overview', 'structures', 'dues'].map(tab => (
+        <div className="flex gap-2 p-1 bg-slate-100/50 border border-border rounded-2xl w-fit flex-wrap">
+          {['overview', 'structures', 'dues', 'online'].map(tab => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setSelectedStudentId(null); }}
-              className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wider ${
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5 ${
                 activeTab === tab 
                   ? 'bg-slate-200/60 text-text-primary border border-border shadow-lg' 
                   : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              {tab === 'structures' ? 'Fee Structures' : tab === 'dues' ? 'Dues & Reminders' : 'Overview'}
+              {tab === 'online' && <Zap size={11} className={activeTab === 'online' ? 'text-accent' : ''} />}
+              {tab === 'structures' ? 'Fee Structures' : tab === 'dues' ? 'Dues & Reminders' : tab === 'online' ? 'Online Payments' : 'Overview'}
+              {tab === 'online' && (() => {
+                const onlineCount = (() => {
+                  const logs = [];
+                  tenantStudents.forEach(s => {
+                    const fee = sharedFeeRecords[s.id];
+                    if (fee && fee.history) fee.history.filter(tx => tx.id?.startsWith('ONL-')).forEach(tx => logs.push(tx));
+                  });
+                  return logs.filter(tx => !verifiedPayments.has(tx.id)).length;
+                })();
+                return onlineCount > 0 ? (
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-accent text-white text-[8px] font-black rounded-full">{onlineCount}</span>
+                ) : null;
+              })()}
             </button>
           ))}
         </div>
@@ -1166,6 +1185,183 @@ export default function FinanceFeesPage() {
           );
         })()}
       </Modal>
+
+      {/* ===== ONLINE PAYMENTS VERIFICATION TAB ===== */}
+      {activeTab === 'online' && (() => {
+        // Build complete online payment log (fee payments + hostel inventory)
+        const feeTxns = [];
+        tenantStudents.forEach(s => {
+          const fee = sharedFeeRecords[s.id];
+          if (fee && fee.history) {
+            fee.history.filter(tx => tx.id?.startsWith('ONL-')).forEach(tx => {
+              feeTxns.push({
+                ...tx,
+                type: 'FEE',
+                studentName: `${s.first_name} ${s.last_name}`,
+                admissionNo: s.admission_no,
+                className: getClassName(s.class_id),
+                studentId: s.id
+              });
+            });
+          }
+        });
+
+        const hostelTxns = [];
+        (sharedHostelInventoryAllocations || []).filter(a => a.tenant_id === activeTenant.id).forEach(alloc => {
+          (alloc.payments || []).filter(p => p.id?.startsWith('HINV-ONL-')).forEach(p => {
+            const stud = tenantStudents.find(s => s.id === alloc.studentId);
+            hostelTxns.push({
+              ...p,
+              type: 'HOSTEL',
+              item: alloc.item,
+              studentName: stud ? `${stud.first_name} ${stud.last_name}` : 'Unknown',
+              admissionNo: stud?.admission_no || '',
+              className: stud ? getClassName(stud.class_id) : '',
+              studentId: alloc.studentId,
+              allocId: alloc.id
+            });
+          });
+        });
+
+        const allOnlineTxns = [...feeTxns, ...hostelTxns].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const filtered = allOnlineTxns.filter(tx => {
+          if (onlineFilter === 'pending') return !verifiedPayments.has(tx.id);
+          if (onlineFilter === 'verified') return verifiedPayments.has(tx.id);
+          return true;
+        });
+
+        const totalOnline = allOnlineTxns.reduce((s, t) => s + t.amount, 0);
+        const pendingCount = allOnlineTxns.filter(t => !verifiedPayments.has(t.id)).length;
+        const verifiedCount = allOnlineTxns.filter(t => verifiedPayments.has(t.id)).length;
+
+        return (
+          <div className="space-y-6">
+            {/* Header Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[
+                { label: 'Total Online Received', value: `₹${totalOnline.toLocaleString('en-IN')}`, icon: Globe, color: 'text-accent', bg: 'bg-accent/10' },
+                { label: 'Pending Verification', value: pendingCount, icon: Clock, color: 'text-warning', bg: 'bg-warning/10' },
+                { label: 'Verified & Settled', value: verifiedCount, icon: BadgeCheck, color: 'text-success', bg: 'bg-success/10' }
+              ].map((kpi, i) => (
+                <div key={i} className="p-5 bg-bg-sidebar border border-border rounded-3xl flex items-center gap-4">
+                  <div className={`p-3 ${kpi.bg} rounded-2xl ${kpi.color}`}><kpi.icon size={20} /></div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-text-secondary">{kpi.label}</p>
+                    <p className="text-2xl font-black font-outfit text-text-primary mt-0.5">{kpi.value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Filter + Verify All */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex gap-2">
+                {['all', 'pending', 'verified'].map(f => (
+                  <button key={f} onClick={() => setOnlineFilter(f)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                      onlineFilter === f ? 'bg-accent text-white border-accent' : 'bg-bg-sidebar text-text-secondary border-border hover:border-accent/40'
+                    }`}>{f === 'all' ? 'All Transactions' : f === 'pending' ? `Pending (${pendingCount})` : `Verified (${verifiedCount})`}</button>
+                ))}
+              </div>
+              {pendingCount > 0 && (
+                <button
+                  onClick={() => {
+                    const newSet = new Set(verifiedPayments);
+                    allOnlineTxns.forEach(tx => newSet.add(tx.id));
+                    setVerifiedPayments(newSet);
+                    toast.success(`All ${pendingCount} online payment(s) marked as verified!`);
+                  }}
+                  className="px-5 py-2.5 bg-success hover:bg-success/90 text-white text-xs font-bold rounded-2xl transition-all flex items-center gap-2"
+                >
+                  <BadgeCheck size={13} /> Verify All Pending
+                </button>
+              )}
+            </div>
+
+            {/* Transaction List */}
+            <div className="space-y-3">
+              {filtered.length === 0 ? (
+                <div className="p-12 bg-bg-sidebar border border-dashed border-border rounded-3xl text-center">
+                  <Zap size={28} className="text-text-secondary mx-auto mb-3 opacity-40" />
+                  <p className="text-sm font-bold text-text-primary">No online payments found</p>
+                  <p className="text-xs text-text-secondary mt-1">Online payments made by parents will appear here for verification.</p>
+                </div>
+              ) : filtered.map((tx, i) => {
+                const isVerified = verifiedPayments.has(tx.id);
+                return (
+                  <div key={i} className={`p-5 rounded-3xl border transition-all flex flex-col md:flex-row md:items-center gap-4 ${
+                    isVerified ? 'bg-success/5 border-success/25' : 'bg-bg-sidebar border-border hover:border-warning/30'
+                  }`}>
+                    {/* Left info */}
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                        tx.type === 'HOSTEL' ? 'bg-purple-500/15 text-purple-500' : 'bg-accent/15 text-accent'
+                      }`}>
+                        {tx.type === 'HOSTEL' ? <HomeIcon size={16} /> : <Zap size={16} />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold text-text-primary">{tx.studentName}</p>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded font-black uppercase border bg-bg-main text-text-secondary border-border">{tx.className}</span>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase border ${
+                            tx.type === 'HOSTEL' ? 'bg-purple-500/10 text-purple-500 border-purple-500/25' : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/25'
+                          }`}>{tx.type === 'HOSTEL' ? '🏠 Hostel Item' : '⚡ Term Fee'}</span>
+                        </div>
+                        <p className="text-[10px] text-text-secondary font-mono mt-0.5">
+                          Receipt: <span className="font-bold text-accent">{tx.id}</span>
+                          {tx.type === 'HOSTEL' && <span className="ml-2 text-text-secondary">• Item: {tx.item}</span>}
+                        </p>
+                        <p className="text-[10px] text-text-secondary">
+                          Method: <span className="font-semibold">{tx.method}</span> • Date: {tx.date} • Adm: {tx.admissionNo}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right actions */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-lg font-black text-success font-mono">₹{tx.amount.toLocaleString('en-IN')}</p>
+                        <p className="text-[9px] text-text-secondary">Amount Paid</p>
+                      </div>
+                      {isVerified ? (
+                        <div className="flex items-center gap-1.5 px-3 py-2 bg-success/15 border border-success/30 rounded-xl text-success text-[10px] font-black">
+                          <BadgeCheck size={14} /> Verified
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            const newSet = new Set(verifiedPayments);
+                            newSet.add(tx.id);
+                            setVerifiedPayments(newSet);
+                            toast.success(`Payment ${tx.id} for ${tx.studentName} marked as verified!`);
+                          }}
+                          className="px-4 py-2 bg-accent hover:bg-accent/90 text-white text-[10px] font-black rounded-xl transition-all flex items-center gap-1.5 shadow shadow-accent/20"
+                        >
+                          <ShieldCheck size={12} /> Mark Verified
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Info note */}
+            <div className="p-4 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 rounded-2xl flex items-start gap-3">
+              <AlertCircle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-700 dark:text-amber-300">How Online Payment Verification Works</p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 leading-relaxed">
+                  When a parent pays online via UPI, Card, or Net Banking from their Guardian Portal, it is instantly reflected in this ledger. 
+                  The school accountant should cross-check with the bank statement or payment gateway dashboard and then click <strong>"Mark Verified"</strong> to confirm receipt. 
+                  Verified payments are permanently settled in the student's fee ledger.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== COLLECT FEE MODAL (with quick search + class filter) ===== */}
       <Modal

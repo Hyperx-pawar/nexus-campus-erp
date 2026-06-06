@@ -364,6 +364,168 @@ export default function HostelManagementPage() {
     return matchesQuery && (isHostelResident || searchQuery.length > 0);
   });
 
+  if (activeRole === 'STUDENT') {
+    // Resolve student allotment
+    const myAllotment = allotments.find(a => a.studentId === myStudentId && a.tenant_id === activeTenant.id);
+    const myAllocations = sharedHostelInventoryAllocations.filter(a => a.studentId === myStudentId && a.tenant_id === activeTenant.id);
+    
+    // Sums
+    const totalCharges = myAllocations.reduce((acc, c) => acc + c.cost, 0);
+    const totalSettled = myAllocations.reduce((acc, c) => acc + c.paid, 0);
+    const outstanding = totalCharges - totalSettled;
+
+    return (
+      <div className="space-y-8 animate-slide-up pb-12">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Hostel Desk</h2>
+            <p className="text-text-secondary text-sm font-medium mt-1">
+              View your room assignment details, issued equipment, and billing status.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
+            <ShieldCheck size={14} />
+            <span>Hostel Ledger Secured</span>
+          </div>
+        </div>
+
+        {/* Room Assignment Section */}
+        <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
+          <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+            <Home size={16} className="text-accent" />
+            <span>My Room Assignment</span>
+          </h3>
+          {myAllotment ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase font-black block">Hostel Block</span>
+                <span className="font-bold text-text-primary text-sm mt-1 block">{getHostelName(myAllotment.hostelId)}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase font-black block">Room Number</span>
+                <span className="font-bold text-text-primary text-sm mt-1 block">Room {myAllotment.roomNumber}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase font-black block">Bed Number</span>
+                <span className="font-bold text-text-primary text-sm mt-1 block">Bed {myAllotment.bedNo}</span>
+              </div>
+              <div className="p-4 bg-bg-sidebar border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase font-black block">Allotment Date</span>
+                <span className="font-bold text-text-primary font-mono text-sm mt-1 block">{myAllotment.date}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
+              No hostel room is currently allotted to you. Please contact the campus warden office for booking assistance.
+            </p>
+          )}
+        </div>
+
+        {/* Inventory Dossier Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Issued Items Table */}
+          <div className="lg:col-span-2 p-6 bg-bg-sidebar border border-border rounded-[2.5rem] space-y-6">
+            <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <Package size={16} className="text-accent" />
+              <span>Issued Equipment Ledger</span>
+            </h3>
+
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-bg-main/50 border border-border rounded-2xl">
+                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest block">Total Cost</span>
+                <span className="text-sm font-black font-mono text-text-primary mt-1 block">₹{totalCharges.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="p-3 bg-bg-main/50 border border-border rounded-2xl">
+                <span className="text-[8px] font-black text-success uppercase tracking-widest block">Total Settled</span>
+                <span className="text-sm font-black font-mono text-success mt-1 block">₹{totalSettled.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="p-3 bg-bg-main/50 border border-border rounded-2xl">
+                <span className="text-[8px] font-black text-warning uppercase tracking-widest block">Outstanding</span>
+                <span className="text-sm font-black font-mono text-warning mt-1 block">₹{outstanding.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-border rounded-2xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                    <th className="p-3 pl-4">Item Name</th>
+                    <th className="p-3">Issue Date</th>
+                    <th className="p-3 font-mono">Cost</th>
+                    <th className="p-3 font-mono">Paid</th>
+                    <th className="p-3 text-right pr-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {myAllocations.map(alloc => (
+                    <tr key={alloc.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 pl-4 font-bold text-text-primary flex items-center gap-1.5">
+                        <Package size={12} className="text-accent" />
+                        {alloc.item}
+                      </td>
+                      <td className="p-3 text-text-secondary font-medium font-mono">{alloc.date}</td>
+                      <td className="p-3 font-mono text-slate-700 font-semibold">₹{alloc.cost}</td>
+                      <td className="p-3 font-mono text-success">₹{alloc.paid}</td>
+                      <td className="p-3 text-right pr-4">
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                          alloc.status === 'PAID' 
+                            ? 'bg-success/15 border border-success/35 text-success'
+                            : alloc.status === 'PARTIAL'
+                            ? 'bg-warning/15 border border-warning/35 text-warning'
+                            : 'bg-danger/15 border border-danger/35 text-danger'
+                        }`}>
+                          {alloc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {myAllocations.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-xs text-text-secondary italic">
+                        No equipment items issued to your profile.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Right: Payment Receipts History */}
+          <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
+            <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <Receipt size={14} className="text-accent" />
+              <span>Settlement Receipts</span>
+            </h3>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+              {myAllocations
+                .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
+                .map((pay, i) => (
+                  <div key={i} className="p-3.5 bg-bg-main border border-border rounded-xl flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
+                      <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-black text-success block">₹{pay.amount}</span>
+                      <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Settled</span>
+                    </div>
+                  </div>
+                ))
+              }
+              {myAllocations.flatMap(a => a.payments || []).length === 0 && (
+                <p className="text-center py-6 text-xs text-text-secondary/70 italic border border-dashed border-border rounded-xl">
+                  No payment transactions logged yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-slide-up pb-12">
       {/* Header with Dynamic Action Button */}
@@ -424,23 +586,26 @@ export default function HostelManagementPage() {
       </div>
 
       {/* Stats Overview Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Hostels', value: totalHostels, icon: Building2, desc: 'Registered blocks', color: 'text-accent' },
-          { label: 'Total Capacity', value: `${totalCapacity} Beds`, icon: Bed, desc: 'Total beds cataloged', color: 'text-warning' },
-          { label: 'Occupied Beds', value: occupiedBeds, icon: UserCheck, desc: 'Beds check-in rosters', color: 'text-success' },
-          { label: 'Available Beds', value: availableBeds, icon: CheckCircle2, desc: 'Vacancies left', color: 'text-cyan-400' }
-        ].map((k, i) => (
-          <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{k.label}</span>
-              <div className={`p-2 bg-accent/10 rounded-xl ${k.color}`}><k.icon size={16} /></div>
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[
+            { label: 'Total Hostels', value: totalHostels, icon: Building2, desc: 'Registered blocks', color: 'text-accent' },
+            { label: 'Total Capacity', value: `${totalCapacity} Beds`, icon: Bed, desc: 'Total beds cataloged', color: 'text-warning' },
+            { label: 'Occupied Beds', value: occupiedBeds, icon: UserCheck, desc: 'Beds check-in rosters', color: 'text-success' },
+            { label: 'Available Beds', value: availableBeds, icon: CheckCircle2, desc: 'Vacancies left', color: 'text-cyan-400' }
+          ].map((k, i) => (
+            <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{k.label}</span>
+                <div className={`p-2 bg-accent/10 rounded-xl ${k.color}`}><k.icon size={16} /></div>
+              </div>
+              <p className="text-3xl font-black font-outfit text-text-primary mt-3">{k.value}</p>
+              <p className="text-[10px] text-text-secondary mt-1">{k.desc}</p>
             </div>
-            <p className="text-3xl font-black font-outfit text-text-primary mt-3">{k.value}</p>
-            <p className="text-[10px] text-text-secondary mt-1">{k.desc}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
 
       {/* Tab: Overview */}
       {activeTab === 'overview' && (
