@@ -2003,6 +2003,80 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
           icon={<Printer size={18} />}
           size="lg"
         >
+          <style>{`
+            @page {
+              size: portrait;
+              margin: 15mm 12mm;
+            }
+            @media print {
+              body, html {
+                background: white !important;
+                color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              
+              /* Hide main app shell components */
+              main, aside, header, nav, .no-print, button, footer {
+                display: none !important;
+              }
+              
+              /* Target React Portal backdrop overlay */
+              div[class*="backdrop-blur-md"],
+              div[class*="fixed"][class*="inset-0"] {
+                position: absolute !important;
+                inset: 0 !important;
+                background: transparent !important;
+                backdrop-filter: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: block !important;
+                z-index: auto !important;
+              }
+              
+              /* Expand modal card container to cover page */
+              div[class*="bg-bg-card"][class*="rounded-"] {
+                max-width: 100% !important;
+                width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                transform: none !important;
+              }
+              
+              /* Hide modal title header */
+              div[class*="border-b"][class*="flex"][class*="justify-between"] {
+                display: none !important;
+              }
+              
+              /* Expand modal scrollable content wrapper */
+              div[class*="max-h-"][class*="overflow-y-auto"] {
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+              }
+              
+              /* Reset question paper card container */
+              #printable-question-paper {
+                display: block !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                position: relative !important;
+              }
+            }
+          `}</style>
           <div className="space-y-6">
             {/* Header controls (hidden during print) */}
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-50 border border-border rounded-2xl no-print">
