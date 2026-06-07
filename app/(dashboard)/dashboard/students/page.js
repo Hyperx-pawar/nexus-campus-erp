@@ -5,7 +5,7 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
-  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus, Edit
+  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus, Edit, ArrowUpCircle
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -27,7 +27,15 @@ export default function StudentRegistryPage() {
     activeRole,
     activeUser,
     sharedStaff,
-    sharedSubjects
+    sharedSubjects,
+    sharedFeeRecords,
+    setSharedFeeRecords,
+    sharedAttendanceRecords,
+    setSharedAttendanceRecords,
+    sharedStudentFeeAddons,
+    sharedFeeStructures,
+    sharedNotifications,
+    setSharedNotifications
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -38,6 +46,110 @@ export default function StudentRegistryPage() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [parsedStudents, setParsedStudents] = useState([]);
+
+  // Student Promotion States
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [selectedStudentForPromotion, setSelectedStudentForPromotion] = useState(null);
+  const [promotionClassId, setPromotionClassId] = useState('');
+  const [resetFees, setResetFees] = useState(true);
+
+  // Pre-fill next logical class helper
+  const getNextLogicalClassId = (currentClassId) => {
+    const currentClass = sharedClasses.find(c => c.id === currentClassId);
+    if (!currentClass) return '';
+    
+    let targetPattern = '';
+    if (currentClass.name.includes('Class XI')) {
+      targetPattern = currentClass.name.replace('Class XI', 'Class XII');
+    } else if (currentClass.name.includes('Class X') && !currentClass.name.includes('Class XII')) {
+      targetPattern = currentClass.name.replace('Class X', 'Class XI');
+      if (currentClass.name === 'Class X - General') {
+        targetPattern = 'Class XI - Science';
+      }
+    } else if (currentClass.name.includes('Class IX')) {
+      targetPattern = currentClass.name.replace('Class IX', 'Class X');
+    }
+    
+    if (targetPattern) {
+      const nextClass = sharedClasses.find(c => c.tenant_id === activeTenant.id && c.name.toLowerCase().includes(targetPattern.toLowerCase()));
+      if (nextClass) return nextClass.id;
+    }
+    
+    const otherClass = sharedClasses.find(c => c.tenant_id === activeTenant.id && c.id !== currentClassId);
+    return otherClass ? otherClass.id : '';
+  };
+
+  const handlePromoteStudent = () => {
+    if (!selectedStudentForPromotion || !promotionClassId) return;
+
+    // 1. Update student class_id
+    const updatedStudents = sharedStudents.map(s => {
+      if (s.id === selectedStudentForPromotion.id) {
+        return {
+          ...s,
+          class_id: promotionClassId
+        };
+      }
+      return s;
+    });
+    setSharedStudents(updatedStudents);
+
+    // 2. Reset fees and configure new term billing if selected
+    if (resetFees) {
+      const classFeeStructures = sharedFeeStructures.filter(
+        fs => fs.class_id === promotionClassId && fs.tenant_id === activeTenant.id
+      );
+      const baseFeeTotal = classFeeStructures.reduce((sum, fs) => sum + fs.amount, 0);
+
+      const studentAddons = sharedStudentFeeAddons[selectedStudentForPromotion.id] || {
+        transport: { enabled: false, fee: 0 },
+        hostel: { enabled: false, fee: 0 }
+      };
+
+      const transportFee = studentAddons.transport?.enabled ? studentAddons.transport.fee : 0;
+      const hostelFee = studentAddons.hostel?.enabled ? studentAddons.hostel.fee : 0;
+      const totalFee = baseFeeTotal + transportFee + hostelFee;
+
+      setSharedFeeRecords(prev => ({
+        ...prev,
+        [selectedStudentForPromotion.id]: {
+          total: totalFee,
+          paid: 0,
+          remaining: totalFee,
+          status: 'UNPAID',
+          history: []
+        }
+      }));
+
+      setSharedAttendanceRecords(prev => ({
+        ...prev,
+        [selectedStudentForPromotion.id]: '100.0%'
+      }));
+    }
+
+    // 3. Dispatch promotion notification to parent dashboard alerts
+    if (selectedStudentForPromotion.parent_id) {
+      const targetClass = sharedClasses.find(c => c.id === promotionClassId);
+      const className = targetClass ? targetClass.name : 'Next Grade';
+
+      const newNotification = {
+        id: `noti-${Date.now()}`,
+        parent_id: selectedStudentForPromotion.parent_id,
+        student_id: selectedStudentForPromotion.id,
+        title: '🎓 Student Promoted to Next Grade',
+        body: `Congratulations! Your child ${selectedStudentForPromotion.first_name} has been promoted to ${className} for the new academic year. New term fee structure has been allocated.`,
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        read: false,
+        type: 'promotion'
+      };
+
+      setSharedNotifications(prev => [newNotification, ...prev]);
+    }
+
+    toast.success(`Student "${selectedStudentForPromotion.first_name} ${selectedStudentForPromotion.last_name}" promoted successfully!`);
+    setShowPromoteModal(false);
+    setSelectedStudentForPromotion(null);
+  };
 
   const handleOpenEditForm = (student) => {
     const parent = sharedParents.find(p => p.id === student.parent_id) || {};
@@ -1400,6 +1512,92 @@ export default function StudentRegistryPage() {
         )}
       </Modal>
 
+      {/* STUDENT PROMOTION MODAL */}
+      <Modal
+        open={showPromoteModal}
+        onClose={() => {
+          setShowPromoteModal(false);
+          setSelectedStudentForPromotion(null);
+        }}
+        title="Promote Student to Next Grade"
+        icon={<ArrowUpCircle size={20} />}
+        size="md"
+      >
+        {selectedStudentForPromotion && (
+          <div className="space-y-5">
+            <div className="p-4 bg-accent/5 border border-accent/15 rounded-2xl">
+              <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Active Candidate Info</h4>
+              <p className="text-sm font-bold text-text-primary mt-1">
+                {selectedStudentForPromotion.first_name} {selectedStudentForPromotion.last_name}
+              </p>
+              <p className="text-[10px] text-text-secondary font-mono mt-0.5">
+                Current Class: <span className="font-bold text-text-primary">{getClassName(selectedStudentForPromotion.class_id)}</span> • Adm No: {selectedStudentForPromotion.admission_no}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Target Promotion Grade *</label>
+                <select
+                  value={promotionClassId}
+                  onChange={(e) => setPromotionClassId(e.target.value)}
+                  className="w-full text-xs bg-bg-sidebar text-text-primary border border-border rounded-xl py-3 px-3 outline-none"
+                  required
+                >
+                  <option value="" disabled>Select target class...</option>
+                  {sharedClasses
+                    .filter(c => c.tenant_id === activeTenant.id)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} (Base Fee: ₹{c.base_fee.toLocaleString('en-IN')})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 p-1.5 ml-1">
+                <input
+                  type="checkbox"
+                  id="resetFeesToggle"
+                  checked={resetFees}
+                  onChange={(e) => setResetFees(e.target.checked)}
+                  className="accent-accent"
+                />
+                <label htmlFor="resetFeesToggle" className="text-xs text-text-primary font-medium cursor-pointer">
+                  Reset and allocate new term billing structure
+                </label>
+              </div>
+
+              <p className="text-[10px] text-text-secondary leading-relaxed italic ml-1">
+                💡 Note: Resetting fees will configure new term balances based on the target class tuition fee, carry over transport/hostel selections (if active), set paid amount to ₹0, and clear previous payment history for the new year.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPromoteModal(false);
+                  setSelectedStudentForPromotion(null);
+                }}
+                className="flex-1 py-3 bg-bg-sidebar border border-border hover:border-slate-300 text-text-primary text-xs font-bold rounded-xl transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePromoteStudent}
+                disabled={!promotionClassId}
+                className="flex-1 py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50"
+              >
+                Confirm Promotion
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Students Table */}
       <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
         
@@ -1472,13 +1670,26 @@ export default function StudentRegistryPage() {
                   <td className="py-4 text-right pr-2">
                     <div className="flex justify-end gap-1.5">
                       {isAdmin && (
-                        <button 
-                          onClick={() => handleOpenEditForm(student)}
-                          className="p-1.5 text-text-secondary hover:text-accent rounded-lg hover:bg-slate-100 transition-all"
-                          title="Edit Student & Parent Details"
-                        >
-                          <Edit size={14} />
-                        </button>
+                        <>
+                          <button 
+                            onClick={() => handleOpenEditForm(student)}
+                            className="p-1.5 text-text-secondary hover:text-accent rounded-lg hover:bg-slate-100 transition-all"
+                            title="Edit Student & Parent Details"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setSelectedStudentForPromotion(student);
+                              setPromotionClassId(getNextLogicalClassId(student.class_id));
+                              setShowPromoteModal(true);
+                            }}
+                            className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
+                            title="Promote Student"
+                          >
+                            <ArrowUpCircle size={14} />
+                          </button>
+                        </>
                       )}
                       <button 
                         onClick={() => setSelectedStudentForDossier(student)}
