@@ -111,6 +111,12 @@ export default function StudentRegistryPage() {
 
   const handleUploadDocument = async (file, docType) => {
     if (!file || !selectedStudentForDossier) return;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 2) {
+      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+      return;
+    }
+    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedStudentForDossier.id}-${docType.replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
@@ -543,6 +549,13 @@ export default function StudentRegistryPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 2) {
+      toast.error(`PDF size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller PDF.`);
+      return;
+    }
+    toast.success(`PDF selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+
     toast.loading('Parsing PDF text elements...');
     try {
       const text = await parsePdfFile(file);
@@ -872,6 +885,12 @@ export default function StudentRegistryPage() {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
+                            const fileSizeMB = file.size / (1024 * 1024);
+                            if (fileSizeMB > 1) {
+                              toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
+                              return;
+                            }
+                            toast.success(`Image selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
                             const reader = new FileReader();
                             reader.onload = () => {
                               setFormData(prev => ({
@@ -886,7 +905,7 @@ export default function StudentRegistryPage() {
                         className="hidden" 
                       />
                     </label>
-                    <span className="text-[10px] text-text-secondary">PNG, JPG up to 5MB</span>
+                    <span className="text-[10px] text-text-secondary">PNG, JPG up to 1MB</span>
                   </div>
 
                   {/* Preset Avatars Grid */}

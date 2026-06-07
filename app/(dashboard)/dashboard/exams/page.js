@@ -411,6 +411,12 @@ export default function ExamsPage() {
 
   const handleQuestionImageUpload = (file, callback) => {
     if (!file) return;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 1) {
+      toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
+      return;
+    }
+    toast.info(`Selected image: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
     
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -638,6 +644,16 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
   };
 
   const triggerScanSimulation = (file) => {
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    const limitMB = isImage ? 1 : 2;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > limitMB) {
+      toast.error(`${isImage ? 'Image' : 'PDF'} size (${fileSizeMB.toFixed(2)} MB) exceeds ${limitMB}MB limit. Please upload a smaller file.`);
+      return;
+    }
+    toast.success(`Selected ${isImage ? 'image' : 'PDF'}: ${file.name} (${fileSizeMB.toFixed(2)} MB / ${limitMB}MB limit)`);
+
     setIsScanningFile(true);
     setScanProgress(0);
     setScanLogs(["[SYSTEM] Initializing scanner engine..."]);

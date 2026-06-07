@@ -378,11 +378,11 @@ export default function HRPayrollPage() {
                           const file = e.target.files?.[0];
                           if (file) {
                             const fileSizeMB = file.size / (1024 * 1024);
-                            if (fileSizeMB > 5) {
-                              toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 5MB limit. Please upload a smaller image.`);
+                            if (fileSizeMB > 1) {
+                              toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
                               return;
                             }
-                            toast.success(`Image selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 5MB limit)`);
+                            toast.success(`Image selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
                             const reader = new FileReader();
                             reader.onload = () => {
                               setFormData(prev => ({
@@ -397,7 +397,7 @@ export default function HRPayrollPage() {
                         className="hidden" 
                       />
                     </label>
-                    <span className="text-[10px] text-text-secondary">PNG, JPG up to 5MB</span>
+                    <span className="text-[10px] text-text-secondary">PNG, JPG up to 1MB</span>
                   </div>
 
                   {/* Preset Avatars Grid */}

@@ -79,6 +79,12 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
                 <input type="file" accept="image/*" onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    const fileSizeMB = file.size / (1024 * 1024);
+                    if (fileSizeMB > 1) {
+                      toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
+                      return;
+                    }
+                    toast.info(`Selected image: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
                     try {
                       toast.loading("Compressing image...");
                       const compressedFile = await compressImage(file, 200, 200, 0.7); // 200x200 max size
@@ -254,6 +260,12 @@ function SettingsEditor({ activeTenant, activeRole }) {
   const handleLogoChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      const fileSizeMB = file.size / (1024 * 1024);
+      if (fileSizeMB > 1) {
+        toast.error(`Logo size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
+        return;
+      }
+      toast.info(`Selected logo: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
       try {
         toast.loading("Compressing logo image...");
         const compressedFile = await compressImage(file, 400, 400, 0.7); // Rescale to max 400x400 for settings logos
