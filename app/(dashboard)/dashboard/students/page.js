@@ -35,7 +35,13 @@ export default function StudentRegistryPage() {
     sharedStudentFeeAddons,
     sharedFeeStructures,
     sharedNotifications,
-    setSharedNotifications
+    setSharedNotifications,
+    sharedRemarks,
+    setSharedRemarks,
+    sharedAcademicRecords,
+    setSharedAcademicRecords,
+    sharedStudentHistory,
+    setSharedStudentHistory
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -52,6 +58,7 @@ export default function StudentRegistryPage() {
   const [selectedStudentForPromotion, setSelectedStudentForPromotion] = useState(null);
   const [promotionClassId, setPromotionClassId] = useState('');
   const [resetFees, setResetFees] = useState(true);
+  const [activeDossierTab, setActiveDossierTab] = useState('documents');
 
   // Pre-fill next logical class helper
   const getNextLogicalClassId = (currentClassId) => {
@@ -81,6 +88,47 @@ export default function StudentRegistryPage() {
 
   const handlePromoteStudent = () => {
     if (!selectedStudentForPromotion || !promotionClassId) return;
+
+    // Archive previous year record before promotion resets active profile records
+    const studentId = selectedStudentForPromotion.id;
+    const currentClassId = selectedStudentForPromotion.class_id;
+    const currentClassName = getClassName(currentClassId);
+    const currentYear = activeTenant.settings?.academicYear || '2025-2026';
+
+    const prevAttendance = sharedAttendanceRecords[studentId] || '0.0%';
+    const prevFees = sharedFeeRecords[studentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
+    const prevMarks = sharedAcademicRecords[studentId] || [];
+    const prevRemarks = sharedRemarks[studentId] || [];
+
+    const archivedRecord = {
+      academic_year: currentYear,
+      class_id: currentClassId,
+      class_name: currentClassName,
+      attendance: prevAttendance,
+      fees: { ...prevFees },
+      academic_records: [...prevMarks],
+      remarks: [...prevRemarks]
+    };
+
+    setSharedStudentHistory(prev => {
+      const studentHistory = prev[studentId] || [];
+      const filteredHistory = studentHistory.filter(h => h.academic_year !== currentYear);
+      return {
+        ...prev,
+        [studentId]: [...filteredHistory, archivedRecord]
+      };
+    });
+
+    // Reset active marks and remarks for the new grade
+    setSharedAcademicRecords(prev => ({
+      ...prev,
+      [studentId]: []
+    }));
+
+    setSharedRemarks(prev => ({
+      ...prev,
+      [studentId]: []
+    }));
 
     // 1. Update student class_id
     const updatedStudents = sharedStudents.map(s => {
@@ -1418,7 +1466,10 @@ export default function StudentRegistryPage() {
       {/* STUDENT DOCUMENT DOSSIER MODAL */}
       <Modal
         open={!!selectedStudentForDossier}
-        onClose={() => setSelectedStudentForDossier(null)}
+        onClose={() => {
+          setSelectedStudentForDossier(null);
+          setActiveDossierTab('documents');
+        }}
         title="Student Documents & Dossier"
         icon={<FileText size={20} />}
         size="lg"
@@ -1443,71 +1494,187 @@ export default function StudentRegistryPage() {
               </div>
             </div>
 
-            {/* Document Upload Selector */}
-            <div className="p-5 bg-bg-main border border-border rounded-2xl space-y-4">
-              <span className="text-[10px] font-black text-accent uppercase tracking-widest block">Upload New Dossier Document</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Document Category</label>
-                  <select 
-                    id="docTypeSelector"
-                    className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
-                  >
-                    <option value="Aadhaar Card Copy">Aadhaar Card Copy</option>
-                    <option value="Birth Certificate">Birth Certificate</option>
-                    <option value="Prior Marksheet (CBSE/State)">Prior Marksheet (CBSE/State)</option>
-                    <option value="Transfer Certificate (TC)">Transfer Certificate (TC)</option>
-                    <option value="Medical Certificate">Medical Health Dossier</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95">
-                    <Plus size={14} />
-                    <span>Choose File & Upload</span>
-                    <input 
-                      type="file" 
-                      accept=".pdf,.doc,.docx,.jpg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        const docType = document.getElementById('docTypeSelector').value;
-                        if (file) {
-                          handleUploadDocument(file, docType);
-                        }
-                      }}
-                      className="hidden" 
-                    />
-                  </label>
-                </div>
-              </div>
+            {/* Segmented Tabs */}
+            <div className="flex gap-2 border-b border-border pb-px">
+              <button
+                type="button"
+                onClick={() => setActiveDossierTab('documents')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${
+                  activeDossierTab === 'documents'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Documents Registry
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDossierTab('history')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${
+                  activeDossierTab === 'history'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Academic History Logs
+              </button>
             </div>
 
-            {/* Documents List */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest block ml-1">Registered Documents Registry</span>
-              <div className="space-y-2">
-                {(selectedStudentForDossier.documents || []).map((doc, idx) => (
-                  <div key={idx} className="p-4 bg-bg-main border border-border hover:border-border rounded-2xl flex justify-between items-center transition-all font-inter">
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-text-primary">{doc.name}</p>
-                      <p className="text-[9px] text-text-secondary font-mono">{doc.fileName} • Uploaded on {doc.date}</p>
+            {activeDossierTab === 'documents' ? (
+              <div className="space-y-6">
+                {/* Document Upload Selector */}
+                <div className="p-5 bg-bg-main border border-border rounded-2xl space-y-4">
+                  <span className="text-[10px] font-black text-accent uppercase tracking-widest block">Upload New Dossier Document</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Document Category</label>
+                      <select 
+                        id="docTypeSelector"
+                        className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
+                      >
+                        <option value="Aadhaar Card Copy">Aadhaar Card Copy</option>
+                        <option value="Birth Certificate">Birth Certificate</option>
+                        <option value="Prior Marksheet (CBSE/State)">Prior Marksheet (CBSE/State)</option>
+                        <option value="Transfer Certificate (TC)">Transfer Certificate (TC)</option>
+                        <option value="Medical Certificate">Medical Health Dossier</option>
+                      </select>
                     </div>
-                    <a 
-                      href={doc.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200/60 text-text-primary text-\[10px] font-bold rounded-lg border border-border transition-all"
-                    >
-                      View File
-                    </a>
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <label className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95">
+                        <Plus size={14} />
+                        <span>Choose File & Upload</span>
+                        <input 
+                          type="file" 
+                          accept=".pdf,.doc,.docx,.jpg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            const docType = document.getElementById('docTypeSelector').value;
+                            if (file) {
+                              handleUploadDocument(file, docType);
+                            }
+                          }}
+                          className="hidden" 
+                        />
+                      </label>
+                    </div>
                   </div>
-                ))}
-                {(selectedStudentForDossier.documents || []).length === 0 && (
-                  <p className="text-xs text-text-secondary italic text-center py-6 border border-dashed border-border rounded-2xl">
-                    No documents uploaded. Click above to register educational/identity certificates.
-                  </p>
-                )}
+                </div>
+
+                {/* Documents List */}
+                <div className="space-y-3">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest block ml-1">Registered Documents Registry</span>
+                  <div className="space-y-2">
+                    {(selectedStudentForDossier.documents || []).map((doc, idx) => (
+                      <div key={idx} className="p-4 bg-bg-main border border-border hover:border-border rounded-2xl flex justify-between items-center transition-all font-inter">
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-text-primary">{doc.name}</p>
+                          <p className="text-[9px] text-text-secondary font-mono">{doc.fileName} • Uploaded on {doc.date}</p>
+                        </div>
+                        <a 
+                          href={doc.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200/60 text-text-primary text-\[10px] font-bold rounded-lg border border-border transition-all"
+                        >
+                          View File
+                        </a>
+                      </div>
+                    ))}
+                    {(selectedStudentForDossier.documents || []).length === 0 && (
+                      <p className="text-xs text-text-secondary italic text-center py-6 border border-dashed border-border rounded-2xl">
+                        No documents uploaded. Click above to register educational/identity certificates.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Academic History View */}
+                {(() => {
+                  const historyRecords = sharedStudentHistory[selectedStudentForDossier.id] || [];
+                  if (historyRecords.length === 0) {
+                    return (
+                      <p className="text-xs text-text-secondary italic text-center py-12 border border-dashed border-border rounded-2xl bg-bg-main/30">
+                        No archived academic history found. Student has not been promoted through any term yet.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-8 max-h-[500px] overflow-y-auto pr-1">
+                      {historyRecords.map((record, index) => (
+                        <div key={index} className="relative pl-6 border-l-2 border-accent/20 space-y-4">
+                          <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-accent border-2 border-bg-sidebar"></div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-black uppercase text-accent tracking-widest">Academic Year {record.academic_year}</span>
+                              <h4 className="text-sm font-bold text-text-primary mt-0.5">{record.class_name}</h4>
+                            </div>
+                            <div className="flex gap-2">
+                              <span className="px-2.5 py-1 bg-accent/5 border border-accent/10 rounded-lg text-[10px] font-bold text-text-primary">
+                                Attendance: {record.attendance}
+                              </span>
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
+                                record.fees?.status === 'PAID'
+                                  ? 'bg-success/5 border-success/15 text-success'
+                                  : record.fees?.status === 'PARTIAL'
+                                  ? 'bg-warning/5 border-warning/15 text-warning'
+                                  : 'bg-danger/5 border-danger/15 text-danger'
+                              }`}>
+                                Fees: {record.fees?.status} (₹{record.fees?.paid?.toLocaleString('en-IN')} / ₹{record.fees?.total?.toLocaleString('en-IN')})
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Performance */}
+                            <div className="bg-bg-main/60 border border-border p-4 rounded-xl space-y-3">
+                              <span className="text-[9px] font-black uppercase text-text-secondary tracking-wider block">Performance Sheet</span>
+                              {record.academic_records && record.academic_records.length > 0 ? (
+                                <div className="space-y-2">
+                                  {record.academic_records.map((ar, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs py-1.5 border-b border-border/50 last:border-0">
+                                      <span className="font-medium text-text-secondary truncate pr-2">{ar.subject}</span>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-bold text-text-primary">{ar.marks}</span>
+                                        <span className="px-1.5 py-0.5 bg-accent/10 text-[9px] font-black text-accent rounded uppercase">{ar.grade}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-text-secondary italic">No marksheet records compiled for this year.</p>
+                              )}
+                            </div>
+
+                            {/* Remarks */}
+                            <div className="bg-bg-main/60 border border-border p-4 rounded-xl space-y-3">
+                              <span className="text-[9px] font-black uppercase text-text-secondary tracking-wider block">Teacher Assessments</span>
+                              {record.remarks && record.remarks.length > 0 ? (
+                                <div className="space-y-3">
+                                  {record.remarks.map((rem, idx) => (
+                                    <div key={idx} className="p-2.5 bg-bg-sidebar border border-border/60 rounded-lg space-y-1">
+                                      <p className="text-[11px] text-text-primary font-medium italic">"{rem.remark}"</p>
+                                      <div className="flex justify-between items-center text-[9px] text-text-secondary font-semibold">
+                                        <span>{rem.teacher}</span>
+                                        <span>{rem.date}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-text-secondary italic">No teacher remarks documented for this term.</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         )}
       </Modal>

@@ -7,7 +7,7 @@ import {
   Clock, Plus, ArrowRight, ShieldCheck, Star, Sparkles, BookOpenCheck,
   AlertTriangle, CreditCard, ChevronRight, UserCheck, Megaphone, Package,
   BellRing, Receipt, Printer, Smartphone, Globe, Lock, Zap, IndianRupee,
-  QrCode, Building2, X, RefreshCw, BadgeCheck
+  QrCode, Building2, X, RefreshCw, BadgeCheck, History
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -226,7 +226,8 @@ function StudentDashboard() {
     sharedTransportRoutes,
     sharedFinalExamsPublished,
     sharedAcademicRecords,
-    sharedClassTestRecords
+    sharedClassTestRecords,
+    sharedStudentHistory
   } = useAuth();
 
 
@@ -600,6 +601,75 @@ function StudentDashboard() {
           </div>
         </div>
       )}
+
+      {/* Past Academic Years History */}
+      {(() => {
+        const myHistory = myStudentProfile ? (sharedStudentHistory[myStudentProfile.id] || []) : [];
+        if (myHistory.length === 0) return null;
+        return (
+          <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-5">
+            <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <History size={16} className="text-accent" />
+              <span>Past Academic Years</span>
+            </h3>
+            <div className="space-y-6">
+              {myHistory.map((record, index) => (
+                <div key={index} className="relative pl-5 border-l-2 border-accent/20 space-y-3">
+                  <div className="absolute -left-[6px] top-1 w-2.5 h-2.5 rounded-full bg-accent border-2 border-bg-sidebar"></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-accent tracking-widest">Academic Year {record.academic_year}</span>
+                      <h4 className="text-sm font-bold text-text-primary mt-0.5">{record.class_name}</h4>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className="px-2.5 py-1 bg-accent/5 border border-accent/10 rounded-lg text-[10px] font-bold text-text-primary">
+                        Attendance: {record.attendance}
+                      </span>
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
+                        record.fees?.status === 'PAID'
+                          ? 'bg-success/5 border-success/15 text-success'
+                          : record.fees?.status === 'PARTIAL'
+                          ? 'bg-warning/5 border-warning/15 text-warning'
+                          : 'bg-danger/5 border-danger/15 text-danger'
+                      }`}>
+                        Fees: {record.fees?.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {record.academic_records && record.academic_records.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {record.academic_records.map((ar, idx) => (
+                        <div key={idx} className="p-3 bg-bg-main/40 border border-border rounded-xl flex justify-between items-center text-xs">
+                          <span className="font-medium text-text-secondary truncate pr-2">{ar.subject}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-bold text-text-primary">{ar.marks}</span>
+                            <span className="px-1.5 py-0.5 bg-accent/10 text-[9px] font-black text-accent rounded uppercase">{ar.grade}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {record.remarks && record.remarks.length > 0 && (
+                    <div className="space-y-2">
+                      {record.remarks.map((rem, idx) => (
+                        <div key={idx} className="p-2.5 bg-bg-sidebar border border-border/60 rounded-lg">
+                          <p className="text-[11px] text-text-primary font-medium italic">"{rem.remark}"</p>
+                          <div className="flex justify-between items-center text-[9px] text-text-secondary font-semibold mt-1">
+                            <span>{rem.teacher}</span>
+                            <span>{rem.date}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -869,7 +939,8 @@ function ParentDashboard() {
     sharedStudentFeeAddons,
     sharedTransportRoutes,
     sharedFinalExamsPublished,
-    sharedClassTestRecords
+    sharedClassTestRecords,
+    sharedStudentHistory
   } = useAuth();
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -1519,6 +1590,70 @@ function ParentDashboard() {
                       )}
                     </div>
                   </div>
+
+                  {/* Past Academic Years for Child */}
+                  {(() => {
+                    const childHistory = sharedStudentHistory[child.id] || [];
+                    if (childHistory.length === 0) return null;
+                    return (
+                      <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-5">
+                        <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                          <History size={14} className="text-accent" />
+                          <span>Past Academic Years — {child.first_name}</span>
+                        </h3>
+                        <div className="space-y-5">
+                          {childHistory.map((record, hIdx) => (
+                            <div key={hIdx} className="relative pl-5 border-l-2 border-accent/20 space-y-3">
+                              <div className="absolute -left-[6px] top-1 w-2.5 h-2.5 rounded-full bg-accent border-2 border-bg-sidebar"></div>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] font-black uppercase text-accent tracking-widest">Year {record.academic_year}</span>
+                                  <h4 className="text-xs font-bold text-text-primary mt-0.5">{record.class_name}</h4>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                  <span className="px-2 py-0.5 bg-accent/5 border border-accent/10 rounded text-[9px] font-bold text-text-primary">
+                                    Attendance: {record.attendance}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                                    record.fees?.status === 'PAID'
+                                      ? 'bg-success/5 border-success/15 text-success'
+                                      : record.fees?.status === 'PARTIAL'
+                                      ? 'bg-warning/5 border-warning/15 text-warning'
+                                      : 'bg-danger/5 border-danger/15 text-danger'
+                                  }`}>
+                                    Fees: {record.fees?.status}
+                                  </span>
+                                </div>
+                              </div>
+                              {record.academic_records && record.academic_records.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {record.academic_records.map((ar, arIdx) => (
+                                    <div key={arIdx} className="p-2.5 bg-bg-main/40 border border-border rounded-lg flex justify-between items-center text-[11px]">
+                                      <span className="font-medium text-text-secondary truncate pr-2">{ar.subject}</span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-bold text-text-primary">{ar.marks}</span>
+                                        <span className="px-1 py-0.5 bg-accent/10 text-[8px] font-black text-accent rounded">{ar.grade}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {record.remarks && record.remarks.length > 0 && (
+                                <div className="space-y-1.5">
+                                  {record.remarks.map((rem, rIdx) => (
+                                    <div key={rIdx} className="p-2 bg-bg-sidebar border border-border/50 rounded-lg">
+                                      <p className="text-[10px] text-text-primary italic">"{rem.remark}"</p>
+                                      <span className="text-[8px] text-text-secondary font-semibold">{rem.teacher} — {rem.date}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );

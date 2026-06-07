@@ -163,6 +163,34 @@ export default function Providers({ children }) {
     ]
   });
 
+  const [sharedStudentHistory, setSharedStudentHistory] = useState({
+    'stud-1': [
+      {
+        academic_year: '2024-2025',
+        class_id: 'class-3',
+        class_name: 'Class XI - Science (CBSE)',
+        attendance: '91.4%',
+        fees: {
+          total: 42000,
+          paid: 42000,
+          remaining: 0,
+          status: 'PAID',
+          history: [
+            { id: 'rcpt-prev-101', date: '2025-05-10', amount: 42000, method: 'Net Banking' }
+          ]
+        },
+        academic_records: [
+          { subject: 'Physics Core theory', marks: '88 / 100', grade: 'A2', desc: 'Class Avg: 75' },
+          { subject: 'Advanced Calculus math', marks: '90 / 100', grade: 'A1', desc: 'Class Avg: 72' },
+          { subject: 'Organic Chemistry practical', marks: '44 / 50', grade: 'A1', desc: 'Class Avg: 40' }
+        ],
+        remarks: [
+          { teacher: 'Prof. Rajesh Iyer (Physics)', remark: 'Shows keen interest in experimental concepts. Consistent performer.', date: 'May 10, 2025' }
+        ]
+      }
+    ]
+  });
+
   const [activeParentId, setActiveParentId] = useState('parent-1');
 
   // Shared fee structure definitions for auto-allocation
@@ -899,7 +927,9 @@ export default function Providers({ children }) {
       sharedClassTestRecords,
       setSharedClassTestRecords,
       sharedSchoolAlerts,
-      setSharedSchoolAlerts
+      setSharedSchoolAlerts,
+      sharedStudentHistory,
+      setSharedStudentHistory
     }}>
       {children}
     </AuthContext.Provider>
