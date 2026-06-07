@@ -52,6 +52,12 @@ export default function StaffRegistryPage() {
 
   const handleUploadDocument = async (file, docType) => {
     if (!file || !selectedStaffForDossier) return;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 10) {
+      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
+      return;
+    }
+    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedStaffForDossier.id}-${docType.replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
@@ -234,6 +240,13 @@ export default function StaffRegistryPage() {
   const handlePdfUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 10) {
+      toast.error(`PDF size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller PDF.`);
+      return;
+    }
+    toast.success(`PDF selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
 
     toast.loading('Parsing PDF text elements...');
     try {
@@ -549,6 +562,12 @@ export default function StaffRegistryPage() {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
+                            const fileSizeMB = file.size / (1024 * 1024);
+                            if (fileSizeMB > 5) {
+                              toast.error(`Image size (${fileSizeMB.toFixed(2)} MB) exceeds 5MB limit. Please upload a smaller image.`);
+                              return;
+                            }
+                            toast.success(`Image selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 5MB limit)`);
                             const reader = new FileReader();
                             reader.onload = () => {
                               setFormData(prev => ({
