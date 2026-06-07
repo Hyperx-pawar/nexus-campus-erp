@@ -7,7 +7,7 @@ import {
   Wallet, Search, CreditCard, CheckCircle2, 
   ArrowRight, Plus, Receipt, Landmark, ShieldCheck, Download, AlertCircle, BellRing,
   Trash2, Edit3, Bus, Home as HomeIcon, Eye, X, Printer, Bell, Building2, User,
-  Zap, BadgeCheck, Clock, Filter, Globe, ChevronDown
+  Zap, BadgeCheck, Clock, Filter, Globe, ChevronDown, ClipboardList
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -74,6 +74,7 @@ export default function FinanceFeesPage() {
   const [paymentMethod, setPaymentMethod] = useState('Razorpay UPI');
   const [classFilter, setClassFilter] = useState('all');
   const [expandedDays, setExpandedDays] = useState({});
+  const [txFilter, setTxFilter] = useState('all'); // all | online | offline
 
   // Switch to specific tab if passed in search parameters safely without Suspense
   React.useEffect(() => {
@@ -200,6 +201,16 @@ export default function FinanceFeesPage() {
       return dateStr;
     }
   };
+
+  const isOnlineTx = (tx) => {
+    if (!tx || !tx.method) return false;
+    const m = tx.method.toLowerCase();
+    const id = (tx.id || '').toLowerCase();
+    return id.startsWith('onl') || m.includes('upi') || m.includes('card') || m.includes('net banking') || m.includes('qr') || m.includes('online') || m.includes('transfer');
+  };
+
+  const onlineTxs = useMemo(() => transactionLogs.filter(tx => isOnlineTx(tx)), [transactionLogs]);
+  const offlineTxs = useMemo(() => transactionLogs.filter(tx => !isOnlineTx(tx)), [transactionLogs]);
 
   // Filter students by search and class
   const filteredStudents = tenantStudents.filter(s => {
@@ -547,7 +558,7 @@ export default function FinanceFeesPage() {
       {/* Tabs Selector */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div className="flex gap-2 p-1 bg-slate-100/50 border border-border rounded-2xl w-fit flex-wrap">
-          {['overview', 'structures', 'dues', 'online'].map(tab => (
+          {['overview', 'structures', 'dues', 'online', 'transactions'].map(tab => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setSelectedStudentId(null); }}
@@ -558,7 +569,8 @@ export default function FinanceFeesPage() {
               }`}
             >
               {tab === 'online' && <Zap size={11} className={activeTab === 'online' ? 'text-accent' : ''} />}
-              {tab === 'structures' ? 'Fee Structures' : tab === 'dues' ? 'Dues & Reminders' : tab === 'online' ? 'Online Payments' : 'Overview'}
+              {tab === 'transactions' && <ClipboardList size={11} className={activeTab === 'transactions' ? 'text-accent' : ''} />}
+              {tab === 'structures' ? 'Fee Structures' : tab === 'dues' ? 'Dues & Reminders' : tab === 'online' ? 'Online Payments' : tab === 'transactions' ? 'All Transactions' : 'Overview'}
               {tab === 'online' && (() => {
                 const onlineCount = (() => {
                   const logs = [];
@@ -1591,6 +1603,249 @@ export default function FinanceFeesPage() {
                   Verified payments are permanently settled in the student's fee ledger.
                 </p>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===== ALL TRANSACTIONS TAB ===== */}
+      {activeTab === 'transactions' && (() => {
+        // Build complete list of all transactions (online + offline)
+        // Online: starts with ONL- or has online payment methods
+        // Offline: standard counter collections, cash, RTGS, etc.
+        const allTxns = [];
+        tenantStudents.forEach(s => {
+          const fee = sharedFeeRecords[s.id];
+          if (fee && fee.history) {
+            fee.history.forEach(tx => {
+              const online = isOnlineTx(tx);
+              allTxns.push({
+                ...tx,
+                isOnline: online,
+                type: 'FEE',
+                studentName: `${s.first_name} ${s.last_name}`,
+                admissionNo: s.admission_no,
+                className: getClassName(s.class_id),
+                studentId: s.id
+              });
+            });
+          }
+        });
+
+        // Add hostel inventory payouts
+        (sharedHostelInventoryAllocations || []).filter(a => a.tenant_id === activeTenant.id).forEach(alloc => {
+          (alloc.payments || []).forEach(p => {
+            const stud = tenantStudents.find(s => s.id === alloc.studentId);
+            if (stud) {
+              const online = isOnlineTx(p);
+              allTxns.push({
+                ...p,
+                isOnline: online,
+                type: 'HOSTEL',
+                item: alloc.item,
+                studentName: `${stud.first_name} ${stud.last_name}`,
+                admissionNo: stud.admission_no,
+                className: getClassName(stud.class_id),
+                studentId: stud.id
+              });
+            }
+          });
+        });
+
+        // Sort descending by date
+        allTxns.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Calculate counts and sums
+        const totalCount = allTxns.length;
+        const totalAmount = allTxns.reduce((sum, tx) => sum + tx.amount, 0);
+
+        const onlineList = allTxns.filter(tx => tx.isOnline);
+        const onlineCount = onlineList.length;
+        const onlineAmount = onlineList.reduce((sum, tx) => sum + tx.amount, 0);
+
+        const offlineList = allTxns.filter(tx => !tx.isOnline);
+        const offlineCount = offlineList.length;
+        const offlineAmount = offlineList.reduce((sum, tx) => sum + tx.amount, 0);
+
+        // Filter by tab search query and class, and online/offline category
+        const filteredTxns = allTxns.filter(tx => {
+          const term = searchQuery.toLowerCase();
+          const matchesSearch = 
+            tx.studentName.toLowerCase().includes(term) ||
+            tx.admissionNo.toLowerCase().includes(term) ||
+            tx.id.toLowerCase().includes(term) ||
+            (tx.utr && tx.utr.toLowerCase().includes(term));
+            
+          const matchesClass = classFilter === 'all' || tenantStudents.find(s => s.id === tx.studentId)?.class_id === classFilter;
+          const matchesType = 
+            txFilter === 'all' || 
+            (txFilter === 'online' && tx.isOnline) || 
+            (txFilter === 'offline' && !tx.isOnline);
+
+          return matchesSearch && matchesClass && matchesType;
+        });
+
+        return (
+          <div className="p-6 bg-bg-sidebar border border-border rounded-3xl space-y-6 animate-slide-up">
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-5 bg-slate-50/50 border border-border rounded-2xl relative overflow-hidden">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">All Transactions</span>
+                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-black/20 text-text-secondary text-[9px] font-black rounded-full uppercase">{totalCount} count</span>
+                </div>
+                <p className="text-2xl font-black font-outfit text-text-primary mt-3">₹{totalAmount.toLocaleString('en-IN')}</p>
+                <p className="text-[10px] text-text-secondary mt-1 opacity-70">Total volume logged</p>
+              </div>
+
+              <div className="p-5 bg-accent/5 border border-border rounded-2xl relative overflow-hidden">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-accent uppercase tracking-widest">Online Transactions</span>
+                  <span className="px-2 py-0.5 bg-accent/15 text-accent text-[9px] font-black rounded-full uppercase">{onlineCount} count</span>
+                </div>
+                <p className="text-2xl font-black font-outfit text-accent mt-3">₹{onlineAmount.toLocaleString('en-IN')}</p>
+                <p className="text-[10px] text-text-secondary mt-1 opacity-70">UPI, QR, Cards & Gateways</p>
+              </div>
+
+              <div className="p-5 bg-success/5 border border-border rounded-2xl relative overflow-hidden">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-success uppercase tracking-widest">Offline Transactions</span>
+                  <span className="px-2 py-0.5 bg-success/15 text-success text-[9px] font-black rounded-full uppercase">{offlineCount} count</span>
+                </div>
+                <p className="text-2xl font-black font-outfit text-success mt-3">₹{offlineAmount.toLocaleString('en-IN')}</p>
+                <p className="text-[10px] text-text-secondary mt-1 opacity-70">Cash, RTGS & Counter Slips</p>
+              </div>
+            </div>
+
+            {/* Filter toolbar */}
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-text-primary font-outfit">Transactions Ledger</h3>
+                  <p className="text-[10px] text-text-secondary">Historical transaction records for the active school.</p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Category switcher */}
+                  <div className="flex p-1 bg-slate-100 dark:bg-black/15 border border-border rounded-xl">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'online', label: 'Online' },
+                      { id: 'offline', label: 'Offline' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setTxFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase ${
+                          txFilter === f.id 
+                            ? 'bg-white dark:bg-bg-sidebar text-text-primary shadow-sm border border-border/40' 
+                            : 'text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative group/txs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={12} />
+                    <input 
+                      type="text" 
+                      placeholder="Receipt or name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-slate-100/50 border border-border rounded-xl py-1.5 pl-8 pr-3 outline-none focus:border-accent/40 transition-all text-xs text-text-primary w-36"
+                    />
+                  </div>
+
+                  {/* Class */}
+                  <select
+                    value={classFilter}
+                    onChange={(e) => setClassFilter(e.target.value)}
+                    className="text-xs bg-bg-main text-text-primary py-1.5 px-3 rounded-xl border border-border font-bold"
+                  >
+                    <option value="all">All Classes</option>
+                    {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Transactions list table */}
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                      <th className="pb-3 pl-2">Student</th>
+                      <th className="pb-3">Class</th>
+                      <th className="pb-3">Receipt ID</th>
+                      <th className="pb-3">Type</th>
+                      <th className="pb-3">Method</th>
+                      <th className="pb-3">Date</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right pr-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border text-xs">
+                    {filteredTxns.map((tx, idx) => {
+                      const isVerificationPending = tx.status === 'PENDING_VERIFICATION';
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 pl-2 font-bold text-text-primary">
+                            <div>
+                              <span>{tx.studentName}</span>
+                              <span className="block text-[8px] text-text-secondary font-mono leading-none mt-0.5">{tx.admissionNo}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 text-text-secondary text-[10px]">{tx.className}</td>
+                          <td className="py-3 font-mono text-text-secondary font-semibold text-[10px]">
+                            {tx.id}
+                            {tx.utr && <span className="ml-2 text-[8px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-sans font-semibold border border-border">UTR: {tx.utr}</span>}
+                          </td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-[8px] font-black uppercase border rounded ${
+                              tx.type === 'HOSTEL' 
+                                ? 'bg-purple-500/10 border-purple-500/25 text-purple-500' 
+                                : 'bg-indigo-500/10 border-indigo-500/25 text-indigo-500'
+                            }`}>
+                              {tx.type === 'HOSTEL' ? '🏠 Hostel' : '⚡ Fee'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-text-secondary font-medium">
+                            <span className="inline-flex items-center gap-1">
+                              {tx.isOnline ? (
+                                <Globe size={11} className="text-accent" />
+                              ) : (
+                                <Landmark size={11} className="text-success" />
+                              )}
+                              <span>{tx.method}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 text-text-secondary text-[10px]">{tx.date}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-[8.5px] font-black uppercase border rounded ${
+                              isVerificationPending
+                                ? 'bg-warning/15 border-warning/35 text-warning'
+                                : 'bg-success/15 border-success/35 text-success'
+                            }`}>
+                              {isVerificationPending ? 'Pending' : 'Cleared'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right pr-2 font-mono font-black text-text-primary">
+                            ₹{tx.amount.toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredTxns.length === 0 && (
+                <p className="text-center py-8 text-xs text-text-secondary italic">No transaction records match the filters.</p>
+              )}
             </div>
           </div>
         );
