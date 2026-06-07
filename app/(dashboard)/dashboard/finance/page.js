@@ -7,7 +7,7 @@ import {
   Wallet, Search, CreditCard, CheckCircle2, 
   ArrowRight, Plus, Receipt, Landmark, ShieldCheck, Download, AlertCircle, BellRing,
   Trash2, Edit3, Bus, Home as HomeIcon, Eye, X, Printer, Bell, Building2, User,
-  Zap, BadgeCheck, Clock, Filter, Globe
+  Zap, BadgeCheck, Clock, Filter, Globe, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -73,6 +73,7 @@ export default function FinanceFeesPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Razorpay UPI');
   const [classFilter, setClassFilter] = useState('all');
+  const [expandedDays, setExpandedDays] = useState({});
 
   // Switch to specific tab if passed in search parameters safely without Suspense
   React.useEffect(() => {
@@ -815,21 +816,52 @@ export default function FinanceFeesPage() {
                   const maxAmt = dailyCollections.reduce((max, day) => Math.max(max, day.amount), 1);
                   return dailyCollections.map((day, idx) => {
                     const percentage = Math.round((day.amount / maxAmt) * 100);
+                    const isExpanded = !!expandedDays[day.date];
                     return (
-                      <div key={idx} className="space-y-1">
-                        <div className="flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-bold text-text-primary">{formatDailyDate(day.date)}</span>
-                            <span className="ml-2 text-[9px] font-semibold text-text-secondary opacity-60">({day.count} {day.count === 1 ? 'payment' : 'payments'})</span>
+                      <div key={idx} className="p-2 hover:bg-slate-50 dark:hover:bg-black/10 rounded-2xl border border-transparent hover:border-border/30 transition-all">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDays(prev => ({ ...prev, [day.date]: !prev[day.date] }))}
+                          className="w-full flex justify-between items-center text-xs text-left"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <ChevronDown 
+                              size={12} 
+                              className={`text-text-secondary shrink-0 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} 
+                            />
+                            <div className="truncate">
+                              <span className="font-bold text-text-primary">{formatDailyDate(day.date)}</span>
+                              <span className="ml-1.5 text-[9px] font-semibold text-text-secondary opacity-60">({day.count})</span>
+                            </div>
                           </div>
-                          <span className="font-mono font-black text-accent">₹{day.amount.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 dark:bg-black/10 rounded-full overflow-hidden">
+                          <span className="font-mono font-black text-accent shrink-0">₹{day.amount.toLocaleString('en-IN')}</span>
+                        </button>
+                        
+                        <div className="h-1 bg-slate-100 dark:bg-black/15 rounded-full overflow-hidden mt-2 ml-4.5">
                           <div 
                             className="h-full bg-gradient-to-r from-accent to-indigo-500 rounded-full transition-all duration-500" 
                             style={{ width: `${percentage}%` }} 
                           />
                         </div>
+
+                        {/* Collapsible Nested Transactions List */}
+                        {isExpanded && (
+                          <div className="mt-2.5 ml-4.5 pl-3 border-l border-accent/25 space-y-2.5 animate-fade-in">
+                            {transactionLogs
+                              .filter(tx => tx.date === day.date && tx.status !== 'PENDING_VERIFICATION')
+                              .map((tx, tIdx) => (
+                                <div key={tIdx} className="flex justify-between items-center text-[10px] py-1 border-b border-border/40 last:border-b-0 gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-text-primary truncate">{tx.studentName}</p>
+                                    <p className="text-[8px] text-text-secondary opacity-85 truncate">
+                                      <span className="font-mono">{tx.id}</span> • {tx.method}
+                                    </p>
+                                  </div>
+                                  <span className="font-mono font-bold text-success shrink-0">+₹{tx.amount.toLocaleString('en-IN')}</span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     );
                   });
