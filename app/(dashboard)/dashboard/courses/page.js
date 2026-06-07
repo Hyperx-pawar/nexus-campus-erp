@@ -212,8 +212,8 @@ export default function CoursesLMSPage() {
       return;
     }
     const fileSizeMB = selectedFile.size / (1024 * 1024);
-    if (fileSizeMB > 2) {
-      toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+    if (fileSizeMB > 10) {
+      toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
       return;
     }
     try {
@@ -265,8 +265,8 @@ export default function CoursesLMSPage() {
     }
     if (materialFile) {
       const fileSizeMB = materialFile.size / (1024 * 1024);
-      if (fileSizeMB > 2) {
-        toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+      if (fileSizeMB > 10) {
+        toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
         return;
       }
     }
@@ -540,11 +540,11 @@ export default function CoursesLMSPage() {
                             const file = e.target.files?.[0];
                             if (file) {
                               const fileSizeMB = file.size / (1024 * 1024);
-                              if (fileSizeMB > 2) {
-                                toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+                              if (fileSizeMB > 10) {
+                                toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
                                 return;
                               }
-                              toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+                              toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
                               setMaterialFile(file);
                             }
                           }}
@@ -559,11 +559,11 @@ export default function CoursesLMSPage() {
                             const file = e.dataTransfer.files?.[0];
                             if (file) {
                               const fileSizeMB = file.size / (1024 * 1024);
-                              if (fileSizeMB > 2) {
-                                toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+                              if (fileSizeMB > 10) {
+                                toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
                                 return;
                               }
-                              toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+                              toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
                               setMaterialFile(file);
                             }
                           }}
@@ -705,7 +705,7 @@ export default function CoursesLMSPage() {
               <div className="p-4 bg-bg-main border border-border rounded-2xl space-y-2">
                 <span className="text-[9px] font-black text-danger uppercase tracking-widest">Active Task</span>
                 <p className="text-xs font-bold text-text-primary">Assignment 1: Syllabus Core Review</p>
-                <p className="text-[9px] text-text-secondary font-bold">Submit notes/answers as PDF or DOC. Max 2MB.</p>
+                <p className="text-[9px] text-text-secondary font-bold">Submit notes/answers as PDF or DOC. Max 10MB.</p>
               </div>
 
               {/* Notes-only policy notice */}
@@ -736,11 +736,11 @@ export default function CoursesLMSPage() {
                       const file = e.target.files?.[0];
                       if (file) {
                         const fileSizeMB = file.size / (1024 * 1024);
-                        if (fileSizeMB > 2) {
-                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+                        if (fileSizeMB > 10) {
+                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
                           return;
                         }
-                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
                         setSelectedFile(file);
                       }
                     }}
@@ -755,11 +755,11 @@ export default function CoursesLMSPage() {
                       const file = e.dataTransfer.files?.[0];
                       if (file) {
                         const fileSizeMB = file.size / (1024 * 1024);
-                        if (fileSizeMB > 2) {
-                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+                        if (fileSizeMB > 10) {
+                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
                           return;
                         }
-                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
                         setSelectedFile(file);
                       }
                     }}

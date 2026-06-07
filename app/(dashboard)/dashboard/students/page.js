@@ -112,11 +112,11 @@ export default function StudentRegistryPage() {
   const handleUploadDocument = async (file, docType) => {
     if (!file || !selectedStudentForDossier) return;
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > 2) {
-      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+    if (fileSizeMB > 10) {
+      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
       return;
     }
-    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedStudentForDossier.id}-${docType.replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
@@ -550,11 +550,11 @@ export default function StudentRegistryPage() {
     if (!file) return;
 
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > 2) {
-      toast.error(`PDF size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller PDF.`);
+    if (fileSizeMB > 10) {
+      toast.error(`PDF size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller PDF.`);
       return;
     }
-    toast.success(`PDF selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+    toast.success(`PDF selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
 
     toast.loading('Parsing PDF text elements...');
     try {

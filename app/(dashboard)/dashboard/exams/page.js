@@ -646,7 +646,7 @@ Q5. Calculate the equivalent resistance when three resistors of 2 Ω, 3 Ω, and 
   const triggerScanSimulation = (file) => {
     if (!file) return;
     const isImage = file.type.startsWith('image/');
-    const limitMB = isImage ? 1 : 2;
+    const limitMB = isImage ? 1 : 10;
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > limitMB) {
       toast.error(`${isImage ? 'Image' : 'PDF'} size (${fileSizeMB.toFixed(2)} MB) exceeds ${limitMB}MB limit. Please upload a smaller file.`);

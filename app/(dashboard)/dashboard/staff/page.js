@@ -53,11 +53,11 @@ export default function StaffRegistryPage() {
   const handleUploadDocument = async (file, docType) => {
     if (!file || !selectedStaffForDossier) return;
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > 2) {
-      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit. Please upload a smaller file.`);
+    if (fileSizeMB > 10) {
+      toast.error(`Document size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
       return;
     }
-    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 2MB limit)`);
+    toast.info(`Uploading document: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedStaffForDossier.id}-${docType.replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
