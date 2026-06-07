@@ -78,8 +78,11 @@ export default function SchoolAdminDashboard() {
         sum += fee.paid || 0;
       }
     });
+    (sharedHostelInventoryAllocations || []).filter(a => a.tenant_id === activeTenant.id).forEach(a => {
+      sum += a.paid || 0;
+    });
     return sum;
-  }, [tenantStudents, sharedFeeRecords]);
+  }, [tenantStudents, sharedFeeRecords, sharedHostelInventoryAllocations, activeTenant.id]);
 
   const getClassName = (classId) => {
     const cls = (sharedClasses || []).find(c => c.id === classId);

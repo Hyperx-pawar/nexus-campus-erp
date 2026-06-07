@@ -75,6 +75,8 @@ export default function FinanceFeesPage() {
   const [classFilter, setClassFilter] = useState('all');
   const [expandedDays, setExpandedDays] = useState({});
   const [txFilter, setTxFilter] = useState('all'); // all | online | offline
+  const [paymentType, setPaymentType] = useState('tuition'); // 'tuition' | 'hostel_inventory'
+  const [selectedInventoryAllocId, setSelectedInventoryAllocId] = useState('');
 
   // Switch to specific tab if passed in search parameters safely without Suspense
   React.useEffect(() => {
@@ -138,31 +140,86 @@ export default function FinanceFeesPage() {
     let totalOutstanding = 0;
     let overdueStudentsCount = 0;
 
+    // Calculate Hostel Inventory totals
+    let hostelExpected = 0;
+    let hostelCollected = 0;
+    let hostelOutstanding = 0;
+
+    (sharedHostelInventoryAllocations || []).filter(a => a.tenant_id === activeTenant.id).forEach(alloc => {
+      hostelExpected += alloc.cost || 0;
+      hostelCollected += alloc.paid || 0;
+      hostelOutstanding += (alloc.cost - (alloc.paid || 0));
+    });
+
     tenantStudents.forEach(s => {
       const fee = sharedFeeRecords[s.id] || { total: 0, paid: 0, remaining: 0 };
       totalExpected += fee.total;
       totalCollected += fee.paid;
       totalOutstanding += fee.remaining;
-      if (fee.remaining > 0) overdueStudentsCount++;
+
+      // Check if student has unpaid hostel inventory
+      const hasUnpaidHostelInv = (sharedHostelInventoryAllocations || [])
+        .some(a => a.studentId === s.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
+
+      if (fee.remaining > 0 || hasUnpaidHostelInv) overdueStudentsCount++;
     });
 
-    return { totalExpected, totalCollected, totalOutstanding, overdueStudentsCount };
-  }, [tenantStudents, sharedFeeRecords]);
+    const unifiedExpected = totalExpected + hostelExpected;
+    const unifiedCollected = totalCollected + hostelCollected;
+    const unifiedOutstanding = totalOutstanding + hostelOutstanding;
 
-  // Compile transaction logs from all students
+    return {
+      totalExpected: unifiedExpected,
+      totalCollected: unifiedCollected,
+      totalOutstanding: unifiedOutstanding,
+      overdueStudentsCount,
+      tuitionExpected: totalExpected,
+      tuitionCollected: totalCollected,
+      tuitionOutstanding: totalOutstanding,
+      hostelExpected,
+      hostelCollected,
+      hostelOutstanding
+    };
+  }, [tenantStudents, sharedFeeRecords, sharedHostelInventoryAllocations, activeTenant.id]);
+
+  // Compile transaction logs from all students (including hostel inventory payments)
   const transactionLogs = useMemo(() => {
     const logs = [];
     tenantStudents.forEach(s => {
       const fee = sharedFeeRecords[s.id];
       if (fee && fee.history) {
         fee.history.forEach(tx => {
-          logs.push({ ...tx, studentName: `${s.first_name} ${s.last_name}`, classId: s.class_id, studentId: s.id });
+          logs.push({
+            ...tx,
+            type: 'FEE',
+            studentName: `${s.first_name} ${s.last_name}`,
+            classId: s.class_id,
+            studentId: s.id
+          });
         });
       }
     });
+
+    // Add hostel inventory payments
+    (sharedHostelInventoryAllocations || []).filter(a => a.tenant_id === activeTenant.id).forEach(alloc => {
+      const stud = tenantStudents.find(s => s.id === alloc.studentId);
+      if (stud) {
+        (alloc.payments || []).forEach(p => {
+          logs.push({
+            ...p,
+            type: 'HOSTEL',
+            item: alloc.item,
+            studentName: `${stud.first_name} ${stud.last_name}`,
+            classId: stud.class_id,
+            studentId: stud.id
+          });
+        });
+      }
+    });
+
     logs.sort((a, b) => new Date(b.date) - new Date(a.date));
     return logs;
-  }, [tenantStudents, sharedFeeRecords]);
+  }, [tenantStudents, sharedFeeRecords, sharedHostelInventoryAllocations, activeTenant.id]);
 
   // Group transaction logs to calculate daily fee collection summaries
   const dailyCollections = useMemo(() => {
@@ -252,10 +309,16 @@ export default function FinanceFeesPage() {
         s.admission_no.toLowerCase().includes(term) ||
         className.includes(term);
       const matchClass = collectClassFilter === 'all' || s.class_id === collectClassFilter;
-      const hasDues = (sharedFeeRecords[s.id]?.remaining || 0) > 0;
+      
+      const fee = sharedFeeRecords[s.id] || { remaining: 0 };
+      const pendingHostelInv = (sharedHostelInventoryAllocations || [])
+        .filter(a => a.studentId === s.id && a.tenant_id === activeTenant.id && a.status !== 'PAID')
+        .reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+      const hasDues = (fee.remaining || 0) > 0 || pendingHostelInv > 0;
+
       return matchSearch && matchClass && hasDues;
     });
-  }, [tenantStudents, collectSearch, collectClassFilter, sharedFeeRecords]);
+  }, [tenantStudents, collectSearch, collectClassFilter, sharedFeeRecords, sharedHostelInventoryAllocations, activeTenant.id]);
 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'];
   if (!allowedRoles.includes(activeRole)) {
@@ -269,9 +332,122 @@ export default function FinanceFeesPage() {
       return;
     }
 
-    const currentFee = sharedFeeRecords[selectedStudentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
     const payAmt = Number(paymentAmount);
+    const student = sharedStudents.find(s => s.id === selectedStudentId);
+    if (!student) return;
 
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const receiptId = `RCPT-${paymentType === 'hostel_inventory' ? 'INV-' : ''}${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (paymentType === 'hostel_inventory') {
+      if (!selectedInventoryAllocId) {
+        toast.error('Please select a hostel inventory item to collect payment for.');
+        return;
+      }
+      const alloc = (sharedHostelInventoryAllocations || []).find(a => a.id === selectedInventoryAllocId);
+      if (!alloc) return;
+
+      const outstanding = alloc.cost - (alloc.paid || 0);
+      if (payAmt > outstanding) {
+        toast.error(`Payment amount (₹${payAmt.toLocaleString('en-IN')}) exceeds outstanding balance (₹${outstanding.toLocaleString('en-IN')}).`);
+        return;
+      }
+
+      const newPaid = (alloc.paid || 0) + payAmt;
+      const newStatus = newPaid >= alloc.cost ? 'PAID' : 'PARTIAL';
+
+      const paymentRecord = {
+        id: receiptId,
+        date: now.toISOString().split('T')[0],
+        amount: payAmt,
+        method: paymentMethod
+      };
+
+      setSharedHostelInventoryAllocations(prev => prev.map(a => {
+        if (a.id === selectedInventoryAllocId) {
+          return {
+            ...a,
+            paid: newPaid,
+            status: newStatus,
+            payments: [...(a.payments || []), paymentRecord]
+          };
+        }
+        return a;
+      }));
+
+      const receipt = {
+        id: receiptId,
+        date: now.toISOString().split('T')[0],
+        dateDisplay: dateStr,
+        time: timeStr,
+        amount: payAmt,
+        method: paymentMethod,
+        studentName: `${student.first_name} ${student.last_name}`,
+        admissionNo: student.admission_no,
+        className: getClassName(student.class_id),
+        schoolName: activeTenant.name,
+        totalFee: alloc.cost,
+        newPaid,
+        newRemaining: alloc.cost - newPaid,
+        newStatus,
+        collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier',
+        schoolAddress: activeTenant.address || '',
+        schoolPhone: activeTenant.phone || '',
+        schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
+        schoolAffiliation: activeTenant.affiliation || '',
+        schoolEstYear: activeTenant.estYear || '',
+        schoolLogo: activeTenant.logo || '',
+        schoolSubdomain: activeTenant.subdomain || '',
+        feeBreakdown: [
+          { label: `${alloc.item} (Hostel Inventory Item)`, code: 'HINV', amount: alloc.cost }
+        ]
+      };
+
+      setLastReceipt(receipt);
+      setShowReceiptModal(true);
+      setShowCollectModal(false);
+      setPaymentAmount('');
+      setSelectedStudentId(null);
+      setCollectSearch('');
+      setSelectedInventoryAllocId('');
+      setPaymentType('tuition'); // Reset
+
+      const notifBase = { date: dateStr, author: `Fee Counter — ${activeTenant.name}`, tenant_id: activeTenant.id };
+      const parent = sharedParents?.find(p => p.id === student.parent_id && p.tenant_id === activeTenant.id);
+
+      toast.success(`✅ Receipt ${receiptId} generated! ₹${payAmt.toLocaleString('en-IN')} collected for ${alloc.item}.`);
+      setTimeout(() => toast.info(`📨 School Admin notified: Hostel payment of ₹${payAmt.toLocaleString('en-IN')} received.`), 600);
+      if (parent) {
+        setTimeout(() => toast.success(`👨‍👩‍👧 Parent (${parent.first_name} ${parent.last_name}) notified.`), 1200);
+        if (setSharedNotifications) {
+          const notifId = `notif-${Date.now()}-${student.id}`;
+          setSharedNotifications(prev => [
+            {
+              id: notifId,
+              tenant_id: activeTenant.id,
+              recipient_id: parent.id,
+              title: `🏠 Hostel Inventory Payment Confirmed: ${student.first_name}`,
+              body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} paid for ${alloc.item}. Outstanding: ₹${(alloc.cost - newPaid).toLocaleString('en-IN')}.`,
+              type: 'FEE_PAYMENT',
+              date: now.toISOString().split('T')[0],
+              read: false,
+              metadata: { 
+                receiptId, 
+                amount: payAmt, 
+                studentId: student.id,
+                receiptDetails: receipt 
+              }
+            },
+            ...prev
+          ]);
+        }
+      }
+      return;
+    }
+
+    const currentFee = sharedFeeRecords[selectedStudentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
     if (payAmt > currentFee.remaining) {
       toast.error(`Payment amount (₹${payAmt.toLocaleString('en-IN')}) exceeds outstanding balance (₹${currentFee.remaining.toLocaleString('en-IN')}).`);
       return;
@@ -280,11 +456,6 @@ export default function FinanceFeesPage() {
     const newPaid = currentFee.paid + payAmt;
     const newRemaining = currentFee.total - newPaid;
     const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
-    const student = sharedStudents.find(s => s.id === selectedStudentId);
-    const now = new Date();
-    const receiptId = `RCPT-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const receipt = {
       id: receiptId,
@@ -302,7 +473,6 @@ export default function FinanceFeesPage() {
       newRemaining,
       newStatus,
       collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier',
-      // Institution details
       schoolAddress: activeTenant.address || '',
       schoolPhone: activeTenant.phone || '',
       schoolEmail: activeTenant.email || `admin@${activeTenant.subdomain}.edu.in`,
@@ -310,10 +480,8 @@ export default function FinanceFeesPage() {
       schoolEstYear: activeTenant.estYear || '',
       schoolLogo: activeTenant.logo || '',
       schoolSubdomain: activeTenant.subdomain || '',
-      // Fee breakdown
       feeBreakdown: (() => {
-        const s = sharedStudents.find(st => st.id === selectedStudentId);
-        const structures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === s?.class_id);
+        const structures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === student?.class_id);
         const addons = sharedStudentFeeAddons[selectedStudentId] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
         const rows = structures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
         if (addons.transport.enabled && addons.transport.fee > 0) rows.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
@@ -333,17 +501,14 @@ export default function FinanceFeesPage() {
       }
     }));
 
-    // ---- Notifications ----
     const notifBase = { date: dateStr, author: `Fee Counter — ${activeTenant.name}`, tenant_id: activeTenant.id };
     const parent = sharedParents?.find(p => p.id === student.parent_id && p.tenant_id === activeTenant.id);
 
-    // Toast chain: Admin → Student → Parent
     toast.success(`✅ Receipt ${receiptId} generated! ₹${payAmt.toLocaleString('en-IN')} collected from ${student.first_name} ${student.last_name}.`);
     setTimeout(() => toast.info(`📨 School Admin notified: Fee of ₹${payAmt.toLocaleString('en-IN')} received for ${student.first_name}.`), 600);
     setTimeout(() => toast.success(`📲 Notification sent to student: ${student.first_name} — Payment of ₹${payAmt.toLocaleString('en-IN')} confirmed!`), 1200);
     if (parent) setTimeout(() => toast.success(`👨‍👩‍👧 Parent (${parent.first_name} ${parent.last_name}) notified of fee payment.`), 1800);
 
-    // Add to sharedNotifications
     if (parent && setSharedNotifications) {
       const notifId = `notif-${Date.now()}-${student.id}`;
       setSharedNotifications(prev => [
@@ -367,7 +532,6 @@ export default function FinanceFeesPage() {
       ]);
     }
 
-    // Add to shared notices board
     if (setSharedNotices) {
       setSharedNotices(prev => [{
         id: Date.now(),
@@ -377,7 +541,6 @@ export default function FinanceFeesPage() {
       }, ...prev]);
     }
 
-    // Show receipt
     setLastReceipt(receipt);
     setShowReceiptModal(true);
     setShowCollectModal(false);
@@ -625,7 +788,33 @@ export default function FinanceFeesPage() {
 
       {/* ===== OVERVIEW TAB ===== */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-6">
+          {/* Hostel Inventory Payments Summary Banner */}
+          <div className="p-5 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-transparent border border-purple-500/15 rounded-[2rem] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-slide-up">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg">
+                  <ClipboardList size={14} />
+                </span>
+                <h4 className="text-xs font-black uppercase tracking-wider text-purple-700 dark:text-purple-400 font-outfit">Hostel Inventory Financial Summary</h4>
+              </div>
+              <p className="text-[11px] text-text-secondary leading-relaxed">Overall counts and outstanding dues of hostel-issued equipment (mattress, lamp, study desk, etc.) for residential students.</p>
+            </div>
+            <div className="flex gap-4 flex-wrap w-full md:w-auto">
+              {[
+                { label: 'Inventory Expected', val: metrics.hostelExpected, color: 'text-text-primary' },
+                { label: 'Inventory Collected', val: metrics.hostelCollected, color: 'text-success' },
+                { label: 'Outstanding Dues', val: metrics.hostelOutstanding, color: 'text-warning' }
+              ].map((sub, i) => (
+                <div key={i} className="px-4 py-2 bg-white dark:bg-bg-sidebar border border-border rounded-xl min-w-[120px] text-center flex-1 md:flex-none">
+                  <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest block">{sub.label}</span>
+                  <span className={`text-sm font-black font-mono mt-0.5 block ${sub.color}`}>₹{sub.val.toLocaleString('en-IN')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Student Collections Ledger */}
           <div className="lg:col-span-2 space-y-6">
@@ -688,27 +877,42 @@ export default function FinanceFeesPage() {
 
                         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto md:justify-end">
                           {/* Breakdown chips */}
-                          <div className="flex gap-1.5 flex-wrap">
-                            <span className="text-[8px] font-bold px-2 py-0.5 bg-slate-100 border border-border rounded text-text-secondary font-mono">
-                              Base: ₹{breakdown.baseFee.toLocaleString('en-IN')}
-                            </span>
-                            {breakdown.transportFee > 0 && (
-                              <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-blue-400 font-mono">
-                                <Bus size={8} className="inline mr-0.5" />₹{breakdown.transportFee.toLocaleString('en-IN')}
-                              </span>
-                            )}
-                            {breakdown.hostelFee > 0 && (
-                              <span className="text-[8px] font-bold px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded text-purple-400 font-mono">
-                                <HomeIcon size={8} className="inline mr-0.5" />₹{breakdown.hostelFee.toLocaleString('en-IN')}
-                              </span>
-                            )}
-                          </div>
+                          {(() => {
+                            const pendingHostelInv = (sharedHostelInventoryAllocations || [])
+                              .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID')
+                              .reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+                            return (
+                              <>
+                                <div className="flex gap-1.5 flex-wrap">
+                                  <span className="text-[8px] font-bold px-2 py-0.5 bg-slate-100 border border-border rounded text-text-secondary font-mono">
+                                    Base: ₹{breakdown.baseFee.toLocaleString('en-IN')}
+                                  </span>
+                                  {breakdown.transportFee > 0 && (
+                                    <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-blue-400 font-mono">
+                                      <Bus size={8} className="inline mr-0.5" />₹{breakdown.transportFee.toLocaleString('en-IN')}
+                                    </span>
+                                  )}
+                                  {breakdown.hostelFee > 0 && (
+                                    <span className="text-[8px] font-bold px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded text-purple-400 font-mono">
+                                      <HomeIcon size={8} className="inline mr-0.5" />₹{breakdown.hostelFee.toLocaleString('en-IN')}
+                                    </span>
+                                  )}
+                                  {pendingHostelInv > 0 && (
+                                    <span className="text-[8px] font-bold px-2 py-0.5 bg-purple-500/10 border border-purple-500/30 rounded text-purple-600 dark:text-purple-400 font-mono">
+                                      <ClipboardList size={8} className="inline mr-0.5" />Inv: ₹{pendingHostelInv.toLocaleString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
 
-                          <div className="text-left md:text-right text-[11px] font-mono">
-                            <p className="text-slate-700">Total: ₹{fee.total.toLocaleString('en-IN')}</p>
-                            <p className="text-success font-bold">Paid: ₹{fee.paid.toLocaleString('en-IN')}</p>
-                            {fee.remaining > 0 && <p className="text-warning font-bold">Due: ₹{fee.remaining.toLocaleString('en-IN')}</p>}
-                          </div>
+                                <div className="text-left md:text-right text-[11px] font-mono">
+                                  <p className="text-slate-700">Total: ₹{fee.total.toLocaleString('en-IN')}</p>
+                                  <p className="text-success font-bold">Paid: ₹{fee.paid.toLocaleString('en-IN')}</p>
+                                  {fee.remaining > 0 && <p className="text-warning font-bold">Due: ₹{fee.remaining.toLocaleString('en-IN')}</p>}
+                                  {pendingHostelInv > 0 && <p className="text-purple-600 dark:text-purple-400 font-bold">Inv Due: ₹{pendingHostelInv.toLocaleString('en-IN')}</p>}
+                                </div>
+                              </>
+                            );
+                          })()}
                           
                           <div className="shrink-0 flex items-center gap-1.5">
                             <button
@@ -746,23 +950,41 @@ export default function FinanceFeesPage() {
                               <Edit3 size={14} />
                             </button>
 
-                            {fee.status === 'PAID' ? (
-                              <span className="px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">Settled</span>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setSelectedStudentId(isSelected ? null : stud.id);
-                                  if (!isSelected) setPaymentAmount(fee.remaining);
-                                }}
-                                className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-text-primary text-\[10px] font-bold rounded-lg transition-all"
-                              >
-                                {isSelected ? 'Cancel' : 'Collect'}
-                              </button>
-                            )}
+                            {(() => {
+                              const pendingHostelInv = (sharedHostelInventoryAllocations || [])
+                                .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID')
+                                .reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+                              const hasDues = fee.remaining > 0 || pendingHostelInv > 0;
+                              return !hasDues ? (
+                                <span className="px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">Settled</span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSelectedStudentId(isSelected ? null : stud.id);
+                                    if (!isSelected) {
+                                      if (fee.remaining > 0) {
+                                        setPaymentType('tuition');
+                                        setPaymentAmount(fee.remaining);
+                                      } else {
+                                        const pendingAllocs = (sharedHostelInventoryAllocations || [])
+                                          .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
+                                        if (pendingAllocs.length > 0) {
+                                          setPaymentType('hostel_inventory');
+                                          setSelectedInventoryAllocId(pendingAllocs[0].id);
+                                          setPaymentAmount(pendingAllocs[0].cost - (pendingAllocs[0].paid || 0));
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-text-primary text-\[10px] font-bold rounded-lg transition-all"
+                                >
+                                  {isSelected ? 'Cancel' : 'Collect'}
+                                </button>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
-
 
                     </div>
                   );
@@ -921,6 +1143,7 @@ export default function FinanceFeesPage() {
             </div>
           </div>
 
+          </div>
         </div>
       )}
 
@@ -1241,10 +1464,23 @@ export default function FinanceFeesPage() {
           if (!stud) return null;
           const fee = sharedFeeRecords[stud.id] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
           const breakdown = getStudentFeeBreakdown(stud);
+          
+          // Hostel Inventory items
+          const inventoryAllocations = (sharedHostelInventoryAllocations || [])
+            .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id);
+          const totalInvCost = inventoryAllocations.reduce((sum, a) => sum + a.cost, 0);
+          const totalInvPaid = inventoryAllocations.reduce((sum, a) => sum + (a.paid || 0), 0);
+          const totalInvRemaining = totalInvCost - totalInvPaid;
+
+          const unifiedTotalExpected = fee.total + totalInvCost;
+          const unifiedTotalPaid = fee.paid + totalInvPaid;
+          const unifiedTotalRemaining = fee.remaining + totalInvRemaining;
+
           return (
             <div className="space-y-4">
               <p className="text-xs text-text-primary font-bold border-b border-border pb-2">Student: {stud.first_name} {stud.last_name} ({stud.admission_no})</p>
               <div className="space-y-1.5 text-xs text-text-secondary">
+                {/* Tuition Fee Breakdown */}
                 {breakdown.classStructures.map((fs, i) => (
                   <div key={i} className="flex justify-between">
                     <span>{fs.name} <span className="text-[8px] font-mono opacity-50">({fs.code})</span></span>
@@ -1266,41 +1502,73 @@ export default function FinanceFeesPage() {
                     <span className="font-bold font-mono">+ ₹{breakdown.hostelFee.toLocaleString('en-IN')}</span>
                   </div>
                 )}
+                
+                {/* Hostel Inventory Items Breakdown */}
+                {inventoryAllocations.length > 0 && (
+                  <>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest block mb-1">Hostel Issued Equipment</span>
+                    {inventoryAllocations.map((a, i) => (
+                      <div key={i} className="flex justify-between text-purple-600 dark:text-purple-400">
+                        <span className="flex items-center gap-1"><ClipboardList size={10} /> {a.item} ({a.status})</span>
+                        <span className="font-bold font-mono">₹{a.cost.toLocaleString('en-IN')}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 <div className="h-px bg-slate-100 my-1.5" />
                 <div className="flex justify-between text-text-primary font-bold">
                   <span>Total Expected</span>
-                  <span className="font-mono text-accent">₹{fee.total.toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-accent font-black">₹{unifiedTotalExpected.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-success">
                   <span>Total Paid</span>
-                  <span className="font-mono font-bold">- ₹{fee.paid.toLocaleString('en-IN')}</span>
+                  <span className="font-mono font-bold">- ₹{unifiedTotalPaid.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-warning font-bold text-sm">
                   <span>Outstanding Balance</span>
-                  <span className="font-mono">₹{fee.remaining.toLocaleString('en-IN')}</span>
+                  <span className="font-mono">₹{unifiedTotalRemaining.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
               {/* Payment History */}
-              {fee.history && fee.history.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-border space-y-2">
-                  <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Payment Transaction History</span>
-                  <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
-                    {fee.history.map((tx, i) => (
-                      <div key={i} className="flex justify-between items-center text-[10px] p-2 bg-slate-100/50 border border-border rounded-lg">
-                        <div>
-                          <span className="text-text-secondary font-mono">#{tx.id}</span>
-                          <span className="text-text-secondary ml-2">{tx.method}</span>
+              {(() => {
+                const combinedHistory = [...(fee.history || []).map(tx => ({ ...tx, type: 'Tuition' }))];
+                inventoryAllocations.forEach(alloc => {
+                  (alloc.payments || []).forEach(p => {
+                    combinedHistory.push({
+                      ...p,
+                      type: `${alloc.item} (Inv)`
+                    });
+                  });
+                });
+                
+                // Sort by date descending
+                combinedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                if (combinedHistory.length === 0) return null;
+                return (
+                  <div className="mt-4 pt-3 border-t border-border space-y-2">
+                    <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Payment Transaction History</span>
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {combinedHistory.map((tx, i) => (
+                        <div key={i} className="flex justify-between items-center text-[10px] p-2 bg-slate-100/50 border border-border rounded-lg">
+                          <div>
+                            <span className="text-text-secondary font-mono">#{tx.id}</span>
+                            <span className="text-text-secondary ml-2 font-bold bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[8px] uppercase">{tx.type}</span>
+                            <span className="text-text-secondary ml-2">{tx.method}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-success font-bold font-mono">₹{tx.amount.toLocaleString('en-IN')}</span>
+                            <span className="text-text-secondary ml-2 font-mono">{tx.date}</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-success font-bold font-mono">₹{tx.amount.toLocaleString('en-IN')}</span>
-                          <span className="text-text-secondary ml-2 font-mono">{tx.date}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Actions Footer */}
               <div className="mt-6 flex justify-end gap-2 no-print">
@@ -1928,6 +2196,10 @@ export default function FinanceFeesPage() {
             /* Step 2: Record Payment */
             const stud = sharedStudents.find(s => s.id === selectedStudentId);
             const fee = sharedFeeRecords[selectedStudentId] || {};
+            const pendingHostelAllocations = (sharedHostelInventoryAllocations || [])
+              .filter(a => a.studentId === selectedStudentId && a.tenant_id === activeTenant.id && a.status !== 'PAID');
+            const totalPendingHostelInv = pendingHostelAllocations.reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+
             return (
               <div className="space-y-4">
                 {/* Student context chip */}
@@ -1941,24 +2213,107 @@ export default function FinanceFeesPage() {
                       <p className="text-[9px] text-text-secondary">{getClassName(stud?.class_id)} &bull; {stud?.admission_no}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setSelectedStudentId(null); setPaymentAmount(''); }} className="text-[10px] text-text-secondary hover:text-accent font-bold underline">
+                  <button onClick={() => { setSelectedStudentId(null); setPaymentAmount(''); setPaymentType('tuition'); }} className="text-[10px] text-text-secondary hover:text-accent font-bold underline">
                     Change
                   </button>
                 </div>
 
-                {/* Fee summary */}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {[
-                    { label: 'Total Fee', val: `₹${(fee.total || 0).toLocaleString('en-IN')}`, color: 'text-text-primary' },
-                    { label: 'Already Paid', val: `₹${(fee.paid || 0).toLocaleString('en-IN')}`, color: 'text-success' },
-                    { label: 'Outstanding', val: `₹${(fee.remaining || 0).toLocaleString('en-IN')}`, color: 'text-warning' },
-                  ].map((item, i) => (
-                    <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
-                      <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
-                      <p className={`text-sm font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
+                {/* Target switcher (Academic Fee vs Hostel Inventory) */}
+                {pendingHostelAllocations.length > 0 && (
+                  <div className="flex p-1 bg-slate-100 dark:bg-black/15 border border-border rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentType('tuition');
+                        setPaymentAmount(fee.remaining || '');
+                      }}
+                      disabled={fee.remaining === 0}
+                      className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase ${
+                        paymentType === 'tuition'
+                          ? 'bg-white dark:bg-bg-sidebar text-text-primary shadow-sm border border-border/40'
+                          : 'text-text-secondary hover:text-text-primary disabled:opacity-50'
+                      }`}
+                    >
+                      ⚡ Academic Fees (Due: ₹{(fee.remaining || 0).toLocaleString('en-IN')})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentType('hostel_inventory');
+                        const firstAlloc = pendingHostelAllocations[0];
+                        if (firstAlloc) {
+                          setSelectedInventoryAllocId(firstAlloc.id);
+                          setPaymentAmount(firstAlloc.cost - (firstAlloc.paid || 0));
+                        }
+                      }}
+                      className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase ${
+                        paymentType === 'hostel_inventory'
+                          ? 'bg-white dark:bg-bg-sidebar text-text-primary shadow-sm border border-border/40'
+                          : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      🏠 Hostel Inventory (Due: ₹{totalPendingHostelInv.toLocaleString('en-IN')})
+                    </button>
+                  </div>
+                )}
+
+                {paymentType === 'tuition' ? (
+                  /* Fee summary */
+                  <div className="grid grid-cols-3 gap-2 text-center animate-slide-up">
+                    {[
+                      { label: 'Total Fee', val: `₹${(fee.total || 0).toLocaleString('en-IN')}`, color: 'text-text-primary' },
+                      { label: 'Already Paid', val: `₹${(fee.paid || 0).toLocaleString('en-IN')}`, color: 'text-success' },
+                      { label: 'Outstanding', val: `₹${(fee.remaining || 0).toLocaleString('en-IN')}`, color: 'text-warning' },
+                    ].map((item, i) => (
+                      <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
+                        <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
+                        <p className={`text-xs font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Hostel Inventory selection and details */
+                  <div className="space-y-3.5 animate-slide-up">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Select Pending Inventory Item *</label>
+                      <select
+                        value={selectedInventoryAllocId}
+                        onChange={e => {
+                          setSelectedInventoryAllocId(e.target.value);
+                          const alloc = pendingHostelAllocations.find(a => a.id === e.target.value);
+                          if (alloc) {
+                            setPaymentAmount(alloc.cost - (alloc.paid || 0));
+                          }
+                        }}
+                        className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border outline-none focus:border-accent"
+                      >
+                        {pendingHostelAllocations.map(a => (
+                          <option key={a.id} value={a.id}>{a.item} (Total: ₹{a.cost}, Pending: ₹{a.cost - (a.paid || 0)})</option>
+                        ))}
+                      </select>
                     </div>
-                  ))}
-                </div>
+
+                    {(() => {
+                      const selectedAlloc = pendingHostelAllocations.find(a => a.id === selectedInventoryAllocId);
+                      if (!selectedAlloc) return null;
+                      const outstanding = selectedAlloc.cost - (selectedAlloc.paid || 0);
+                      return (
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          {[
+                            { label: 'Item Cost', val: `₹${selectedAlloc.cost.toLocaleString('en-IN')}`, color: 'text-text-primary' },
+                            { label: 'Paid So Far', val: `₹${(selectedAlloc.paid || 0).toLocaleString('en-IN')}`, color: 'text-success' },
+                            { label: 'Remaining Due', val: `₹${outstanding.toLocaleString('en-IN')}`, color: 'text-warning' },
+                          ].map((item, i) => (
+                            <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
+                              <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
+                              <p className={`text-xs font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <form onSubmit={handleCollectPayment} className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1970,7 +2325,13 @@ export default function FinanceFeesPage() {
                         value={paymentAmount}
                         onChange={e => setPaymentAmount(e.target.value)}
                         className="w-full text-xs font-mono"
-                        max={fee.remaining || 0}
+                        max={(() => {
+                          if (paymentType === 'hostel_inventory') {
+                            const alloc = pendingHostelAllocations.find(a => a.id === selectedInventoryAllocId);
+                            return alloc ? (alloc.cost - (alloc.paid || 0)) : 0;
+                          }
+                          return fee.remaining || 0;
+                        })()}
                         min={1}
                         required
                         autoFocus
