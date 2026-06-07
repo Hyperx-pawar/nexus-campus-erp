@@ -49,10 +49,15 @@ function ProfileEditor({ activeTenant, activeRole, activeUser }) {
     setSaving(true);
     try {
       await updateProfile(profile);
+      toast.success(profile.newPassword ? 'Profile and password updated successfully!' : 'Profile updated successfully!');
+      setProfile(prev => ({
+        ...prev,
+        newPassword: ''
+      }));
       setSaving(false);
     } catch (err) {
       setSaving(false);
-      toast.error('Failed to update profile');
+      toast.error(err.message || 'Failed to update profile');
     }
   };
 

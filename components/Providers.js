@@ -685,14 +685,20 @@ export default function Providers({ children }) {
 
     if (session?.user) {
       try {
-        const { error } = await supabase.auth.updateUser({
+        const updateParams = {
           data: {
             first_name: profileData.name.split(' ')[0] || '',
             last_name: profileData.name.split(' ').slice(1).join(' ') || '',
             phone: profileData.phone,
             avatar: profileData.avatar
           }
-        });
+        };
+
+        if (profileData.newPassword) {
+          updateParams.password = profileData.newPassword;
+        }
+
+        const { error } = await supabase.auth.updateUser(updateParams);
         if (error) throw error;
         
         await supabase
@@ -734,6 +740,7 @@ export default function Providers({ children }) {
         }
       } catch (err) {
         console.error('Failed to sync profile change to Supabase database:', err);
+        throw err;
       }
     }
     return { success: true };
