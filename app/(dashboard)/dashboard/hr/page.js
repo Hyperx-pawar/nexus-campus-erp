@@ -32,8 +32,6 @@ export default function HRPayrollPage() {
     designation: 'Lecturer',
     department: 'Science',
     basic: 55000,
-    allowances: 0,
-    deductions: 0,
     panNo: '',
     phone: '',
     email: '',
@@ -48,11 +46,10 @@ export default function HRPayrollPage() {
 
   const isAdmin = activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ACCOUNTANT';
 
-  // Manual Salary calculations (Strictly Basic + manual allowances - manual deductions)
-  const calculateSalary = (basic, allowances = 0, deductions = 0) => {
-    const gross = Number(basic) + Number(allowances);
-    const net = gross - Number(deductions);
-    return { hra: 0, da: 0, pf: 0, tds: 0, allowances: Number(allowances), deductions: Number(deductions), gross, net };
+  // Salary calculations (Strictly Basic Salary only)
+  const calculateSalary = (basic) => {
+    const b = Number(basic) || 0;
+    return { hra: 0, da: 0, pf: 0, tds: 0, allowances: 0, deductions: 0, gross: b, net: b };
   };
 
   // Sync with sharedStaff as the single source of truth, and restrict based on activeRole
@@ -158,8 +155,6 @@ export default function HRPayrollPage() {
         designation: 'Lecturer',
         department: 'Science',
         basic: 55000,
-        allowances: 0,
-        deductions: 0,
         panNo: '',
         phone: '',
         email: '',
@@ -186,8 +181,7 @@ export default function HRPayrollPage() {
   // Calculate aggregate payroll metrics dynamically
   const totalEmployeesCount = employees.length;
   const totalBasicSalaries = employees.reduce((sum, emp) => sum + Number(emp.basic), 0);
-  const totalNetPayouts = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic, emp.allowances, emp.deductions).net, 0);
-  const totalDeductions = employees.reduce((sum, emp) => sum + calculateSalary(emp.basic, emp.allowances, emp.deductions).deductions, 0);
+  const avgSalary = totalEmployeesCount > 0 ? Math.round(totalBasicSalaries / totalEmployeesCount) : 0;
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -195,7 +189,7 @@ export default function HRPayrollPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">HR & Payroll Ledger</h2>
-          <p className="text-text-secondary text-sm font-medium mt-1">Configure staff salaries, allowances, TDS tax deductions, and bank payouts.</p>
+          <p className="text-text-secondary text-sm font-medium mt-1">Configure staff payroll, basic salary profiles, and bank payouts.</p>
         </div>
         {isAdmin && (
           <button 
@@ -209,12 +203,11 @@ export default function HRPayrollPage() {
       </div>
 
       {/* Overview stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Staff Count', value: totalEmployeesCount, desc: 'Active staff members', icon: Users },
-          { label: 'Basic Salaries (Month)', value: `₹${(totalBasicSalaries / 100000).toFixed(2)} Lakh`, desc: 'Base institutional pay', icon: Wallet },
-          { label: 'Manual Deductions', value: `₹${(totalDeductions / 100000).toFixed(2)} Lakh`, desc: 'Total monthly deductions', icon: FileBox },
-          { label: 'Net Payouts', value: `₹${(totalNetPayouts / 100000).toFixed(2)} Lakh`, desc: 'Direct bank settlement', icon: CreditCard }
+          { label: 'Total Payroll (Month)', value: `₹${(totalBasicSalaries / 100000).toFixed(2)} Lakh`, desc: 'Total monthly base pay', icon: Wallet },
+          { label: 'Average Monthly Salary', value: `₹${avgSalary.toLocaleString('en-IN')}`, desc: 'Average pay per employee', icon: CreditCard }
         ].map((k, i) => (
           <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
             <div className="flex items-center justify-between">
@@ -252,9 +245,6 @@ export default function HRPayrollPage() {
                 <th className="pb-3 pl-2">Staff Member</th>
                 <th className="pb-3">PAN Code</th>
                 <th className="pb-3">Basic Pay</th>
-                <th className="pb-3">Allowances</th>
-                <th className="pb-3">Deductions</th>
-                <th className="pb-3">Net Payout</th>
                 <th className="pb-3 text-right pr-2">Disbursement</th>
               </tr>
             </thead>
@@ -282,13 +272,6 @@ export default function HRPayrollPage() {
                     </td>
                     <td className="py-4 font-mono text-text-secondary">{emp.pan || 'N/A'}</td>
                     <td className="py-4 font-mono font-bold text-text-primary">₹{emp.basic.toLocaleString('en-IN')}</td>
-                    <td className="py-4 font-mono text-success">
-                      ₹{emp.allowances.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-4 font-mono text-danger">
-                      ₹{emp.deductions.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-4 font-mono text-accent font-black">₹{sal.net.toLocaleString('en-IN')}</td>
                     <td className="py-4 text-right pr-2">
                       {emp.status === 'PAID' ? (
                         <div className="flex items-center gap-2 justify-end">
@@ -521,33 +504,13 @@ export default function HRPayrollPage() {
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Allowances (₹ / month)</label>
-              <input 
-                type="number" 
-                value={formData.allowances}
-                onChange={(e) => setFormData({...formData, allowances: e.target.value})}
-                className="w-full text-xs font-mono"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Deductions (₹ / month)</label>
-              <input 
-                type="number" 
-                value={formData.deductions}
-                onChange={(e) => setFormData({...formData, deductions: e.target.value})}
-                className="w-full text-xs font-mono"
-              />
-            </div>
 
             {/* Calculations Breakdown */}
             <div className="md:col-span-2 p-4 bg-bg-main border border-border rounded-2xl space-y-2 text-xs">
               <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Monthly Payroll Estimate</span>
-              <div className="grid grid-cols-2 gap-2 text-text-secondary font-medium">
+              <div className="flex items-center justify-between text-text-secondary font-medium">
                 <div>Basic Pay: <span className="text-text-primary font-bold font-mono">₹{Number(formData.basic || 0).toLocaleString('en-IN')}</span></div>
-                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{calculateSalary(Number(formData.basic) || 0, Number(formData.allowances) || 0, Number(formData.deductions) || 0).net.toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Allowances: <span className="text-success font-mono">+ ₹{(Number(formData.allowances) || 0).toLocaleString('en-IN')}</span></div>
-                <div className="text-[10px]">Deductions: <span className="text-danger font-mono">- ₹{(Number(formData.deductions) || 0).toLocaleString('en-IN')}</span></div>
+                <div>Net Disbursed: <span className="text-accent font-black font-mono">₹{Number(formData.basic || 0).toLocaleString('en-IN')}</span></div>
               </div>
             </div>
 
@@ -603,40 +566,17 @@ export default function HRPayrollPage() {
               <div className="h-px bg-border my-4" />
 
               {/* Earnings & Deductions Tables */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Earnings */}
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-black text-success uppercase tracking-widest border-b border-success/20 pb-1">Earnings</h4>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Basic Salary</span>
-                      <span className="font-mono text-text-primary font-bold">₹{viewingSlipEmployee.basic.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Allowances</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.allowances.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="h-px bg-slate-100 my-1" />
-                    <div className="flex justify-between text-success font-bold">
-                      <span>Gross Earnings</span>
-                      <span className="font-mono">₹{sal.gross.toLocaleString('en-IN')}</span>
-                    </div>
+              <div className="space-y-2 max-w-md mx-auto">
+                <h4 className="text-[10px] font-black text-success uppercase tracking-widest border-b border-success/20 pb-1">Earnings Summary</h4>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">Basic Salary</span>
+                    <span className="font-mono text-text-primary font-bold">₹{viewingSlipEmployee.basic.toLocaleString('en-IN')}</span>
                   </div>
-                </div>
-
-                {/* Deductions */}
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-black text-danger uppercase tracking-widest border-b border-danger/20 pb-1">Deductions</h4>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Deductions</span>
-                      <span className="font-mono text-text-primary font-bold">₹{sal.deductions.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="h-px bg-slate-100 my-1" />
-                    <div className="flex justify-between text-danger font-bold">
-                      <span>Total Deductions</span>
-                      <span className="font-mono">₹{sal.deductions.toLocaleString('en-IN')}</span>
-                    </div>
+                  <div className="h-px bg-slate-100 my-1" />
+                  <div className="flex justify-between text-success font-bold">
+                    <span>Total Earnings</span>
+                    <span className="font-mono">₹{viewingSlipEmployee.basic.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>
