@@ -486,9 +486,63 @@ export default function Providers({ children }) {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
+  // Restore active role from cookies on mount (for demo/simulation persistent refreshes)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !session?.user) {
+      const match = document.cookie.match(/sb-demo-role=([^;]+)/);
+      if (match && match[1]) {
+        const role = match[1];
+        setActiveRole(role);
+        
+        const names = {
+          SUPER_ADMIN: 'Dr. Ramesh Kumar (Super Admin)',
+          SCHOOL_ADMIN: 'Smt. Anjali Sharma (School Principal)',
+          TEACHER: 'Prof. Rajesh Iyer (HOD Physics)',
+          STUDENT: 'Aarav Patel (B.Tech Year 3)',
+          PARENT: 'Vikram Patel (Guardian)',
+          ACCOUNTANT: 'Karan Johar (Bursar)',
+          LIBRARIAN: 'Deepa Roy (Chief Librarian)',
+          TRANSPORT_MANAGER: 'Harpreet Singh (Fleet Head)',
+          HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)'
+        };
+        
+        let email = activeTenant?.subdomain ? `user@${activeTenant.subdomain}.edu.in` : 'user@school.edu.in';
+        if (role === 'SUPER_ADMIN') {
+          email = 'ramesh.kumar@campuserp.in';
+        } else if (role === 'PARENT') {
+          const parent = sharedParents[0];
+          names.PARENT = `${parent.first_name} ${parent.last_name} (Guardian)`;
+          email = parent.email;
+        } else {
+          const staffName = names[role].split(' (')[0]
+            .replace('Smt. ', '')
+            .replace('Prof. ', '')
+            .replace('Dr. ', '')
+            .replace('Karan Johar', 'karan.johar')
+            .replace('Suresh Chandra', 'suresh.chandra')
+            .replace('Harpreet Singh', 'harpreet.singh')
+            .replace('Aarav Patel', 'aarav.patel')
+            .toLowerCase()
+            .replace(' ', '.');
+          email = `${staffName}@${activeTenant.subdomain}.edu.in`;
+        }
+
+        setActiveUser({
+          name: names[role] || 'User Profile',
+          email: email,
+          role: role
+        });
+      }
+    }
+  }, [session, activeTenant, sharedParents]);
+
   // Login handler
   const login = async (email, password) => {
     try {
+      if (typeof window !== 'undefined') {
+        document.cookie = "sb-demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie = "sb-demo-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success('Access session authenticated successfully');
@@ -505,6 +559,10 @@ export default function Providers({ children }) {
     try {
       await supabase.auth.signOut();
       setSession(null);
+      if (typeof window !== 'undefined') {
+        document.cookie = "sb-demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie = "sb-demo-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
       toast.success('Session terminated successfully');
       router.push('/login');
     } catch (err) {
@@ -515,6 +573,10 @@ export default function Providers({ children }) {
   // Dev tools role switcher
   const switchRole = (role) => {
     setActiveRole(role);
+    if (typeof window !== 'undefined') {
+      document.cookie = "sb-demo-session=true; path=/; max-age=86400";
+      document.cookie = `sb-demo-role=${role}; path=/; max-age=86400`;
+    }
     const names = {
       SUPER_ADMIN: 'Dr. Ramesh Kumar (Super Admin)',
       SCHOOL_ADMIN: 'Smt. Anjali Sharma (School Principal)',

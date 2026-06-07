@@ -36,18 +36,19 @@ export async function proxy(request) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+  const isDemo = request.cookies.get('sb-demo-session')?.value === 'true';
 
   const pathname = request.nextUrl.pathname;
 
   // Protect /dashboard route
-  if (pathname.startsWith('/dashboard') && !user) {
+  if (pathname.startsWith('/dashboard') && !user && !isDemo) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and tries to access login page, redirect to dashboard
-  if (pathname === '/login' && user) {
+  // If user is logged in or in demo mode, and tries to access login page, redirect to dashboard
+  if (pathname === '/login' && (user || isDemo)) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
