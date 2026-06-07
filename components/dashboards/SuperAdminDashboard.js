@@ -24,7 +24,8 @@ import {
   Home,
   Bus,
   FileBox,
-  Settings
+  Settings,
+  Search
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -56,6 +57,10 @@ export default function SuperAdminDashboard() {
   const [newSchool, setNewSchool] = useState({ name: '', subdomain: '', email: '', phone: '' });
   const [newAdmin, setNewAdmin] = useState({ email: '', password: '', firstName: '', lastName: '', tenantId: '' });
   const [filterActiveOnly, setFilterActiveOnly] = useState(true);
+
+  // Storage tab and search states
+  const [storageViewTab, setStorageViewTab] = useState('campuses'); // 'campuses' | 'tables'
+  const [storageSearchQuery, setStorageSearchQuery] = useState('');
 
   // Storage Analyzer states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -444,42 +449,179 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* Details Table: Database Catalogs Size Allocation */}
-        <div className="overflow-x-auto border border-border rounded-2xl">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
-                <th className="p-3 pl-4">Postgres Schema Table</th>
-                <th className="p-3 text-right">Est. Rows</th>
-                <th className="p-3 text-right">Data Size</th>
-                <th className="p-3 text-right">Index Size</th>
-                <th className="p-3 text-right pr-4">Compression Ratio</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {[
-                { name: 'public.profiles', rows: displayedProfilesCount, data: filterActiveOnly ? '16 KB' : '48 KB', idx: filterActiveOnly ? '16 KB' : '32 KB', ratio: '88% (Saved)' },
-                { name: 'public.students', rows: displayedStudentsCount, data: filterActiveOnly ? '8 KB' : '64 KB', idx: filterActiveOnly ? '8 KB' : '48 KB', ratio: '84% (Saved)' },
-                { name: 'public.staff', rows: displayedStaffCount, data: filterActiveOnly ? '8 KB' : '24 KB', idx: filterActiveOnly ? '8 KB' : '16 KB', ratio: '78% (Saved)' },
-                { name: 'public.circulations', rows: displayedCirculationsCount, data: filterActiveOnly ? '4 KB' : '16 KB', idx: filterActiveOnly ? '8 KB' : '16 KB', ratio: '60% (Saved)' },
-                { name: 'public.notifications', rows: displayedNotificationsCount, data: filterActiveOnly ? '12 KB' : '96 KB', idx: filterActiveOnly ? '16 KB' : '64 KB', ratio: '92% (Saved)' },
-                { name: 'pg_catalog & extensions (System)', rows: 2840, data: `${dbSystemOverheadDataMB.toFixed(2)} MB`, idx: '4.20 MB', ratio: 'N/A' },
-              ].map((row, index) => (
-                <tr key={index} className="hover:bg-slate-50/50">
-                  <td className="p-3 pl-4 font-mono font-bold text-text-primary">{row.name}</td>
-                  <td className="p-3 text-right font-mono text-text-secondary">{row.rows.toLocaleString()}</td>
-                  <td className="p-3 text-right font-mono text-text-primary font-semibold">{row.data}</td>
-                  <td className="p-3 text-right font-mono text-text-secondary">{row.idx}</td>
-                  <td className="p-3 text-right pr-4">
-                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-success/15 border border-success/35 text-success">
-                      {row.ratio}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Tab Controls & Search Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-slate-50/50 dark:bg-slate-900/20 p-2 rounded-2xl border border-border">
+          {/* Tab buttons */}
+          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setStorageViewTab('campuses')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                storageViewTab === 'campuses'
+                  ? 'bg-white dark:bg-slate-700 text-accent shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Building2 size={13} />
+              <span>Campus Data Allocation</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStorageViewTab('tables')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                storageViewTab === 'tables'
+                  ? 'bg-white dark:bg-slate-700 text-accent shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Database size={13} />
+              <span>System Catalog Tables</span>
+            </button>
+          </div>
+
+          {/* Search bar (visible only in campuses tab) */}
+          {storageViewTab === 'campuses' && (
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={14} />
+              <input
+                type="text"
+                placeholder="Search campus or domain..."
+                value={storageSearchQuery}
+                onChange={(e) => setStorageSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-xs bg-bg-main border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+          )}
         </div>
+
+        {storageViewTab === 'campuses' ? (
+          /* Campus Storage Breakdown Table */
+          <div className="overflow-x-auto border border-border rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                  <th className="p-3 pl-4">Institution / Campus</th>
+                  <th className="p-3 text-right">Database Space</th>
+                  <th className="p-3 text-right">File Storage</th>
+                  <th className="p-3 text-right">Total Space Used</th>
+                  <th className="p-3 text-center" style={{ width: '25%' }}>Quota Usage (100 MB Limit)</th>
+                  <th className="p-3 text-center pr-4">Health Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(() => {
+                  const filteredTenants = (tenants || []).filter(tenant => 
+                    tenant.name.toLowerCase().includes(storageSearchQuery.toLowerCase()) || 
+                    tenant.subdomain.toLowerCase().includes(storageSearchQuery.toLowerCase())
+                  );
+
+                  if (filteredTenants.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan="6" className="p-8 text-center text-xs text-text-secondary font-bold">
+                          No campuses match your search filter
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredTenants.map((tenant) => {
+                    const storage = getTenantStorageInfo(tenant.id);
+                    const pctNum = parseFloat(storage.percentage);
+                    
+                    // Status Badge config
+                    let statusBadgeClass = '';
+                    let statusText = '';
+                    let fillBarClass = '';
+
+                    if (pctNum >= 90) {
+                      statusText = 'Critical';
+                      statusBadgeClass = 'bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200/50 dark:border-rose-900/30';
+                      fillBarClass = 'bg-rose-500';
+                    } else if (pctNum >= 75) {
+                      statusText = 'Warning';
+                      statusBadgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30';
+                      fillBarClass = 'bg-amber-500';
+                    } else if (pctNum >= 30) {
+                      statusText = 'Healthy';
+                      statusBadgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30';
+                      fillBarClass = 'bg-emerald-500';
+                    } else {
+                      statusText = 'Low Usage';
+                      statusBadgeClass = 'bg-slate-100 text-slate-800 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/30';
+                      fillBarClass = 'bg-accent';
+                    }
+
+                    return (
+                      <tr key={tenant.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 pl-4">
+                          <div className="font-bold text-text-primary">{tenant.name}</div>
+                          <div className="text-[10px] text-text-secondary font-mono mt-0.5">{tenant.subdomain}.campuserp.in</div>
+                        </td>
+                        <td className="p-3 text-right font-mono text-text-primary font-semibold">{storage.dbSize} MB</td>
+                        <td className="p-3 text-right font-mono text-text-secondary">{storage.fileSize} MB</td>
+                        <td className="p-3 text-right font-mono text-text-primary font-bold">{storage.totalUsed} MB</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-300 ${fillBarClass}`}
+                                style={{ width: `${storage.percentage}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-mono font-bold text-[10px] text-text-primary">{storage.percentage}%</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-center pr-4">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block ${statusBadgeClass}`}>
+                            {statusText}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Details Table: Database Catalogs Size Allocation */
+          <div className="overflow-x-auto border border-border rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                  <th className="p-3 pl-4">Postgres Schema Table</th>
+                  <th className="p-3 text-right">Est. Rows</th>
+                  <th className="p-3 text-right">Data Size</th>
+                  <th className="p-3 text-right">Index Size</th>
+                  <th className="p-3 text-right pr-4">Compression Ratio</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[
+                  { name: 'public.profiles', rows: displayedProfilesCount, data: filterActiveOnly ? '16 KB' : '48 KB', idx: filterActiveOnly ? '16 KB' : '32 KB', ratio: '88% (Saved)' },
+                  { name: 'public.students', rows: displayedStudentsCount, data: filterActiveOnly ? '8 KB' : '64 KB', idx: filterActiveOnly ? '8 KB' : '48 KB', ratio: '84% (Saved)' },
+                  { name: 'public.staff', rows: displayedStaffCount, data: filterActiveOnly ? '8 KB' : '24 KB', idx: filterActiveOnly ? '8 KB' : '16 KB', ratio: '78% (Saved)' },
+                  { name: 'public.circulations', rows: displayedCirculationsCount, data: filterActiveOnly ? '4 KB' : '16 KB', idx: filterActiveOnly ? '8 KB' : '16 KB', ratio: '60% (Saved)' },
+                  { name: 'public.notifications', rows: displayedNotificationsCount, data: filterActiveOnly ? '12 KB' : '96 KB', idx: filterActiveOnly ? '16 KB' : '64 KB', ratio: '92% (Saved)' },
+                  { name: 'pg_catalog & extensions (System)', rows: 2840, data: `${dbSystemOverheadDataMB.toFixed(2)} MB`, idx: '4.20 MB', ratio: 'N/A' },
+                ].map((row, index) => (
+                  <tr key={index} className="hover:bg-slate-50/50">
+                    <td className="p-3 pl-4 font-mono font-bold text-text-primary">{row.name}</td>
+                    <td className="p-3 text-right font-mono text-text-secondary">{row.rows.toLocaleString()}</td>
+                    <td className="p-3 text-right font-mono text-text-primary font-semibold">{row.data}</td>
+                    <td className="p-3 text-right font-mono text-text-secondary">{row.idx}</td>
+                    <td className="p-3 text-right pr-4">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-success/15 border border-success/35 text-success">
+                        {row.ratio}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Main Grid: Onboarded Schools & Management Forms */}
