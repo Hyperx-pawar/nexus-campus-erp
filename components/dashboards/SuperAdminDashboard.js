@@ -510,6 +510,19 @@ export default function SuperAdminDashboard() {
               </thead>
               <tbody className="divide-y divide-border">
                 {(() => {
+                  if (loading) {
+                    return (
+                      <tr>
+                        <td colSpan="6" className="p-8 text-center text-xs text-text-secondary font-bold">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="animate-spin text-accent" size={14} />
+                            <span>Loading campus telemetry...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   const filteredTenants = (tenants || []).filter(tenant => 
                     tenant.name.toLowerCase().includes(storageSearchQuery.toLowerCase()) || 
                     tenant.subdomain.toLowerCase().includes(storageSearchQuery.toLowerCase())
@@ -519,7 +532,7 @@ export default function SuperAdminDashboard() {
                     return (
                       <tr>
                         <td colSpan="6" className="p-8 text-center text-xs text-text-secondary font-bold">
-                          No campuses match your search filter
+                          {storageSearchQuery ? 'No campuses match your search filter' : 'No onboarded campuses found'}
                         </td>
                       </tr>
                     );
