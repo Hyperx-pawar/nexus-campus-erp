@@ -162,6 +162,44 @@ export default function FinanceFeesPage() {
     return logs;
   }, [tenantStudents, sharedFeeRecords]);
 
+  // Group transaction logs to calculate daily fee collection summaries
+  const dailyCollections = useMemo(() => {
+    const dailyMap = {};
+    transactionLogs.forEach(tx => {
+      if (tx.status === 'PENDING_VERIFICATION') return;
+      const dateStr = tx.date;
+      if (!dailyMap[dateStr]) {
+        dailyMap[dateStr] = { amount: 0, count: 0 };
+      }
+      dailyMap[dateStr].amount += tx.amount;
+      dailyMap[dateStr].count += 1;
+    });
+
+    const array = Object.keys(dailyMap).map(date => ({
+      date,
+      amount: dailyMap[date].amount,
+      count: dailyMap[date].count
+    }));
+    array.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return array;
+  }, [transactionLogs]);
+
+  const formatDailyDate = (dateStr) => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (dateStr === todayStr) return 'Today';
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) return dateStr;
+      return dateObj.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Filter students by search and class
   const filteredStudents = tenantStudents.filter(s => {
     const term = searchQuery.toLowerCase();
@@ -756,6 +794,48 @@ export default function FinanceFeesPage() {
                 ))}
                 {transactionLogs.length === 0 && (
                   <p className="text-center py-6 text-xs text-text-secondary">No receipts cataloged.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Daily Collections Summary */}
+            <div className="p-6 bg-bg-sidebar border border-border rounded-3xl space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-accent/10 rounded-lg text-accent">
+                    <Landmark size={14} />
+                  </div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-primary font-outfit">Daily Collections</h3>
+                </div>
+                <span className="text-[9px] bg-slate-100 dark:bg-black/20 text-text-secondary px-2 py-0.5 rounded-full font-bold">Per Day Ledger</span>
+              </div>
+              
+              <div className="space-y-3.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-1">
+                {(() => {
+                  const maxAmt = dailyCollections.reduce((max, day) => Math.max(max, day.amount), 1);
+                  return dailyCollections.map((day, idx) => {
+                    const percentage = Math.round((day.amount / maxAmt) * 100);
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-text-primary">{formatDailyDate(day.date)}</span>
+                            <span className="ml-2 text-[9px] font-semibold text-text-secondary opacity-60">({day.count} {day.count === 1 ? 'payment' : 'payments'})</span>
+                          </div>
+                          <span className="font-mono font-black text-accent">₹{day.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 dark:bg-black/10 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-accent to-indigo-500 rounded-full transition-all duration-500" 
+                            style={{ width: `${percentage}%` }} 
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+                {dailyCollections.length === 0 && (
+                  <p className="text-center py-6 text-xs text-text-secondary">No collections logged yet.</p>
                 )}
               </div>
             </div>
