@@ -66,12 +66,25 @@ export default function FinanceFeesPage() {
   
   const [activeTab, setActiveTab] = useState('overview');
   const [verifiedPayments, setVerifiedPayments] = useState(new Set()); // set of tx IDs
+  const [viewingReceiptScreenshot, setViewingReceiptScreenshot] = useState(null);
   const [onlineFilter, setOnlineFilter] = useState('all'); // all | pending | verified
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Razorpay UPI');
   const [classFilter, setClassFilter] = useState('all');
+
+  // Switch to specific tab if passed in search parameters safely without Suspense
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && ['overview', 'structures', 'dues', 'online'].includes(tab)) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
+
   
   // Collect Fee modal quick-search
   const [showCollectModal, setShowCollectModal] = useState(false);
@@ -1268,7 +1281,57 @@ export default function FinanceFeesPage() {
                 <button
                   onClick={() => {
                     const newSet = new Set(verifiedPayments);
-                    allOnlineTxns.forEach(tx => newSet.add(tx.id));
+                    const updatedRecords = { ...sharedFeeRecords };
+                    
+                    filtered.filter(tx => !verifiedPayments.has(tx.id)).forEach(tx => {
+                      newSet.add(tx.id);
+                      
+                      if (tx.type === 'FEE') {
+                        const sId = tx.studentId;
+                        const currentFee = updatedRecords[sId];
+                        if (currentFee) {
+                          const updatedHistory = (currentFee.history || []).map(h => {
+                            if (h.id === tx.id) {
+                              return { ...h, status: 'VERIFIED' };
+                            }
+                            return h;
+                          });
+                          
+                          const newPaid = currentFee.paid + tx.amount;
+                          const newRemaining = Math.max(0, currentFee.remaining - tx.amount);
+                          const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+                          
+                          updatedRecords[sId] = {
+                            ...currentFee,
+                            paid: newPaid,
+                            remaining: newRemaining,
+                            status: newStatus,
+                            history: updatedHistory
+                          };
+
+                          // Notify parent
+                          const stud = sharedStudents.find(st => st.id === sId);
+                          const parent = sharedParents?.find(p => p.id === stud?.parent_id);
+                          if (parent && setSharedNotifications) {
+                            setSharedNotifications(prev => [
+                              {
+                                id: `notif-${Date.now()}-${sId}-${tx.id}`,
+                                tenant_id: activeTenant.id,
+                                recipient_id: parent.id,
+                                title: `✅ Online Payment Verified: ${stud?.first_name} ${stud?.last_name}`,
+                                body: `Your payment of ₹${tx.amount.toLocaleString('en-IN')} (UTR: ${tx.utr || 'N/A'}) has been verified. Receipt ID: ${tx.id}.`,
+                                type: 'FEE_PAYMENT',
+                                date: new Date().toISOString().split('T')[0],
+                                read: false
+                              },
+                              ...prev
+                            ]);
+                          }
+                        }
+                      }
+                    });
+
+                    setSharedFeeRecords(updatedRecords);
                     setVerifiedPayments(newSet);
                     toast.success(`All ${pendingCount} online payment(s) marked as verified!`);
                   }}
@@ -1310,10 +1373,20 @@ export default function FinanceFeesPage() {
                         </div>
                         <p className="text-[10px] text-text-secondary font-mono mt-0.5">
                           Receipt: <span className="font-bold text-accent">{tx.id}</span>
+                          {tx.utr && <span className="ml-2 text-text-secondary font-sans font-semibold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">UTR: {tx.utr}</span>}
                           {tx.type === 'HOSTEL' && <span className="ml-2 text-text-secondary">• Item: {tx.item}</span>}
                         </p>
-                        <p className="text-[10px] text-text-secondary">
-                          Method: <span className="font-semibold">{tx.method}</span> • Date: {tx.date} • Adm: {tx.admissionNo}
+                        <p className="text-[10px] text-text-secondary flex items-center gap-1 flex-wrap">
+                          <span>Method: <span className="font-semibold">{tx.method}</span> • Date: {tx.date} • Adm: {tx.admissionNo}</span>
+                          {tx.receiptImage && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceiptScreenshot(tx.receiptImage)}
+                              className="ml-2 px-2 py-0.5 bg-accent/10 hover:bg-accent text-accent hover:text-white rounded text-[9px] font-bold transition-all border border-accent/20"
+                            >
+                              View Screenshot
+                            </button>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1334,6 +1407,54 @@ export default function FinanceFeesPage() {
                             const newSet = new Set(verifiedPayments);
                             newSet.add(tx.id);
                             setVerifiedPayments(newSet);
+                            
+                            // Synchronize details to sharedFeeRecords if this is a fee transaction
+                            if (tx.type === 'FEE') {
+                              const sId = tx.studentId;
+                              const currentFee = sharedFeeRecords[sId];
+                              if (currentFee) {
+                                const updatedHistory = (currentFee.history || []).map(h => {
+                                  if (h.id === tx.id) {
+                                    return { ...h, status: 'VERIFIED' };
+                                  }
+                                  return h;
+                                });
+                                
+                                const newPaid = currentFee.paid + tx.amount;
+                                const newRemaining = Math.max(0, currentFee.remaining - tx.amount);
+                                const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+                                
+                                setSharedFeeRecords(prev => ({
+                                  ...prev,
+                                  [sId]: {
+                                    ...currentFee,
+                                    paid: newPaid,
+                                    remaining: newRemaining,
+                                    status: newStatus,
+                                    history: updatedHistory
+                                  }
+                                }));
+
+                                // Notify parent
+                                const stud = sharedStudents.find(st => st.id === sId);
+                                const parent = sharedParents?.find(p => p.id === stud?.parent_id);
+                                if (parent && setSharedNotifications) {
+                                  setSharedNotifications(prev => [
+                                    {
+                                      id: `notif-${Date.now()}-${sId}`,
+                                      tenant_id: activeTenant.id,
+                                      recipient_id: parent.id,
+                                      title: `✅ Online Payment Verified: ${stud?.first_name} ${stud?.last_name}`,
+                                      body: `Your payment of ₹${tx.amount.toLocaleString('en-IN')} (UTR: ${tx.utr || 'N/A'}) has been verified. Receipt ID: ${tx.id}.`,
+                                      type: 'FEE_PAYMENT',
+                                      date: new Date().toISOString().split('T')[0],
+                                      read: false
+                                    },
+                                    ...prev
+                                  ]);
+                                }
+                              }
+                            }
                             toast.success(`Payment ${tx.id} for ${tx.studentName} marked as verified!`);
                           }}
                           className="px-4 py-2 bg-accent hover:bg-accent/90 text-white text-[10px] font-black rounded-xl transition-all flex items-center gap-1.5 shadow shadow-accent/20"
@@ -2015,6 +2136,29 @@ export default function FinanceFeesPage() {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Receipt Screenshot Viewer Modal */}
+      <Modal
+        open={!!viewingReceiptScreenshot}
+        onClose={() => setViewingReceiptScreenshot(null)}
+        title="Payment Receipt Screenshot"
+        icon={<Eye size={16} />}
+        size="md"
+      >
+        {viewingReceiptScreenshot && (
+          <div className="space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto border border-border rounded-2xl bg-black flex items-center justify-center p-2">
+              <img src={viewingReceiptScreenshot} alt="Payment Receipt Screenshot" className="max-w-full h-auto object-contain rounded-lg animate-fade-in" />
+            </div>
+            <button
+              onClick={() => setViewingReceiptScreenshot(null)}
+              className="w-full py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all"
+            >
+              Close Preview
+            </button>
+          </div>
+        )}
       </Modal>
     </div>
   );

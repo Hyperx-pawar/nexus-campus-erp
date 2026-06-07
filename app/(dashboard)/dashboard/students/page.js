@@ -60,6 +60,13 @@ export default function StudentRegistryPage() {
   const [resetFees, setResetFees] = useState(true);
   const [activeDossierTab, setActiveDossierTab] = useState('documents');
 
+  // Bulk Selection & Promotion States
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [selectedClassFilter, setSelectedClassFilter] = useState('');
+  const [showBulkPromoteModal, setShowBulkPromoteModal] = useState(false);
+  const [bulkPromotionTargetClassId, setBulkPromotionTargetClassId] = useState('');
+  const [bulkPromotionResetFees, setBulkPromotionResetFees] = useState(true);
+
   // Pre-fill next logical class helper
   const getNextLogicalClassId = (currentClassId) => {
     const currentClass = sharedClasses.find(c => c.id === currentClassId);
@@ -197,6 +204,146 @@ export default function StudentRegistryPage() {
     toast.success(`Student "${selectedStudentForPromotion.first_name} ${selectedStudentForPromotion.last_name}" promoted successfully!`);
     setShowPromoteModal(false);
     setSelectedStudentForPromotion(null);
+  };
+
+  const handleBulkPromoteStudents = () => {
+    if (selectedStudentIds.length === 0 || !bulkPromotionTargetClassId) return;
+
+    const currentYear = activeTenant.settings?.academicYear || '2025-2026';
+    const targetClass = sharedClasses.find(c => c.id === bulkPromotionTargetClassId);
+    const targetClassName = targetClass ? targetClass.name : 'Next Logical Class';
+
+    // 1. Prepare history snapshots
+    const historyUpdates = {};
+    const academicRecordsUpdates = {};
+    const remarksUpdates = {};
+    const feeRecordsUpdates = {};
+    const newAlerts = [];
+
+    selectedStudentIds.forEach((studentId, idx) => {
+      const student = sharedStudents.find(s => s.id === studentId);
+      if (!student) return;
+
+      const currentClassId = student.class_id;
+      const currentClassName = getClassName(currentClassId);
+
+      const prevAttendance = sharedAttendanceRecords[studentId] || '0.0%';
+      const prevFees = sharedFeeRecords[studentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
+      const prevMarks = sharedAcademicRecords[studentId] || [];
+      const prevRemarks = sharedRemarks[studentId] || [];
+
+      const archivedRecord = {
+        academic_year: currentYear,
+        class_id: currentClassId,
+        class_name: currentClassName,
+        attendance: prevAttendance,
+        fees: { ...prevFees },
+        academic_records: [...prevMarks],
+        remarks: [...prevRemarks]
+      };
+
+      // We will accumulate updates
+      historyUpdates[studentId] = archivedRecord;
+      academicRecordsUpdates[studentId] = [];
+      remarksUpdates[studentId] = [];
+
+      // Fee Reset Calculations
+      if (bulkPromotionResetFees) {
+        const classFeeStructures = sharedFeeStructures.filter(
+          fs => fs.class_id === bulkPromotionTargetClassId && fs.tenant_id === activeTenant.id
+        );
+        const baseFeeTotal = classFeeStructures.reduce((sum, fs) => sum + fs.amount, 0);
+
+        const studentAddons = sharedStudentFeeAddons[studentId] || {
+          transport: { enabled: false, routeId: '', fee: 0 },
+          hostel: { enabled: false, blockId: '', fee: 0 }
+        };
+
+        const finalTotal = baseFeeTotal + (studentAddons.transport?.fee || 0) + (studentAddons.hostel?.fee || 0);
+
+        feeRecordsUpdates[studentId] = {
+          total: finalTotal,
+          paid: 0,
+          remaining: finalTotal,
+          status: 'UNPAID',
+          history: []
+        };
+      }
+
+      // Alerts
+      if (student.parent_id) {
+        newAlerts.push({
+          id: `alert-${Date.now()}-${studentId}-${idx}`,
+          parent_id: student.parent_id,
+          student_id: student.id,
+          title: '🎓 Student Promoted to Next Grade (Bulk)',
+          body: `Congratulations! Your child ${student.first_name} has been promoted to ${targetClassName} for the new academic year. New term fee structure has been allocated.`,
+          date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          read: false,
+          type: 'promotion'
+        });
+      }
+    });
+
+    // 2. Commit history updates
+    setSharedStudentHistory(prev => {
+      const updated = { ...prev };
+      Object.keys(historyUpdates).forEach(studentId => {
+        const studentHistory = updated[studentId] || [];
+        const filteredHistory = studentHistory.filter(h => h.academic_year !== currentYear);
+        updated[studentId] = [...filteredHistory, historyUpdates[studentId]];
+      });
+      return updated;
+    });
+
+    // 3. Reset active marks and remarks
+    setSharedAcademicRecords(prev => {
+      const updated = { ...prev };
+      Object.keys(academicRecordsUpdates).forEach(studentId => {
+        updated[studentId] = [];
+      });
+      return updated;
+    });
+
+    setSharedRemarks(prev => {
+      const updated = { ...prev };
+      Object.keys(remarksUpdates).forEach(studentId => {
+        updated[studentId] = [];
+      });
+      return updated;
+    });
+
+    // 4. Update student class_ids
+    const updatedStudents = sharedStudents.map(s => {
+      if (selectedStudentIds.includes(s.id)) {
+        return {
+          ...s,
+          class_id: bulkPromotionTargetClassId
+        };
+      }
+      return s;
+    });
+    setSharedStudents(updatedStudents);
+
+    // 5. Reset fee records
+    if (bulkPromotionResetFees) {
+      setSharedFeeRecords(prev => {
+        const updated = { ...prev };
+        Object.keys(feeRecordsUpdates).forEach(studentId => {
+          updated[studentId] = feeRecordsUpdates[studentId];
+        });
+        return updated;
+      });
+    }
+
+    // 6. Notifications
+    if (newAlerts.length > 0) {
+      setSharedNotifications(prev => [...newAlerts, ...prev]);
+    }
+
+    toast.success(`Successfully promoted ${selectedStudentIds.length} students to ${targetClassName}!`);
+    setSelectedStudentIds([]);
+    setShowBulkPromoteModal(false);
   };
 
   const handleOpenEditForm = (student) => {
@@ -566,6 +713,9 @@ export default function StudentRegistryPage() {
   const filteredStudents = sharedStudents.filter(s => {
     const studentTenantId = s.tenant_id || 'demo-tenant-1';
     if (studentTenantId !== activeTenant.id) return false;
+
+    // Class Filter Selection
+    if (selectedClassFilter && s.class_id !== selectedClassFilter) return false;
 
     // Teacher Restriction
     if (activeRole === 'TEACHER') {
@@ -1476,22 +1626,38 @@ export default function StudentRegistryPage() {
       >
         {selectedStudentForDossier && (
           <div className="space-y-6">
-            <div className="flex items-center gap-4 p-4 bg-slate-100/50 border border-border rounded-2xl">
-              {selectedStudentForDossier.profile_picture_url ? (
-                <img 
-                  src={selectedStudentForDossier.profile_picture_url} 
-                  alt="Student Avatar" 
-                  className="w-14 h-14 rounded-xl object-cover border border-border" 
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xl font-black font-outfit">
-                  {selectedStudentForDossier.first_name[0]}{selectedStudentForDossier.last_name[0]}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-slate-100/50 border border-border rounded-2xl">
+              <div className="flex items-center gap-4">
+                {selectedStudentForDossier.profile_picture_url ? (
+                  <img 
+                    src={selectedStudentForDossier.profile_picture_url} 
+                    alt="Student Avatar" 
+                    className="w-14 h-14 rounded-xl object-cover border border-border" 
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xl font-black font-outfit">
+                    {selectedStudentForDossier.first_name[0]}{selectedStudentForDossier.last_name[0]}
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-sm font-bold text-text-primary">{selectedStudentForDossier.first_name} {selectedStudentForDossier.last_name}</h4>
+                  <p className="text-[10px] text-text-secondary uppercase">Admission No: {selectedStudentForDossier.admission_no} • Class: {getClassName(selectedStudentForDossier.class_id)}</p>
                 </div>
-              )}
-              <div>
-                <h4 className="text-sm font-bold text-text-primary">{selectedStudentForDossier.first_name} {selectedStudentForDossier.last_name}</h4>
-                <p className="text-[10px] text-text-secondary uppercase">Admission No: {selectedStudentForDossier.admission_no} • Class: {getClassName(selectedStudentForDossier.class_id)}</p>
               </div>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setSelectedStudentForPromotion(selectedStudentForDossier);
+                    setPromotionClassId(getNextLogicalClassId(selectedStudentForDossier.class_id));
+                    setShowPromoteModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-950/40 transition-all shadow-sm shrink-0"
+                  title="Promote Student"
+                >
+                  <ArrowUpCircle size={14} />
+                  <span>Promote Student</span>
+                </button>
+              )}
             </div>
 
             {/* Segmented Tabs */}
@@ -1679,6 +1845,89 @@ export default function StudentRegistryPage() {
         )}
       </Modal>
 
+      {/* BULK PROMOTION MODAL */}
+      <Modal
+        open={showBulkPromoteModal}
+        onClose={() => {
+          setShowBulkPromoteModal(false);
+        }}
+        title="Bulk Promote Students to Next Grade"
+        icon={<ArrowUpCircle size={18} />}
+        size="md"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-slate-100/50 border border-border rounded-2xl space-y-2">
+            <span className="text-[10px] font-black text-accent uppercase tracking-widest block">Selected Candidates ({selectedStudentIds.length})</span>
+            <div className="max-h-24 overflow-y-auto text-xs text-text-primary font-medium divide-y divide-border/40">
+              {selectedStudentIds.map(id => {
+                const s = sharedStudents.find(stud => stud.id === id);
+                return s ? (
+                  <div key={id} className="py-1 flex justify-between items-center">
+                    <span>{s.first_name} {s.last_name}</span>
+                    <span className="text-[10px] text-text-secondary">{getClassName(s.class_id)}</span>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Target Promotion Grade *</label>
+              <select
+                value={bulkPromotionTargetClassId}
+                onChange={(e) => setBulkPromotionTargetClassId(e.target.value)}
+                className="w-full bg-slate-100/50 border border-border rounded-xl px-3 py-2.5 outline-none focus:border-accent/40 text-xs text-text-primary"
+              >
+                <option value="">Select Promotion Class</option>
+                {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+              <input
+                type="checkbox"
+                id="bulkResetFees"
+                checked={bulkPromotionResetFees}
+                onChange={(e) => setBulkPromotionResetFees(e.target.checked)}
+                className="rounded border-gray-300 text-accent focus:ring-accent w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="bulkResetFees" className="text-xs text-text-primary leading-relaxed cursor-pointer select-none">
+                <span className="font-black block text-amber-800 dark:text-amber-400">Reset Billing structures for new class</span>
+                Automatically clears active term fees ledger, sets outstanding balance to the new class base fee, and keeps active transport/hostel subscriptions.
+              </label>
+            </div>
+
+            <div className="p-4 bg-slate-100/50 border border-border rounded-2xl text-[11px] text-text-secondary leading-relaxed">
+              <span className="font-bold text-text-primary block mb-1">⚠️ Warning:</span>
+              Confirming this bulk promotion will archive the current year files (grades, fee logs, attendance history, and remarks) for all {selectedStudentIds.length} students under academic year <span className="font-bold text-text-primary">{(activeTenant.settings?.academicYear || '2025-2026')}</span>, clear active terms marks/remarks, and increment their enrolled class. This action cannot be undone.
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBulkPromoteModal(false);
+              }}
+              className="px-4 py-2 border border-border hover:bg-slate-50 text-text-secondary hover:text-text-primary font-black text-xs uppercase tracking-wider rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!bulkPromotionTargetClassId}
+              onClick={handleBulkPromoteStudents}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
+            >
+              Confirm Bulk Promotion
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* STUDENT PROMOTION MODAL */}
       <Modal
         open={showPromoteModal}
@@ -1768,22 +2017,97 @@ export default function StudentRegistryPage() {
       {/* Students Table */}
       <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
         
-        {/* Search Bar */}
-        <div className="max-w-md relative group/search">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within/search:text-accent transition-colors" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search by student name, Aadhaar, class, parent..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-100/50 border border-border rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-all text-xs text-text-primary placeholder:text-text-secondary"
-          />
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+          {/* Search Bar */}
+          <div className="flex-1 max-w-md relative group/search">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within/search:text-accent transition-colors" size={16} />
+            <input 
+              type="text" 
+              placeholder="Search by student name, Aadhaar, class, parent..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-100/50 border border-border rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-all text-xs text-text-primary placeholder:text-text-secondary"
+            />
+          </div>
+
+          {/* Class Filter Dropdown (Class View Promotion Integration) */}
+          <div className="flex items-center gap-2 bg-slate-100/50 border border-border rounded-2xl px-4 py-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary whitespace-nowrap">Filter Class:</span>
+            <select
+              value={selectedClassFilter}
+              onChange={(e) => {
+                setSelectedClassFilter(e.target.value);
+                setSelectedStudentIds([]); // Reset bulk selections on class change
+              }}
+              className="bg-transparent text-xs text-text-primary outline-none py-1.5 cursor-pointer font-bold font-outfit"
+            >
+              <option value="" className="bg-bg-sidebar">All Classes</option>
+              {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
+                <option key={cls.id} value={cls.id} className="bg-bg-sidebar">{cls.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {/* Bulk Action Bar */}
+        {isAdmin && selectedStudentIds.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-black">
+                {selectedStudentIds.length}
+              </span>
+              <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400">
+                students selected for bulk academic promotion
+              </span>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedStudentIds([]);
+                }}
+                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary font-semibold transition-colors"
+              >
+                Clear Selection
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstStudent = sharedStudents.find(s => s.id === selectedStudentIds[0]);
+                  if (firstStudent) {
+                    setBulkPromotionTargetClassId(getNextLogicalClassId(firstStudent.class_id));
+                  }
+                  setShowBulkPromoteModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/15 active:scale-95 transition-all"
+              >
+                <ArrowUpCircle size={14} />
+                <span>Bulk Promote</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border text-[10px] font-black uppercase text-text-secondary tracking-widest">
+                {isAdmin && (
+                  <th className="pb-3 pl-2 w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredStudents.length > 0 && selectedStudentIds.length === filteredStudents.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedStudentIds(filteredStudents.map(s => s.id));
+                        } else {
+                          setSelectedStudentIds([]);
+                        }
+                      }}
+                      className="rounded border-border bg-bg-sidebar text-accent focus:ring-accent w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="pb-3 pl-2">Student Name</th>
                 <th className="pb-3">Class</th>
                 <th className="pb-3">Admission No</th>
@@ -1798,6 +2122,22 @@ export default function StudentRegistryPage() {
             <tbody className="divide-y divide-border text-xs">
               {filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                  {isAdmin && (
+                    <td className="py-4 pl-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudentIds.includes(student.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedStudentIds(prev => [...prev, student.id]);
+                          } else {
+                            setSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+                          }
+                        }}
+                        className="rounded border-border bg-bg-sidebar text-accent focus:ring-accent w-3.5 h-3.5 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2">
                     {student.profile_picture_url ? (
                       <img 
@@ -1851,10 +2191,11 @@ export default function StudentRegistryPage() {
                               setPromotionClassId(getNextLogicalClassId(student.class_id));
                               setShowPromoteModal(true);
                             }}
-                            className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
+                            className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/40 transition-all shadow-xs"
                             title="Promote Student"
                           >
-                            <ArrowUpCircle size={14} />
+                            <ArrowUpCircle size={12} />
+                            <span>Promote</span>
                           </button>
                         </>
                       )}

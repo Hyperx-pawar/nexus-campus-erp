@@ -33,7 +33,19 @@ export default function Providers({ children }) {
     email: 'admin@iitd.edu.in',
     affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited',
     estYear: '1961',
-    settings: { currency: '₹' }
+    settings: { 
+      currency: '₹',
+      board: 'UGC',
+      academicYear: '2026-2027',
+      bank: {
+        bankName: 'State Bank of India',
+        accountName: 'IIT Delhi Operations',
+        accountNo: '10293847561',
+        ifscCode: 'SBIN0000214',
+        upiId: 'iitd@sbi',
+        qrCode: ''
+      }
+    }
   });
 
   useEffect(() => {
@@ -72,9 +84,75 @@ export default function Providers({ children }) {
   });
 
   const [availableTenants, setAvailableTenants] = useState([
-    { id: 'demo-tenant-1', name: 'Indian Institute of Technology (IIT) Delhi', subdomain: 'iitd', logo: '', address: 'Hauz Khas, New Delhi – 110016, Delhi, India', phone: '+91-11-2659-1777', email: 'admin@iitd.edu.in', affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited', estYear: '1961' },
-    { id: 'demo-tenant-2', name: 'Delhi Public School (DPS) RK Puram', subdomain: 'dpsrkp', logo: '', address: 'Sector 4, R.K. Puram, New Delhi – 110022', phone: '+91-11-2617-6940', email: 'admin@dpsrkp.edu.in', affiliation: 'CBSE Affiliated • School No. 1620009', estYear: '1972' },
-    { id: 'demo-tenant-3', name: "St. Stephen's College", subdomain: 'ststephens', logo: '', address: 'University Enclave, Delhi – 110007', phone: '+91-11-2766-7271', email: 'admin@ststephens.edu.in', affiliation: 'University of Delhi • NAAC A Accredited', estYear: '1881' }
+    { 
+      id: 'demo-tenant-1', 
+      name: 'Indian Institute of Technology (IIT) Delhi', 
+      subdomain: 'iitd', 
+      logo: '', 
+      address: 'Hauz Khas, New Delhi – 110016, Delhi, India', 
+      phone: '+91-11-2659-1777', 
+      email: 'admin@iitd.edu.in', 
+      affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited', 
+      estYear: '1961',
+      settings: {
+        board: 'UGC',
+        academicYear: '2026-2027',
+        bank: {
+          bankName: 'State Bank of India',
+          accountName: 'IIT Delhi Operations',
+          accountNo: '10293847561',
+          ifscCode: 'SBIN0000214',
+          upiId: 'iitd@sbi',
+          qrCode: ''
+        }
+      }
+    },
+    { 
+      id: 'demo-tenant-2', 
+      name: 'Delhi Public School (DPS) RK Puram', 
+      subdomain: 'dpsrkp', 
+      logo: '', 
+      address: 'Sector 4, R.K. Puram, New Delhi – 110022', 
+      phone: '+91-11-2617-6940', 
+      email: 'admin@dpsrkp.edu.in', 
+      affiliation: 'CBSE Affiliated • School No. 1620009', 
+      estYear: '1972',
+      settings: {
+        board: 'CBSE',
+        academicYear: '2026-2027',
+        bank: {
+          bankName: 'HDFC Bank',
+          accountName: 'DPS RK Puram Accounts',
+          accountNo: '998877665544',
+          ifscCode: 'HDFC0000104',
+          upiId: 'dpsrkp@hdfc',
+          qrCode: ''
+        }
+      }
+    },
+    { 
+      id: 'demo-tenant-3', 
+      name: "St. Stephen's College", 
+      subdomain: 'ststephens', 
+      logo: '', 
+      address: 'University Enclave, Delhi – 110007', 
+      phone: '+91-11-2766-7271', 
+      email: 'admin@ststephens.edu.in', 
+      affiliation: 'University of Delhi • NAAC A Accredited', 
+      estYear: '1881',
+      settings: {
+        board: 'STATE',
+        academicYear: '2026-2027',
+        bank: {
+          bankName: 'ICICI Bank',
+          accountName: 'St Stephens College Fees',
+          accountNo: '556677889900',
+          ifscCode: 'ICIC0000011',
+          upiId: 'stephens@icici',
+          qrCode: ''
+        }
+      }
+    }
   ]);
 
   // Shared state for multi-role dynamic simulation
@@ -180,12 +258,89 @@ export default function Providers({ children }) {
           ]
         },
         academic_records: [
-          { subject: 'Physics Core theory', marks: '88 / 100', grade: 'A2', desc: 'Class Avg: 75' },
-          { subject: 'Advanced Calculus math', marks: '90 / 100', grade: 'A1', desc: 'Class Avg: 72' },
-          { subject: 'Organic Chemistry practical', marks: '44 / 50', grade: 'A1', desc: 'Class Avg: 40' }
+          { subject: 'Physics Core Theory', marks: '88 / 100', grade: 'A2', desc: 'Class Avg: 75' },
+          { subject: 'Advanced Calculus Math', marks: '90 / 100', grade: 'A1', desc: 'Class Avg: 72' },
+          { subject: 'Organic Chemistry Practical', marks: '44 / 50', grade: 'A1', desc: 'Class Avg: 40' }
         ],
         remarks: [
           { teacher: 'Prof. Rajesh Iyer (Physics)', remark: 'Shows keen interest in experimental concepts. Consistent performer.', date: 'May 10, 2025' }
+        ]
+      },
+      {
+        academic_year: '2023-2024',
+        class_id: 'class-5',
+        class_name: 'Class X - General',
+        attendance: '88.7%',
+        fees: {
+          total: 30000,
+          paid: 30000,
+          remaining: 0,
+          status: 'PAID',
+          history: [
+            { id: 'rcpt-prev-050', date: '2024-03-15', amount: 30000, method: 'UPI' }
+          ]
+        },
+        academic_records: [
+          { subject: 'Mathematics', marks: '92 / 100', grade: 'A1', desc: 'Board Exam' },
+          { subject: 'Science', marks: '85 / 100', grade: 'A2', desc: 'Board Exam' },
+          { subject: 'English', marks: '78 / 100', grade: 'B1', desc: 'Board Exam' },
+          { subject: 'Social Science', marks: '81 / 100', grade: 'A2', desc: 'Board Exam' },
+          { subject: 'Hindi', marks: '75 / 100', grade: 'B1', desc: 'Board Exam' }
+        ],
+        remarks: [
+          { teacher: 'Mrs. Sunita Mehta (Class Teacher)', remark: 'Excellent CBSE board result. Recommended for Science stream.', date: 'Apr 2, 2024' }
+        ]
+      }
+    ],
+    'stud-2': [
+      {
+        academic_year: '2024-2025',
+        class_id: 'class-4',
+        class_name: 'Class XI - Commerce (CBSE)',
+        attendance: '94.2%',
+        fees: {
+          total: 36000,
+          paid: 36000,
+          remaining: 0,
+          status: 'PAID',
+          history: [
+            { id: 'rcpt-prev-201', date: '2025-04-22', amount: 36000, method: 'UPI' }
+          ]
+        },
+        academic_records: [
+          { subject: 'Accountancy', marks: '82 / 100', grade: 'A2', desc: 'Class Avg: 68' },
+          { subject: 'Business Studies', marks: '88 / 100', grade: 'A2', desc: 'Class Avg: 71' },
+          { subject: 'Economics', marks: '79 / 100', grade: 'B1', desc: 'Class Avg: 65' },
+          { subject: 'English Core', marks: '85 / 100', grade: 'A2', desc: 'Class Avg: 73' }
+        ],
+        remarks: [
+          { teacher: 'Mr. Vikram Das (Accounts)', remark: 'Strong analytical skills. Active in class discussions and debate competitions.', date: 'May 5, 2025' }
+        ]
+      }
+    ],
+    'stud-3': [
+      {
+        academic_year: '2024-2025',
+        class_id: 'class-5',
+        class_name: 'Class X - General',
+        attendance: '87.5%',
+        fees: {
+          total: 30000,
+          paid: 25000,
+          remaining: 5000,
+          status: 'PARTIAL',
+          history: [
+            { id: 'rcpt-prev-301', date: '2025-06-01', amount: 25000, method: 'Cash' }
+          ]
+        },
+        academic_records: [
+          { subject: 'Mathematics', marks: '76 / 100', grade: 'B1', desc: 'Class Avg: 65' },
+          { subject: 'Science', marks: '82 / 100', grade: 'A2', desc: 'Class Avg: 70' },
+          { subject: 'English', marks: '71 / 100', grade: 'B1', desc: 'Class Avg: 68' },
+          { subject: 'Social Science', marks: '69 / 100', grade: 'B2', desc: 'Class Avg: 62' }
+        ],
+        remarks: [
+          { teacher: 'Ms. Priya Kapoor (Science)', remark: 'Good progress in practicals. Needs to focus more on theory subjects.', date: 'May 18, 2025' }
         ]
       }
     ]
@@ -223,9 +378,11 @@ export default function Providers({ children }) {
 
   // Shared Roster for employees
   const [sharedStaff, setSharedStaff] = useState([
-    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', basic: 75000, allowances: 0, deductions: 0, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', basic: 90000, allowances: 0, deductions: 0, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1' },
-    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', basic: 50000, allowances: 0, deductions: 0, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2' }
+    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', role: 'TEACHER', basic: 75000, allowances: 0, deductions: 0, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '998877665544', ifsc_code: 'SBIN0000214' },
+    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', role: 'SCHOOL_ADMIN', basic: 90000, allowances: 0, deductions: 0, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'HDFC Bank', account_no: '112233445566', ifsc_code: 'HDFC0000104' },
+    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', role: 'LIBRARIAN', basic: 50000, allowances: 0, deductions: 0, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2', bank_name: 'ICICI Bank', account_no: '556677889900', ifsc_code: 'ICIC0000011' },
+    { id: 'staff-4', first_name: 'Karan', last_name: 'Johar', employee_id: 'EMP-ADM-03', designation: 'Bursar', role: 'ACCOUNTANT', basic: 65000, allowances: 0, deductions: 0, pan_no: 'KJHOP1234E', phone: '+91 91234 56780', email: 'karan.johar@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'Axis Bank', account_no: '887766554433', ifsc_code: 'UTIB0000082' },
+    { id: 'staff-5', first_name: 'Vinod', last_name: 'Mehta', employee_id: 'EMP-ADM-04', designation: 'Office Administrator', role: 'ADMINISTRATOR', basic: 68000, allowances: 0, deductions: 0, pan_no: 'VNMTH5678D', phone: '+91 98765 12345', email: 'vinod.mehta@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '223344556677', ifsc_code: 'SBIN0000214' }
   ]);
 
   // Shared fleet maintenance logs
@@ -531,7 +688,8 @@ export default function Providers({ children }) {
           ACCOUNTANT: 'Karan Johar (Bursar)',
           LIBRARIAN: 'Deepa Roy (Chief Librarian)',
           TRANSPORT_MANAGER: 'Harpreet Singh (Fleet Head)',
-          HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)'
+          HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)',
+          ADMINISTRATOR: 'Shri. Vinod Mehta (Office Administrator)'
         };
         
         let email = activeTenant?.subdomain ? `user@${activeTenant.subdomain}.edu.in` : 'user@school.edu.in';
@@ -546,10 +704,12 @@ export default function Providers({ children }) {
             .replace('Smt. ', '')
             .replace('Prof. ', '')
             .replace('Dr. ', '')
+            .replace('Shri. ', '')
             .replace('Karan Johar', 'karan.johar')
             .replace('Suresh Chandra', 'suresh.chandra')
             .replace('Harpreet Singh', 'harpreet.singh')
             .replace('Aarav Patel', 'aarav.patel')
+            .replace('Vinod Mehta', 'vinod.mehta')
             .toLowerCase()
             .replace(' ', '.');
           email = `${staffName}@${activeTenant.subdomain}.edu.in`;
@@ -567,6 +727,13 @@ export default function Providers({ children }) {
   // Login handler
   const login = async (email, password) => {
     try {
+      // Allow demo login bypass for any onboarded staff member by email
+      const foundStaff = (sharedStaff || []).find(s => s.email?.toLowerCase() === email?.toLowerCase());
+      if (foundStaff) {
+        simulateStaffSession(foundStaff);
+        return { success: true };
+      }
+
       if (typeof window !== 'undefined') {
         document.cookie = "sb-demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         document.cookie = "sb-demo-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -614,7 +781,8 @@ export default function Providers({ children }) {
       ACCOUNTANT: 'Karan Johar (Bursar)',
       LIBRARIAN: 'Deepa Roy (Chief Librarian)',
       TRANSPORT_MANAGER: 'Harpreet Singh (Fleet Head)',
-      HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)'
+      HOSTEL_WARDEN: 'Suresh Chandra (Warden Block A)',
+      ADMINISTRATOR: 'Shri. Vinod Mehta (Office Administrator)'
     };
     
     let email = activeTenant?.subdomain ? `user@${activeTenant.subdomain}.edu.in` : 'user@school.edu.in';
@@ -629,10 +797,12 @@ export default function Providers({ children }) {
         .replace('Smt. ', '')
         .replace('Prof. ', '')
         .replace('Dr. ', '')
+        .replace('Shri. ', '')
         .replace('Karan Johar', 'karan.johar')
         .replace('Suresh Chandra', 'suresh.chandra')
         .replace('Harpreet Singh', 'harpreet.singh')
         .replace('Aarav Patel', 'aarav.patel')
+        .replace('Vinod Mehta', 'vinod.mehta')
         .toLowerCase()
         .replace(' ', '.');
       email = `${staffName}@${activeTenant.subdomain}.edu.in`;
@@ -668,6 +838,37 @@ export default function Providers({ children }) {
       }
       toast.success(`Switched school campus to: ${tenant.name}`);
     }
+  };
+
+  const simulateStaffSession = (staff) => {
+    // Determine active role from staff.role, fallback to matching designation
+    let role = staff.role;
+    if (!role) {
+      const desc = (staff.designation || '').toLowerCase();
+      if (desc.includes('principal') || desc.includes('dean')) role = 'SCHOOL_ADMIN';
+      else if (desc.includes('accountant') || desc.includes('bursar') || desc.includes('finance')) role = 'ACCOUNTANT';
+      else if (desc.includes('librarian')) role = 'LIBRARIAN';
+      else if (desc.includes('transport') || desc.includes('fleet')) role = 'TRANSPORT_MANAGER';
+      else if (desc.includes('warden')) role = 'HOSTEL_WARDEN';
+      else if (desc.includes('administrator') || desc.includes('admin')) role = 'ADMINISTRATOR';
+      else role = 'TEACHER';
+    }
+
+    setActiveRole(role);
+    setActiveUser({
+      name: `${staff.first_name} ${staff.last_name} (${staff.designation})`,
+      email: staff.email,
+      role: role,
+      avatar: staff.profile_picture_url || ''
+    });
+
+    if (typeof window !== 'undefined') {
+      document.cookie = "sb-demo-session=true; path=/; max-age=86400";
+      document.cookie = `sb-demo-role=${role}; path=/; max-age=86400`;
+    }
+
+    toast.success(`Switched active session to staff: ${staff.first_name} ${staff.last_name} (${role})`);
+    router.push('/dashboard');
   };
 
   const switchParent = (parentId) => {
@@ -845,13 +1046,39 @@ export default function Providers({ children }) {
       settings: {
         ...prev.settings,
         board: tenantData.board,
-        academicYear: tenantData.academicYear
+        academicYear: tenantData.academicYear,
+        bank: {
+          bankName: tenantData.bankName,
+          accountName: tenantData.accountName,
+          accountNo: tenantData.accountNo,
+          ifscCode: tenantData.ifscCode,
+          upiId: tenantData.upiId,
+          qrCode: tenantData.qrCode
+        }
       }
     }));
     
     setAvailableTenants(prev => prev.map(t => 
       t.id === activeTenant.id 
-        ? { ...t, name: tenantData.name, subdomain: tenantData.subdomain, logo: tenantData.logo } 
+        ? { 
+            ...t, 
+            name: tenantData.name, 
+            subdomain: tenantData.subdomain, 
+            logo: tenantData.logo,
+            settings: {
+              ...t.settings,
+              board: tenantData.board,
+              academicYear: tenantData.academicYear,
+              bank: {
+                bankName: tenantData.bankName,
+                accountName: tenantData.accountName,
+                accountNo: tenantData.accountNo,
+                ifscCode: tenantData.ifscCode,
+                upiId: tenantData.upiId,
+                qrCode: tenantData.qrCode
+              }
+            }
+          } 
         : t
     ));
     
@@ -864,7 +1091,8 @@ export default function Providers({ children }) {
       session,
       loading,
       activeUser,
-      activeRole,
+      activeRole: activeRole === 'ADMINISTRATOR' ? 'SCHOOL_ADMIN' : activeRole,
+      realRole: activeRole,
       activeTenant,
       availableTenants,
       login,
@@ -891,6 +1119,7 @@ export default function Providers({ children }) {
       setSharedRemarks,
       activeParentId,
       switchParent,
+      simulateStaffSession,
       addStudentAndParent,
       sharedClasses,
       setSharedClasses,

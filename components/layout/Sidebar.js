@@ -76,7 +76,7 @@ const sidebarLinks = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { activeRole, activeUser, activeTenant, logout } = useAuth();
+  const { activeRole, activeUser, activeTenant, logout, realRole } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const filteredLinks = sidebarLinks.map(group => ({
@@ -145,7 +145,7 @@ export default function Sidebar() {
                 <span className="text-[12px] font-bold text-text-primary truncate">{activeUser?.name || 'Academic User'}</span>
                 <div className="flex items-center gap-1 mt-0.5">
                    <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
-                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-widest">{activeRole}</span>
+                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-widest">{realRole || activeRole}</span>
                 </div>
               </div>
             )}

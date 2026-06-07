@@ -5,7 +5,7 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
-  Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText
+  Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText, Zap
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -19,7 +19,8 @@ export default function StaffRegistryPage() {
     activeTenant, 
     sharedStaff, 
     setSharedStaff,
-    activeRole
+    activeRole,
+    simulateStaffSession
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -34,13 +35,17 @@ export default function StaffRegistryPage() {
     firstName: '',
     lastName: '',
     designation: 'Lecturer',
+    role: 'TEACHER',
     department: 'Science',
     basic: 55000,
     panNo: '',
     phone: '',
     email: '',
     avatar: '',
-    avatarFile: null
+    avatarFile: null,
+    bankName: 'State Bank of India',
+    accountNo: '',
+    ifscCode: ''
   });
 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN'];
@@ -138,6 +143,7 @@ export default function StaffRegistryPage() {
         last_name: formData.lastName,
         employee_id: empId,
         designation: formData.designation,
+        role: formData.role || 'TEACHER',
         department: formData.department,
         basic: Number(formData.basic),
         allowances: 0,
@@ -147,6 +153,9 @@ export default function StaffRegistryPage() {
         email: formData.email,
         tenant_id: activeTenant.id,
         profile_picture_url: profilePicUrl,
+        bank_name: formData.bankName || 'State Bank of India',
+        account_no: formData.accountNo || 'N/A',
+        ifsc_code: formData.ifscCode || 'N/A',
         documents: []
       };
 
@@ -157,13 +166,17 @@ export default function StaffRegistryPage() {
         firstName: '',
         lastName: '',
         designation: 'Lecturer',
+        role: 'TEACHER',
         department: 'Science',
         basic: 55000,
         panNo: '',
         phone: '',
         email: '',
         avatar: '',
-        avatarFile: null
+        avatarFile: null,
+        bankName: 'State Bank of India',
+        accountNo: '',
+        ifscCode: ''
       });
       setShowAddForm(false);
       setLoading(false);
@@ -384,6 +397,34 @@ export default function StaffRegistryPage() {
             <UserPlus size={14} />
             <span>Onboard Staff</span>
           </button>
+        </div>
+      </div>
+
+      {/* Credentials Help Tips */}
+      <div className="p-5 bg-gradient-to-br from-indigo-50/70 to-blue-50/70 border border-indigo-100 rounded-3xl space-y-3 shadow-[0_4px_20px_rgba(99,102,241,0.04)] relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
+        <div className="flex items-center gap-2">
+          <Shield className="text-indigo-600" size={18} />
+          <h4 className="text-xs font-black text-indigo-950 uppercase tracking-widest">How to Access & Test Staff Roles (RBAC)</h4>
+        </div>
+        <p className="text-xs text-indigo-950/70 leading-relaxed max-w-4xl">
+          When you onboard a staff member (such as an <strong>Accountant</strong> or <strong>Office Administrator</strong>), their account is assigned a Role. You can test their dashboard context in two ways:
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1.5 text-xs text-indigo-950/80">
+          <div className="flex items-start gap-2 bg-white/60 p-3 rounded-2xl border border-indigo-100/50">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-indigo-600 text-[10px] font-black text-white shrink-0">1</span>
+            <div>
+              <p className="font-bold text-indigo-950">Zap Login (Instant Simulation)</p>
+              <p className="text-[11px] text-indigo-950/70 mt-0.5">Click the <span className="inline-flex items-center text-success font-semibold gap-0.5"><Zap size={10} /> Zap</span> button on any row in the directory below to instantly log in as that staff member.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 bg-white/60 p-3 rounded-2xl border border-indigo-100/50">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-indigo-600 text-[10px] font-black text-white shrink-0">2</span>
+            <div>
+              <p className="font-bold text-indigo-950">Direct Email Login</p>
+              <p className="text-[11px] text-indigo-950/70 mt-0.5">On the login screen, enter the staff member's email (e.g. <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold text-[10px]">karan.johar@iitd.edu.in</code>) with any password to sign in directly.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -654,13 +695,48 @@ export default function StaffRegistryPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Designation Role</label>
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">System Access Role (RBAC) *</label>
+              <select 
+                value={formData.role}
+                onChange={(e) => {
+                  const selectedRole = e.target.value;
+                  const roleDefaults = {
+                    TEACHER: 'Lecturer',
+                    ACCOUNTANT: 'Accountant',
+                    LIBRARIAN: 'Librarian',
+                    TRANSPORT_MANAGER: 'Transport Head',
+                    HOSTEL_WARDEN: 'Hostel Warden',
+                    ADMINISTRATOR: 'Office Administrator',
+                    SCHOOL_ADMIN: 'Principal Office'
+                  };
+                  setFormData(prev => ({
+                    ...prev,
+                    role: selectedRole,
+                    designation: roleDefaults[selectedRole] || prev.designation
+                  }));
+                }}
+                className="w-full text-xs bg-bg-sidebar text-text-primary"
+                required
+              >
+                <option value="TEACHER">Teacher / Instructor (TEACHER)</option>
+                <option value="ACCOUNTANT">Accountant / Bursar (ACCOUNTANT)</option>
+                <option value="ADMINISTRATOR">Office Administrator (ADMINISTRATOR)</option>
+                <option value="LIBRARIAN">Librarian (LIBRARIAN)</option>
+                <option value="TRANSPORT_MANAGER">Transport Head (TRANSPORT_MANAGER)</option>
+                <option value="HOSTEL_WARDEN">Hostel Warden (HOSTEL_WARDEN)</option>
+                <option value="SCHOOL_ADMIN">School Admin / Principal (SCHOOL_ADMIN)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Custom Designation Title *</label>
               <input 
                 type="text" 
-                placeholder="e.g. HOD Physics, Principal Office, Librarian"
+                placeholder="e.g. HOD Physics, Senior Bursar"
                 value={formData.designation}
                 onChange={(e) => setFormData({...formData, designation: e.target.value})}
                 className="w-full text-xs"
+                required
               />
             </div>
             <div className="space-y-1.5">
@@ -697,6 +773,50 @@ export default function StaffRegistryPage() {
                 className="w-full text-xs font-mono"
                 required
               />
+            </div>
+
+            {/* Bank Details section */}
+            <div className="md:col-span-2 p-5 bg-slate-100/50 border border-border rounded-2xl space-y-4">
+              <h4 className="text-xs font-bold text-accent uppercase tracking-wider font-outfit">Bank Account Payout Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Bank Name *</label>
+                  <select 
+                    value={formData.bankName}
+                    onChange={(e) => setFormData({...formData, bankName: e.target.value})}
+                    className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
+                    required
+                  >
+                    <option value="State Bank of India">State Bank of India</option>
+                    <option value="HDFC Bank">HDFC Bank</option>
+                    <option value="ICICI Bank">ICICI Bank</option>
+                    <option value="Axis Bank">Axis Bank</option>
+                    <option value="Punjab National Bank">Punjab National Bank</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Account Number *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 998877665544"
+                    value={formData.accountNo}
+                    onChange={(e) => setFormData({...formData, accountNo: e.target.value})}
+                    className="w-full text-xs font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">IFSC Code *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. SBIN0000214"
+                    value={formData.ifscCode}
+                    onChange={(e) => setFormData({...formData, ifscCode: e.target.value})}
+                    className="w-full text-xs font-mono uppercase"
+                    required
+                  />
+                </div>
+              </div>
             </div>
             {/* Calculations Breakdown */}
             <div className="md:col-span-2 p-4 bg-bg-main border border-border rounded-2xl space-y-2 text-xs">
@@ -743,6 +863,70 @@ export default function StaffRegistryPage() {
               <div>
                 <h4 className="text-sm font-bold text-text-primary">{selectedStaffForDossier.first_name} {selectedStaffForDossier.last_name}</h4>
                 <p className="text-[10px] text-text-secondary uppercase font-mono">ID: {selectedStaffForDossier.employee_id} • Designation: {selectedStaffForDossier.designation}</p>
+              </div>
+            </div>
+
+            {/* System Access / RBAC privileges box */}
+            <div className="p-5 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 border border-blue-100 rounded-3xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="text-blue-600" size={18} />
+                  <span className="text-[11px] font-black text-blue-900 uppercase tracking-widest block">System Access & Privileges (RBAC)</span>
+                </div>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[8px] font-black rounded-full uppercase tracking-wider">
+                  {selectedStaffForDossier.role || 'TEACHER'}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Access Scope & Data Scope</p>
+                  <p className="font-semibold text-slate-800">
+                    {selectedStaffForDossier.role === 'ACCOUNTANT' ? (
+                      '💰 Fees & Finance, HR & Payroll, Receipts, Certificate Hub'
+                    ) : selectedStaffForDossier.role === 'ADMINISTRATOR' ? (
+                      '💼 Complete Office Control, Admissions, Academic Promotions, Settings'
+                    ) : selectedStaffForDossier.role === 'SCHOOL_ADMIN' ? (
+                      '🎓 School Admin / Principal portal access'
+                    ) : (
+                      '📚 Classroom academics, Attendance, Marks & Exams, Syllabus/LMS'
+                    )}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Login Credentials (Demo Bypass)</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-100 break-all select-all font-bold">
+                      {selectedStaffForDossier.email}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1 md:col-span-2 pt-2 border-t border-blue-100/50">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Salary Payout Bank Account Details</p>
+                  <p className="font-semibold text-slate-800 flex items-center gap-1">
+                    🏦 <span className="font-bold text-slate-900">{selectedStaffForDossier.bank_name || 'State Bank of India'}</span>
+                    <span className="text-text-secondary">• A/C:</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedStaffForDossier.account_no || 'N/A'}</span>
+                    <span className="text-text-secondary">• IFSC:</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedStaffForDossier.ifsc_code || 'N/A'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-blue-100/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                  Use this email with any password on the login screen, or click the simulate button to test their exact dashboard.
+                </p>
+                <button
+                  onClick={() => {
+                    simulateStaffSession(selectedStaffForDossier);
+                    setSelectedStaffForDossier(null);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-md shadow-blue-500/10"
+                >
+                  <Zap size={13} />
+                  <span>Simulate Login (Test Access)</span>
+                </button>
               </div>
             </div>
 
@@ -874,13 +1058,22 @@ export default function StaffRegistryPage() {
                     <td className="py-4 font-mono text-text-secondary">{staff.pan_no || 'N/A'}</td>
                     <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
                     <td className="py-4 text-right pr-2">
-                      <button 
-                        onClick={() => setSelectedStaffForDossier(staff)}
-                        className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
-                        title="Staff Documents & Dossier"
-                      >
-                        <FileBox size={14} />
-                      </button>
+                      <div className="flex justify-end gap-1">
+                        <button 
+                          onClick={() => simulateStaffSession(staff)}
+                          className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
+                          title="Login as Staff (RBAC Simulator)"
+                        >
+                          <Zap size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setSelectedStaffForDossier(staff)}
+                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
+                          title="Staff Documents & Dossier"
+                        >
+                          <FileBox size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -4,14 +4,14 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Shield, Mail, Lock, ArrowRight, Loader2, 
-  Sparkles, ShieldCheck, Eye, EyeOff, X
+  Sparkles, ShieldCheck, Eye, EyeOff, X, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/Providers';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, switchRole, availableTenants, activeTenant, switchTenant } = useAuth();
+  const { login, switchRole, availableTenants, activeTenant, switchTenant, sharedStaff, simulateStaffSession } = useAuth();
   
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -175,6 +175,7 @@ export default function LoginPage() {
                   {[
                     { role: 'SUPER_ADMIN', label: 'Super Admin', desc: 'Global platform manager' },
                     { role: 'SCHOOL_ADMIN', label: 'School Admin', desc: 'Campus principal' },
+                    { role: 'ADMINISTRATOR', label: 'Office Administrator', desc: 'Manage data from office' },
                     { role: 'TEACHER', label: 'Teacher / Instructor', desc: 'Academics & grading' },
                     { role: 'STUDENT', label: 'Student Profile', desc: 'LMS portal & progress' },
                     { role: 'PARENT', label: 'Parent / Guardian', desc: 'Progress & fee logs' },
@@ -197,6 +198,49 @@ export default function LoginPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Dynamic Onboarded Staff List Section */}
+              {sharedStaff && sharedStaff.filter(s => s.tenant_id === activeTenant.id).length > 0 && (
+                <div className="border-t border-border pt-4 mt-2 space-y-2">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest flex items-center justify-between">
+                    <span>Onboarded Staff Accounts</span>
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[7px] font-black uppercase tracking-wider">ACTIVE</span>
+                  </label>
+                  <div className="space-y-1.5 max-h-[30vh] overflow-y-auto custom-scrollbar pr-1">
+                    {sharedStaff
+                      .filter(s => s.tenant_id === activeTenant.id)
+                      .map((staff) => (
+                        <button
+                          key={staff.id}
+                          onClick={() => {
+                            simulateStaffSession(staff);
+                            setIsDemoOpen(false);
+                            router.push('/dashboard');
+                          }}
+                          className="w-full p-2.5 bg-slate-50/70 hover:bg-emerald-600/10 border border-border hover:border-emerald-500/30 rounded-xl transition-all text-left flex items-start gap-2.5 group"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 border border-emerald-200/50 flex items-center justify-center text-emerald-700 text-[9px] font-black uppercase shrink-0 mt-0.5">
+                            {staff.first_name[0]}{staff.last_name[0]}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-bold text-text-primary group-hover:text-emerald-600 transition-colors truncate">
+                              {staff.first_name} {staff.last_name}
+                            </p>
+                            <span className="text-[8px] text-text-secondary block font-medium truncate">
+                              {staff.designation} • {staff.role}
+                            </span>
+                            <span className="text-[7.5px] font-mono text-text-secondary block truncate mt-0.5">
+                              {staff.email}
+                            </span>
+                          </div>
+                          <div className="p-1 text-text-secondary group-hover:text-emerald-600 align-self-center shrink-0">
+                            <Zap size={11} />
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="text-[9px] text-text-secondary leading-relaxed border-t border-border pt-4">

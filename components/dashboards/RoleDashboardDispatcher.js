@@ -13,6 +13,8 @@ import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import Modal from '@/components/Modal';
+import { compressImage } from '@/lib/storage';
+
 
 // ── Number → Words helper (Indian system) ──────────────────────────────────
 const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -681,8 +683,9 @@ function StudentDashboard() {
 // Online Payment Modal
 // ─────────────────────────────────────────────────────────────────
 function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSuccess }) {
+  const { activeTenant } = useAuth();
   const [step, setStep] = useState('method'); // method | detail | processing | success
-  const [method, setMethod] = useState(null); // UPI | CARD | NETBANKING
+  const [method, setMethod] = useState(null); // BANK_QR | CARD | NETBANKING
   const [upiId, setUpiId] = useState('');
   const [cardNo, setCardNo] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -691,17 +694,81 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
   const [bank, setBank] = useState('');
   const [progress, setProgress] = useState(0);
   const [processingMsg, setProcessingMsg] = useState('Initiating secure payment...');
-  const amountToPay = fees.remaining;
+  
+  // UTR QR & Bank inputs
+  const [utrNumber, setUtrNumber] = useState('');
+  const [paymentMode, setPaymentMode] = useState('UPI'); // UPI | IMPS | NEFT_RTGS
+  const [receiptImage, setReceiptImage] = useState('');
+  const [receiptPreview, setReceiptPreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  
+  const [customAmount, setCustomAmount] = useState(fees.remaining);
+  const amountToPay = Number(customAmount) || 0;
 
   const methods = [
-    { id: 'UPI', label: 'UPI / QR Code', desc: 'Pay via Google Pay, PhonePe, Paytm', icon: QrCode, color: 'indigo' },
+    { id: 'BANK_QR', label: 'Scan QR / Bank Transfer', desc: 'Scan school QR or pay to Bank Account', icon: QrCode, color: 'indigo' },
     { id: 'CARD', label: 'Debit / Credit Card', desc: 'Visa, Mastercard, RuPay accepted', icon: CreditCard, color: 'violet' },
     { id: 'NETBANKING', label: 'Net Banking', desc: 'SBI, HDFC, ICICI, Axis & more', icon: Building2, color: 'sky' },
   ];
 
   const banks = ['State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra Bank', 'Punjab National Bank', 'Bank of Baroda', 'Canara Bank'];
 
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 2) {
+      toast.error(`Receipt image size (${fileSizeMB.toFixed(2)} MB) exceeds 2MB limit.`);
+      return;
+    }
+    
+    try {
+      setUploadingImage(true);
+      const compressedFile = await compressImage(file, 600, 600, 0.7);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result);
+        setReceiptPreview(reader.result);
+        setUploadingImage(false);
+        toast.success("Receipt screenshot uploaded & compressed!");
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (err) {
+      console.error(err);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReceiptImage(reader.result);
+        setReceiptPreview(reader.result);
+        setUploadingImage(false);
+        toast.success("Receipt screenshot preloaded!");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleProceed = () => {
+    if (amountToPay <= 0) {
+      toast.error('Please enter a valid payment amount (minimum ₹1).');
+      return;
+    }
+    if (amountToPay > fees.remaining) {
+      toast.error(`Payment amount cannot exceed outstanding balance of ₹${fees.remaining.toLocaleString('en-IN')}.`);
+      return;
+    }
+    if (method === 'BANK_QR') {
+      if (!utrNumber.trim()) {
+        toast.error('Please enter the transaction UTR / Reference number.');
+        return;
+      }
+      if (utrNumber.trim().length < 6) {
+        toast.error('UTR / Reference number should be at least 6 digits.');
+        return;
+      }
+      setStep('processing');
+      runProcessingAnimation();
+      return;
+    }
     if (method === 'UPI' && !upiId.trim()) { toast.error('Please enter a valid UPI ID.'); return; }
     if (method === 'CARD' && (!cardNo || !cardExpiry || !cardCvv || !cardName)) { toast.error('Please fill all card details.'); return; }
     if (method === 'NETBANKING' && !bank) { toast.error('Please select your bank.'); return; }
@@ -710,7 +777,13 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
   };
 
   const runProcessingAnimation = () => {
-    const msgs = [
+    const msgs = method === 'BANK_QR' ? [
+      'Submitting transaction receipt...',
+      'Uploading deposit screenshot...',
+      'Registering UTR number...',
+      'Generating pending verification voucher...',
+      'Awaiting administrator review...'
+    ] : [
       'Initiating secure payment...',
       'Connecting to payment gateway...',
       'Verifying payment credentials...',
@@ -751,18 +824,36 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
         </div>
 
         {/* Amount summary bar */}
-        <div className="px-6 py-3 bg-accent/5 border-b border-border flex items-center justify-between">
+        <div className="px-6 py-3 bg-accent/5 border-b border-border flex items-center justify-between gap-4">
           <div>
             <p className="text-[9px] font-black uppercase tracking-widest text-text-secondary">Payment for {child.first_name} {child.last_name}</p>
-            <p className="text-[10px] text-text-secondary">Adm: {child.admission_no} • Outstanding Fee Balance</p>
+            <p className="text-[10px] text-text-secondary">Adm: {child.admission_no} • Outstanding: ₹{fees.remaining.toLocaleString('en-IN')}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xl font-black text-accent font-outfit">₹{amountToPay.toLocaleString('en-IN')}</p>
-            <p className="text-[9px] text-text-secondary">Total payable amount</p>
+          <div className="flex flex-col items-end shrink-0">
+            <span className="text-[9px] text-text-secondary font-black uppercase tracking-widest block mb-0.5">Amount to Pay</span>
+            <div className="relative flex items-center">
+              <span className="absolute left-2.5 text-accent font-black text-xs">₹</span>
+              <input
+                type="number"
+                min="1"
+                max={fees.remaining}
+                value={customAmount}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  if (isNaN(val)) {
+                    setCustomAmount('');
+                  } else {
+                    setCustomAmount(Math.min(val, fees.remaining));
+                  }
+                }}
+                className="w-28 pl-6 pr-2 py-1 bg-white dark:bg-black/35 border border-border rounded-xl text-right font-outfit font-black text-accent text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+                disabled={step === 'processing' || step === 'success'}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh] custom-scrollbar">
           {/* Step: Method Selection */}
           {step === 'method' && (
             <>
@@ -771,7 +862,18 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
                 {methods.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => { setMethod(m.id); setStep('detail'); }}
+                    onClick={() => {
+                      if (amountToPay <= 0) {
+                        toast.error('Please enter a valid payment amount (minimum ₹1).');
+                        return;
+                      }
+                      if (amountToPay > fees.remaining) {
+                        toast.error(`Payment amount cannot exceed outstanding balance of ₹${fees.remaining.toLocaleString('en-IN')}.`);
+                        return;
+                      }
+                      setMethod(m.id);
+                      setStep('detail');
+                    }}
                     className={`w-full p-4 rounded-2xl border-2 flex items-center gap-4 transition-all hover:scale-[1.01] ${
                       colorMap[m.color]
                     }`}
@@ -799,22 +901,112 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
                 <ArrowRight size={10} className="rotate-180" /> Back to methods
               </button>
 
-              {method === 'UPI' && (
+              {method === 'BANK_QR' && (
                 <div className="space-y-4">
-                  <div className="flex flex-col items-center gap-3 p-6 bg-bg-sidebar rounded-2xl border border-border">
-                    <div className="w-28 h-28 bg-white rounded-xl flex items-center justify-center border border-border">
-                      <QrCode size={80} className="text-text-primary opacity-80" />
+                  <div className="p-4 bg-accent/5 border border-border rounded-2xl space-y-3">
+                    <p className="text-[10px] font-black uppercase text-accent tracking-widest mb-1">School bank account credentials</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      {[
+                        { label: 'Bank Name', value: activeTenant.settings?.bank?.bankName || 'State Bank of India' },
+                        { label: 'Account Name', value: activeTenant.settings?.bank?.accountName || 'School Fee Operations' },
+                        { label: 'Account Number', value: activeTenant.settings?.bank?.accountNo || '10293847561' },
+                        { label: 'IFSC Code', value: activeTenant.settings?.bank?.ifscCode || 'SBIN0000214' },
+                        { label: 'UPI ID', value: activeTenant.settings?.bank?.upiId || 'school@upi' }
+                      ].map((f, i) => (
+                        <div key={i} className="p-2.5 bg-bg-sidebar border border-border rounded-xl flex items-center justify-between group/field">
+                          <div className="min-w-0 pr-2">
+                            <span className="text-[8px] text-text-secondary uppercase font-bold block">{f.label}</span>
+                            <span className="font-bold font-mono text-text-primary text-[11px] truncate block mt-0.5" title={f.value}>{f.value}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(f.value);
+                              toast.success(`Copied ${f.label} to clipboard!`);
+                            }}
+                            className="p-1 text-[9px] font-bold text-accent bg-accent/10 hover:bg-accent hover:text-white rounded transition-all shrink-0"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-[10px] text-text-secondary font-semibold text-center">Scan with any UPI app or enter ID below</p>
                   </div>
-                  <div>
-                    <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">UPI ID (e.g. name@upi)</label>
-                    <input
-                      className="w-full px-3 py-2.5 text-sm bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all"
-                      placeholder="yourname@okicici"
-                      value={upiId}
-                      onChange={e => setUpiId(e.target.value)}
-                    />
+
+                  {/* QR Scanner Image Container */}
+                  <div className="flex flex-col items-center gap-3 p-5 bg-bg-sidebar rounded-2xl border border-border">
+                    {activeTenant.settings?.bank?.qrCode ? (
+                      <div className="relative group/qr">
+                        <img 
+                          src={activeTenant.settings.bank.qrCode} 
+                          alt="School UPI QR Scanner" 
+                          className="w-32 h-32 object-contain rounded-xl shadow-md border-2 border-accent/20 bg-white"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/qr:opacity-100 rounded-xl flex items-center justify-center transition-all">
+                          <span className="text-[10px] text-white font-bold bg-accent/90 px-2.5 py-1 rounded-full flex items-center gap-1"><QrCode size={10} /> Scan UPI</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-28 h-28 bg-white/80 rounded-xl flex flex-col items-center justify-center border border-border text-text-secondary">
+                        <QrCode size={48} className="opacity-40" />
+                        <span className="text-[8px] text-text-secondary mt-1 font-bold text-center px-2">No QR uploaded by school</span>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-text-secondary font-semibold text-center leading-normal">Scan the QR scanner using any UPI App (GPay/PhonePe/Paytm) or transfer directly to the Bank Account above.</p>
+                  </div>
+
+                  {/* Inputs for parent to confirm payment details */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Payment Mode *</label>
+                        <select 
+                          className="w-full px-3 py-2 text-xs bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all text-text-primary font-bold"
+                          value={paymentMode}
+                          onChange={e => setPaymentMode(e.target.value)}
+                        >
+                          <option value="UPI">UPI App Payment</option>
+                          <option value="IMPS">IMPS Transfer</option>
+                          <option value="NEFT_RTGS">NEFT / RTGS Transfer</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Transaction UTR / Ref No *</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-3 py-2 text-xs bg-bg-sidebar border border-border rounded-xl focus:outline-none focus:border-accent transition-all font-mono text-text-primary"
+                          placeholder="e.g. 12-digit number"
+                          value={utrNumber}
+                          onChange={e => setUtrNumber(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase tracking-widest text-text-secondary block mb-1.5">Upload Payment Receipt Screenshot</label>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={handleReceiptUpload}
+                          className="hidden"
+                          id="receipt-screenshot-uploader"
+                        />
+                        <label 
+                          htmlFor="receipt-screenshot-uploader"
+                          className="px-4 py-2 bg-bg-sidebar border border-border hover:border-accent/40 rounded-xl cursor-pointer text-[10px] font-bold text-text-primary transition-all flex items-center gap-1.5"
+                        >
+                          {uploadingImage ? "Compressing..." : "Choose Screenshot"}
+                        </label>
+                        {receiptPreview && (
+                          <div className="w-9 h-9 rounded bg-slate-100 border border-border overflow-hidden relative group shrink-0">
+                            <img src={receiptPreview} alt="Receipt Preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -860,7 +1052,7 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
                 className="w-full py-3.5 bg-accent hover:bg-accent/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm mt-2 shadow-lg shadow-accent/20"
               >
                 <Lock size={14} />
-                Pay ₹{amountToPay.toLocaleString('en-IN')} Securely
+                {method === 'BANK_QR' ? 'Submit Payment Receipt' : `Pay ₹${amountToPay.toLocaleString('en-IN')} Securely`}
               </button>
             </>
           )}
@@ -889,24 +1081,58 @@ function OnlinePaymentModal({ child, fees, feeBreakdown, totalFee, onClose, onSu
           {/* Step: Success */}
           {step === 'success' && (
             <div className="flex flex-col items-center gap-5 py-4">
-              <div className="w-20 h-20 bg-success/15 rounded-full flex items-center justify-center border-2 border-success/30">
-                <BadgeCheck size={40} className="text-success" />
+              <div className={`w-20 h-20 ${method === 'BANK_QR' ? 'bg-warning/15 border-warning/30' : 'bg-success/15 border-success/30'} rounded-full flex items-center justify-center border-2`}>
+                {method === 'BANK_QR' ? (
+                  <Clock size={40} className="text-warning animate-pulse" />
+                ) : (
+                  <BadgeCheck size={40} className="text-success" />
+                )}
               </div>
               <div className="text-center space-y-1">
-                <p className="text-lg font-black text-text-primary">Payment Successful!</p>
-                <p className="text-[11px] text-text-secondary">₹{amountToPay.toLocaleString('en-IN')} paid for {child.first_name} {child.last_name}</p>
+                <p className="text-lg font-black text-text-primary">
+                  {method === 'BANK_QR' ? 'Payment Receipt Submitted!' : 'Payment Successful!'}
+                </p>
+                <p className="text-[11px] text-text-secondary">
+                  ₹{amountToPay.toLocaleString('en-IN')} paid for {child.first_name} {child.last_name}
+                </p>
               </div>
-              <div className="w-full p-4 bg-bg-sidebar rounded-2xl border border-border space-y-2 text-xs">
-                <div className="flex justify-between"><span className="text-text-secondary">Payment Method</span><span className="font-bold text-text-primary">{method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`}</span></div>
-                <div className="flex justify-between"><span className="text-text-secondary">Transaction ID</span><span className="font-mono font-bold text-accent">TXN{Date.now().toString().slice(-10)}</span></div>
-                <div className="flex justify-between"><span className="text-text-secondary">Amount Settled</span><span className="font-black text-success">₹{amountToPay.toLocaleString('en-IN')}</span></div>
-                <div className="flex justify-between"><span className="text-text-secondary">Status</span><span className="text-[9px] bg-success/15 text-success font-black px-2 py-0.5 rounded uppercase">Cleared</span></div>
-              </div>
-              <button onClick={() => {
-                const label = method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`;
-                onSuccess(label);
-              }} className="w-full py-3 bg-success hover:bg-success/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-success/20">
-                <Receipt size={14} /> View Official Receipt
+              
+              {method === 'BANK_QR' ? (
+                <div className="w-full p-4 bg-bg-sidebar rounded-2xl border border-border space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-text-secondary">Method Channel</span><span className="font-bold text-text-primary">Bank QR / Transfer ({paymentMode})</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">UTR / Reference No</span><span className="font-mono font-bold text-accent">{utrNumber}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Receipt Screenshot</span><span className="text-text-secondary font-semibold">{receiptImage ? 'Uploaded' : 'Not Provided'}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Verification Status</span><span className="text-[9px] bg-warning/15 text-warning font-black px-2 py-0.5 rounded uppercase">Pending Review</span></div>
+                </div>
+              ) : (
+                <div className="w-full p-4 bg-bg-sidebar rounded-2xl border border-border space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-text-secondary">Payment Method</span><span className="font-bold text-text-primary">{method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Transaction ID</span><span className="font-mono font-bold text-accent">TXN{Date.now().toString().slice(-10)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Amount Settled</span><span className="font-black text-success">₹{amountToPay.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Status</span><span className="text-[9px] bg-success/15 text-success font-black px-2 py-0.5 rounded uppercase">Cleared</span></div>
+                </div>
+              )}
+              
+              <button 
+                onClick={() => {
+                  if (method === 'BANK_QR') {
+                    onSuccess(`QR/Bank Transfer (${paymentMode})`, { utr: utrNumber, mode: paymentMode, receiptImage }, amountToPay);
+                  } else {
+                    const label = method === 'UPI' ? `UPI (${upiId})` : method === 'CARD' ? 'Debit/Credit Card' : `Net Banking – ${bank}`;
+                    onSuccess(label, null, amountToPay);
+                  }
+                }} 
+                className={`w-full py-3 ${method === 'BANK_QR' ? 'bg-warning hover:bg-warning/90 shadow-warning/20' : 'bg-success hover:bg-success/90 shadow-success/20'} text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg`}
+              >
+                {method === 'BANK_QR' ? (
+                  <>
+                    <CheckCircle2 size={14} /> Close & Await Review
+                  </>
+                ) : (
+                  <>
+                    <Receipt size={14} /> View Official Receipt
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -978,6 +1204,10 @@ function ParentDashboard() {
   }, [sharedNotifications, activeTenant.id, parentProfile]);
 
   const handleViewReceiptFromHistory = (child, payment) => {
+    if (payment.status === 'PENDING_VERIFICATION') {
+      toast.info(`Transaction ${payment.id} is pending verification. Official receipt will be available once verified.`);
+      return;
+    }
     const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
     const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
     const feeBreakdown = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
@@ -1018,7 +1248,7 @@ function ParentDashboard() {
     setShowReceiptModal(true);
   };
 
-  const handleOnlinePaymentSuccess = (child, paymentMethodLabel) => {
+  const handleOnlinePaymentPending = (child, paymentMethodLabel, pendingDetails, amountPaidOverride) => {
     const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
     const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
     const feeBreakdown = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
@@ -1030,9 +1260,77 @@ function ParentDashboard() {
       + (addons.hostel.enabled ? addons.hostel.fee : 0);
 
     const prevFees = sharedFeeRecords[child.id] || { total: totalFee, paid: 0, remaining: totalFee, status: 'UNPAID', history: [] };
-    const amountPaid = prevFees.remaining;
+    const amountPaid = amountPaidOverride !== undefined ? amountPaidOverride : prevFees.remaining;
+    const receiptId = `ONL-UTR-${pendingDetails.utr}`;
+    const today = new Date().toISOString().split('T')[0];
+
+    const pendingTx = {
+      id: receiptId,
+      date: today,
+      amount: amountPaid,
+      method: paymentMethodLabel,
+      status: 'PENDING_VERIFICATION',
+      utr: pendingDetails.utr,
+      receiptImage: pendingDetails.receiptImage || ''
+    };
+
+    const updatedRecord = {
+      ...prevFees,
+      history: [
+        ...(prevFees.history || []),
+        pendingTx
+      ]
+    };
+    setSharedFeeRecords(prev => ({ ...prev, [child.id]: updatedRecord }));
+
+    const notif = {
+      id: `notif-${Date.now()}`,
+      tenant_id: activeTenant.id,
+      recipient_id: parentProfile?.id || '',
+      type: 'FEE_PAYMENT',
+      title: `⏳ Online Payment Verification Pending – ${child.first_name} ${child.last_name}`,
+      body: `₹${amountPaid.toLocaleString('en-IN')} submitted via Bank QR / UTR ${pendingDetails.utr}. Awaiting verification by accountant.`,
+      date: today,
+      read: false
+    };
+    setSharedNotifications(prev => [notif, ...(prev || [])]);
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    setSharedSchoolAlerts(prev => [{
+      id: `school-alert-${Date.now()}`,
+      type: 'ONLINE_PAYMENT',
+      icon: '⚡',
+      title: `New Online Fee Payment Submitted`,
+      body: `${child.first_name} ${child.last_name} submitted ₹${amountPaid.toLocaleString('en-IN')} via QR / Bank Transfer. UTR Reference: ${pendingDetails.utr}. Please verify in Finance.`,
+      time: `Today at ${timeStr}`,
+      read: false,
+      receiptId,
+      studentId: child.id,
+      tenant_id: activeTenant.id
+    }, ...(prev || [])]);
+
+    setPaymentTarget(null);
+    toast.success(`Payment receipt submitted successfully! Review pending verification.`);
+  };
+
+
+  const handleOnlinePaymentSuccess = (child, paymentMethodLabel, amountPaidOverride) => {
+    const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
+    const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+    const feeBreakdown = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+    if (addons.transport.enabled && addons.transport.fee > 0) feeBreakdown.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+    if (addons.hostel.enabled && addons.hostel.fee > 0) feeBreakdown.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+
+    const totalFee = classStructures.reduce((sum, fs) => sum + fs.amount, 0)
+      + (addons.transport.enabled ? addons.transport.fee : 0)
+      + (addons.hostel.enabled ? addons.hostel.fee : 0);
+
+    const prevFees = sharedFeeRecords[child.id] || { total: totalFee, paid: 0, remaining: totalFee, status: 'UNPAID', history: [] };
+    const amountPaid = amountPaidOverride !== undefined ? amountPaidOverride : prevFees.remaining;
     const newPaid = prevFees.paid + amountPaid;
-    const newRemaining = 0;
+    const newRemaining = Math.max(0, prevFees.remaining - amountPaid);
+    const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
     const receiptId = `ONL-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
 
@@ -1041,7 +1339,7 @@ function ParentDashboard() {
       total: totalFee,
       paid: newPaid,
       remaining: newRemaining,
-      status: 'PAID',
+      status: newStatus,
       history: [
         ...(prevFees.history || []),
         { id: receiptId, date: today, amount: amountPaid, method: paymentMethodLabel }
@@ -1064,7 +1362,7 @@ function ParentDashboard() {
       totalFee,
       newPaid,
       newRemaining,
-      newStatus: 'PAID',
+      newStatus,
       collectedBy: 'Online Payment Gateway',
       schoolAddress: activeTenant.address || '',
       schoolPhone: activeTenant.phone || '',
@@ -1112,8 +1410,11 @@ function ParentDashboard() {
     toast.success(`₹${amountPaid.toLocaleString('en-IN')} paid successfully! Receipt generated.`);
   };
 
-  const handleHostelItemPaySuccess = (child, alloc, methodLabel) => {
-    const amountPaid = alloc.cost - alloc.paid;
+  const handleHostelItemPaySuccess = (child, alloc, methodLabel, amountPaidOverride) => {
+    const prevOutstanding = alloc.cost - alloc.paid;
+    const amountPaid = amountPaidOverride !== undefined ? amountPaidOverride : prevOutstanding;
+    const newPaid = alloc.paid + amountPaid;
+    const newStatus = newPaid >= alloc.cost ? 'PAID' : 'PARTIAL';
     const receiptId = `HINV-ONL-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -1124,8 +1425,8 @@ function ParentDashboard() {
         a.id === alloc.id
           ? {
               ...a,
-              paid: a.cost,
-              status: 'PAID',
+              paid: newPaid,
+              status: newStatus,
               payments: [
                 ...(a.payments || []),
                 { id: receiptId, date: today, amount: amountPaid, method: methodLabel }
@@ -1378,63 +1679,107 @@ function ParentDashboard() {
                       <span>Term Fee Receipts & Settlement History</span>
                     </h3>
                     <div className="space-y-3">
-                      {fees.history.length === 0 ? (
-                        <div className="p-4 bg-slate-50/50 border border-dashed border-border rounded-xl text-center">
-                          <p className="text-xs text-text-secondary italic font-medium">No payments processed yet.</p>
-                        </div>
-                      ) : (
-                        fees.history.map((h, i) => (
-                          <div 
-                            key={i} 
-                            onClick={() => handleViewReceiptFromHistory(child, h)}
-                            className="p-3.5 bg-bg-main border border-border rounded-xl flex items-center justify-between cursor-pointer hover:border-accent/20 transition-all group/receipt"
-                            title="Click to view and print official receipt"
-                          >
-                            <div>
-                              <p className="text-xs font-mono font-bold text-text-primary group-hover/receipt:text-accent transition-colors">Receipt ID: #{h.id}</p>
-                              <span className="text-[9px] text-text-secondary font-semibold">Settled via: {h.method} • {h.date}</span>
-                            </div>
-                            <div className="text-right flex items-center gap-3">
-                              <div>
-                                <span className="text-sm font-black text-success font-mono">₹{h.amount.toLocaleString('en-IN')}</span>
-                                <span className="text-[8px] bg-success/15 border border-success/35 text-success font-black px-1 rounded ml-1.5 uppercase block mt-0.5 text-center">Paid</span>
+                      {(() => {
+                        const hasPendingVerification = fees.history?.some(h => h.status === 'PENDING_VERIFICATION');
+                        return (
+                          <>
+                            {fees.history.length === 0 ? (
+                              <div className="p-4 bg-slate-50/50 border border-dashed border-border rounded-xl text-center">
+                                <p className="text-xs text-text-secondary italic font-medium">No payments processed yet.</p>
                               </div>
-                              <ChevronRight size={14} className="text-text-secondary opacity-0 group-hover/receipt:opacity-100 group-hover/receipt:translate-x-0.5 transition-all" />
+                            ) : (
+                              fees.history.map((h, i) => {
+                                const isPending = h.status === 'PENDING_VERIFICATION';
+                                return (
+                                  <div 
+                                    key={i} 
+                                    onClick={() => handleViewReceiptFromHistory(child, h)}
+                                    className={`p-3.5 bg-bg-main border border-border rounded-xl flex items-center justify-between cursor-pointer transition-all group/receipt ${
+                                      isPending ? 'border-warning/30 hover:border-warning/50' : 'hover:border-accent/20'
+                                    }`}
+                                    title={isPending ? "Verification is pending" : "Click to view and print official receipt"}
+                                  >
+                                    <div className="min-w-0 flex-1 pr-2">
+                                      <p className={`text-xs font-mono font-bold text-text-primary ${!isPending ? 'group-hover/receipt:text-accent' : ''} transition-colors truncate`}>
+                                        {isPending ? `Verification Pending (UTR: ${h.utr})` : `Receipt ID: #${h.id}`}
+                                      </p>
+                                      <span className="text-[9px] text-text-secondary font-semibold block mt-0.5">
+                                        {isPending ? `Submitted via: ${h.method} • ${h.date}` : `Settled via: ${h.method} • ${h.date}`}
+                                      </span>
+                                    </div>
+                                    <div className="text-right flex items-center gap-3 shrink-0">
+                                      <div>
+                                        <span className={`text-sm font-black font-mono font-bold ${isPending ? 'text-warning' : 'text-success'}`}>
+                                          ₹{h.amount.toLocaleString('en-IN')}
+                                        </span>
+                                        <span className={`text-[8px] border font-black px-1 rounded ml-1.5 uppercase block mt-0.5 text-center ${
+                                          isPending 
+                                            ? 'bg-warning/15 border-warning/35 text-warning' 
+                                            : 'bg-success/15 border-success/35 text-success'
+                                        }`}>
+                                          {isPending ? 'Pending' : 'Paid'}
+                                        </span>
+                                      </div>
+                                      {!isPending && <ChevronRight size={14} className="text-text-secondary opacity-0 group-hover/receipt:opacity-100 group-hover/receipt:translate-x-0.5 transition-all" />}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+
+                            {/* Remaining fees breakdown */}
+                            <div className="p-4 bg-slate-100/50 border border-border rounded-xl flex justify-between items-center text-xs">
+                              <span className="text-text-secondary font-bold">Outstanding Remaining Balance:</span>
+                              <span className={`font-mono font-black ${fees.remaining > 0 ? 'text-warning text-sm' : 'text-success'}`}>
+                                ₹{fees.remaining.toLocaleString('en-IN')}
+                              </span>
                             </div>
-                          </div>
-                        ))
-                      )}
 
-                      {/* Remaining fees breakdown */}
-                      <div className="p-4 bg-slate-100/50 border border-border rounded-xl flex justify-between items-center text-xs">
-                        <span className="text-text-secondary font-bold">Outstanding Remaining Balance:</span>
-                        <span className={`font-mono font-black ${fees.remaining > 0 ? 'text-warning text-sm' : 'text-success'}`}>
-                          ₹{fees.remaining.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-
-                      {/* Online Pay Now Button */}
-                      {fees.remaining > 0 ? (
-                        <button
-                          onClick={() => {
-                            const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
-                            const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
-                            const bd = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
-                            if (addons.transport.enabled && addons.transport.fee > 0) bd.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
-                            if (addons.hostel.enabled && addons.hostel.fee > 0) bd.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
-                            const tot = classStructures.reduce((s, f) => s + f.amount, 0) + (addons.transport.enabled ? addons.transport.fee : 0) + (addons.hostel.enabled ? addons.hostel.fee : 0);
-                            setPaymentTarget({ child, fees, feeBreakdown: bd, totalFee: tot });
-                          }}
-                          className="w-full py-3.5 bg-gradient-to-r from-accent to-indigo-500 hover:from-accent/90 hover:to-indigo-500/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-accent/20 active:scale-[0.98]"
-                        >
-                          <Zap size={15} className="fill-white" />
-                          Pay ₹{fees.remaining.toLocaleString('en-IN')} Online Now
-                        </button>
-                      ) : (
-                        <div className="w-full py-3 bg-success/10 border border-success/30 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-success">
-                          <BadgeCheck size={14} /> Fee Fully Settled — No Balance Due
-                        </div>
-                      )}
+                            {/* Online Pay Now Button */}
+                            {fees.remaining > 0 ? (
+                              hasPendingVerification ? (
+                                <div className="space-y-2">
+                                  <div className="p-4 bg-warning/5 border border-warning/20 rounded-2xl text-xs text-warning flex items-start gap-2.5">
+                                    <Clock size={16} className="shrink-0 mt-0.5 text-warning" />
+                                    <div>
+                                      <p className="font-bold text-text-primary text-[11px]">Verification In Progress</p>
+                                      <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">
+                                        Your payment receipt is currently under review by the finance desk. You will be notified once settled.
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    disabled
+                                    className="w-full py-3.5 bg-slate-100 text-text-secondary font-black rounded-2xl cursor-not-allowed flex items-center justify-center gap-2 text-sm border border-border"
+                                  >
+                                    <Lock size={15} /> Payment Under Verification
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    const classStructures = sharedFeeStructures.filter(fs => fs.tenant_id === activeTenant.id && fs.class_id === child.class_id);
+                                    const addons = sharedStudentFeeAddons[child.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
+                                    const bd = classStructures.map(fs => ({ label: fs.name, code: fs.code, amount: fs.amount }));
+                                    if (addons.transport.enabled && addons.transport.fee > 0) bd.push({ label: 'Transport Fee', code: 'TRP', amount: addons.transport.fee });
+                                    if (addons.hostel.enabled && addons.hostel.fee > 0) bd.push({ label: 'Hostel Fee', code: 'HST', amount: addons.hostel.fee });
+                                    const tot = classStructures.reduce((s, f) => s + f.amount, 0) + (addons.transport.enabled ? addons.transport.fee : 0) + (addons.hostel.enabled ? addons.hostel.fee : 0);
+                                    setPaymentTarget({ child, fees, feeBreakdown: bd, totalFee: tot });
+                                  }}
+                                  className="w-full py-3.5 bg-gradient-to-r from-accent to-indigo-500 hover:from-accent/90 hover:to-indigo-500/90 text-white font-black rounded-2xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-accent/20 active:scale-[0.98]"
+                                >
+                                  <Zap size={15} className="fill-white" />
+                                  Pay ₹{fees.remaining.toLocaleString('en-IN')} Online Now
+                                </button>
+                              )
+                            ) : (
+                              <div className="w-full py-3 bg-success/10 border border-success/30 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-success">
+                                <BadgeCheck size={14} /> Fee Fully Settled — No Balance Due
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1700,10 +2045,22 @@ function ParentDashboard() {
           feeBreakdown={paymentTarget.feeBreakdown}
           totalFee={paymentTarget.totalFee}
           onClose={() => setPaymentTarget(null)}
-          onSuccess={(methodLabel) => handleOnlinePaymentSuccess(
-            paymentTarget.child,
-            methodLabel || paymentTarget._method || 'Online Payment'
-          )}
+          onSuccess={(methodLabel, pendingDetails, amountPaid) => {
+            if (pendingDetails) {
+              handleOnlinePaymentPending(
+                paymentTarget.child,
+                methodLabel || 'Scan QR / Bank Transfer',
+                pendingDetails,
+                amountPaid
+              );
+            } else {
+              handleOnlinePaymentSuccess(
+                paymentTarget.child,
+                methodLabel || paymentTarget._method || 'Online Payment',
+                amountPaid
+              );
+            }
+          }}
         />
       )}
 
@@ -1720,7 +2077,7 @@ function ParentDashboard() {
             feeBreakdown={syntheticBreakdown}
             totalFee={alloc.cost}
             onClose={() => setHostelPayTarget(null)}
-            onSuccess={(methodLabel) => handleHostelItemPaySuccess(child, alloc, methodLabel || 'Online Payment')}
+            onSuccess={(methodLabel, pendingDetails, amountPaid) => handleHostelItemPaySuccess(child, alloc, methodLabel || 'Online Payment', amountPaid)}
           />
         );
       })()}

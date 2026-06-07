@@ -20,7 +20,8 @@ import {
   Bus,
   FileBox,
   Settings,
-  CheckCircle
+  CheckCircle,
+  History
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -32,6 +33,7 @@ export default function SchoolAdminDashboard() {
   const { 
     activeTenant, 
     activeUser, 
+    realRole,
     sharedNotices, 
     setSharedNotices,
     sharedStudents,
@@ -43,7 +45,8 @@ export default function SchoolAdminDashboard() {
     sharedHostelInventoryAllocations,
     sharedMaintenanceBills,
     sharedBooks,
-    sharedFeeRecords
+    sharedFeeRecords,
+    sharedStudentHistory
   } = useAuth();
   
   const [newNotice, setNewNotice] = useState({ title: '', body: '', target: 'ALL' });
@@ -216,10 +219,14 @@ export default function SchoolAdminDashboard() {
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-[10px] font-black uppercase tracking-wider">
             <Sparkles size={10} />
-            <span>Campus Principal Portal</span>
+            <span>{realRole === 'ADMINISTRATOR' ? 'Campus Office Administrator Portal' : 'Campus Principal Portal'}</span>
           </div>
           <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">{activeTenant?.name}</h2>
-          <p className="text-text-secondary text-sm font-medium">Welcome back, Principal Admin. Standard Indian Board (CBSE) profiles sync is operational.</p>
+          <p className="text-text-secondary text-sm font-medium">
+            {realRole === 'ADMINISTRATOR' 
+              ? 'Welcome back, Office Administrator. Standard Indian Board (CBSE) profiles sync is operational.' 
+              : 'Welcome back, Principal Admin. Standard Indian Board (CBSE) profiles sync is operational.'}
+          </p>
         </div>
         <div className="relative z-10 flex flex-col items-end shrink-0 bg-slate-100/50 border border-border px-6 py-4 rounded-3xl">
           <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Academic Year</span>
@@ -550,6 +557,112 @@ export default function SchoolAdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Student Promotions Desk Quick Access Banner */}
+      <div className="p-8 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-[0_4px_24px_rgba(16,185,129,0.03)]">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg">
+              <Zap size={16} />
+            </span>
+            <h3 className="text-sm font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">Academic Term Promotions</h3>
+          </div>
+          <h4 className="text-xl font-black font-outfit text-text-primary tracking-tight">Ready to transition to the next Academic Year?</h4>
+          <p className="text-xs text-text-secondary max-w-2xl leading-relaxed">
+            Promote eligible students to their next grades, archive their current academic year files (grades, fee logs, attendance history, and remarks), and allocate fresh billing/ledger lists automatically.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/students"
+          className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-95 transition-all shrink-0"
+        >
+          <span>Promote Students Now</span>
+          <ArrowRight size={14} />
+        </Link>
+      </div>
+
+      {/* Student Academic Year Archives */}
+      {(() => {
+        const allHistoryEntries = [];
+        tenantStudents.forEach(s => {
+          const history = (sharedStudentHistory || {})[s.id] || [];
+          history.forEach(record => {
+            allHistoryEntries.push({
+              studentName: `${s.first_name} ${s.last_name}`,
+              studentId: s.id,
+              admissionNo: s.admission_no,
+              ...record
+            });
+          });
+        });
+        if (allHistoryEntries.length === 0) return null;
+        return (
+          <div className="p-8 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-6">
+            <div>
+              <div className="flex items-center gap-2">
+                <History size={18} className="text-accent" />
+                <h3 className="text-xl font-black font-outfit text-text-primary tracking-tight">Student Academic Year Archives</h3>
+              </div>
+              <p className="text-xs text-text-secondary font-medium mt-1">Historical performance records saved during student promotions. Scroll to review past academic year data.</p>
+            </div>
+
+            <div className="overflow-hidden border border-border rounded-2xl bg-bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/50 border-b border-border text-[9px] font-black uppercase text-text-secondary tracking-widest">
+                      <th className="p-4">Student Name</th>
+                      <th className="p-4">Admission No.</th>
+                      <th className="p-4">Academic Year</th>
+                      <th className="p-4">Class</th>
+                      <th className="p-4">Attendance</th>
+                      <th className="p-4">Fee Status</th>
+                      <th className="p-4">Subjects</th>
+                      <th className="p-4 text-right">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allHistoryEntries.map((entry, idx) => (
+                      <tr key={idx} className="border-b border-border hover:bg-slate-50/50 last:border-none">
+                        <td className="p-4 font-bold text-text-primary">{entry.studentName}</td>
+                        <td className="p-4 font-mono text-text-secondary">{entry.admissionNo}</td>
+                        <td className="p-4">
+                          <span className="px-2 py-0.5 bg-accent/10 text-accent text-[9px] font-black rounded uppercase">{entry.academic_year}</span>
+                        </td>
+                        <td className="p-4 font-semibold text-text-primary">{entry.class_name}</td>
+                        <td className="p-4 font-mono font-bold text-text-primary">{entry.attendance}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
+                            entry.fees?.status === 'PAID'
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400'
+                              : entry.fees?.status === 'PARTIAL'
+                              ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
+                              : 'bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-400'
+                          }`}>
+                            {entry.fees?.status} (₹{(entry.fees?.paid || 0).toLocaleString('en-IN')} / ₹{(entry.fees?.total || 0).toLocaleString('en-IN')})
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {(entry.academic_records || []).map((ar, arIdx) => (
+                              <span key={arIdx} className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-border rounded text-[8px] font-bold text-text-primary">
+                                {ar.subject.split(' ')[0]}: <span className="text-accent">{ar.grade}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-4 text-right text-[10px] text-text-secondary italic max-w-[200px] truncate" title={(entry.remarks || [])[0]?.remark || 'No remarks'}>
+                          {(entry.remarks || [])[0]?.remark || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Campus Core Modules Launcher */}
       <div className="p-8 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] backdrop-blur-md border border-border rounded-[2.5rem] space-y-6">

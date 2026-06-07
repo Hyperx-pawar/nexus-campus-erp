@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 export default function DevSwitcher() {
   const { 
-    activeRole, 
+    activeRole: contextActiveRole, 
     activeUser, 
     activeTenant, 
     availableTenants, 
@@ -19,8 +19,11 @@ export default function DevSwitcher() {
     switchTenant,
     sharedParents,
     activeParentId,
-    switchParent
+    switchParent,
+    realRole
   } = useAuth();
+  
+  const activeRole = realRole || contextActiveRole;
   
   const pathname = usePathname();
   const router = useRouter();
@@ -29,6 +32,7 @@ export default function DevSwitcher() {
   const roles = [
     { code: 'SUPER_ADMIN', label: 'Super Admin', color: 'border-danger/30 text-danger bg-danger/5' },
     { code: 'SCHOOL_ADMIN', label: 'School Admin', color: 'border-warning/30 text-warning bg-warning/5' },
+    { code: 'ADMINISTRATOR', label: 'Office Administrator', color: 'border-sky-500/30 text-sky-400 bg-sky-500/5' },
     { code: 'TEACHER', label: 'Teacher', color: 'border-accent/30 text-accent bg-accent/5' },
     { code: 'STUDENT', label: 'Student', color: 'border-success/30 text-success bg-success/5' },
     { code: 'PARENT', label: 'Parent', color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10' },
@@ -39,25 +43,25 @@ export default function DevSwitcher() {
   ];
 
   const modules = [
-    { name: 'Dashboard Home', path: '/dashboard', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN'] },
-    { name: 'Student Directory', path: '/dashboard/students', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'PARENT'] },
-    { name: 'Staff Directory', path: '/dashboard/staff', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-    { name: 'Daily Attendance', path: '/dashboard/attendance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
-    { name: 'Syllabus & LMS', path: '/dashboard/courses', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
-    { name: 'Exams & Marksheets', path: '/dashboard/exams', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
-    { name: 'Timetable', path: '/dashboard/timetable', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
-    { name: 'Library Books', path: '/dashboard/library', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'LIBRARIAN', 'TEACHER', 'STUDENT'] },
-    { name: 'Hostels & Boarding', path: '/dashboard/hostel', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'HOSTEL_WARDEN', 'STUDENT'] },
-    { name: 'School Bus & Transport', path: '/dashboard/transport', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT'] },
-    { name: 'ID Card Generator', path: '/dashboard/idcards', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
-    { name: 'Career Portal (Placements)', path: '/dashboard/placement', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STUDENT', 'TEACHER'] },
-    { name: 'Online Admissions', path: '/dashboard/admissions', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-    { name: 'HR & Staff Payroll', path: '/dashboard/hr', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'] },
-    { name: 'Fees & Finance', path: '/dashboard/finance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'] },
-    { name: 'System Analytics', path: '/dashboard/analytics', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-    { name: 'School Settings', path: '/dashboard/settings', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-    { name: 'School Monitoring', path: '/dashboard/pulse', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-    { name: 'Edit Profile Desk', path: '/dashboard/profile', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN'] }
+    { name: 'Dashboard Home', path: '/dashboard', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN'] },
+    { name: 'Student Directory', path: '/dashboard/students', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'PARENT'] },
+    { name: 'Staff Directory', path: '/dashboard/staff', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR'] },
+    { name: 'Daily Attendance', path: '/dashboard/attendance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER'] },
+    { name: 'Syllabus & LMS', path: '/dashboard/courses', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT'] },
+    { name: 'Exams & Marksheets', path: '/dashboard/exams', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT', 'PARENT'] },
+    { name: 'Timetable', path: '/dashboard/timetable', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT'] },
+    { name: 'Library Books', path: '/dashboard/library', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'LIBRARIAN', 'TEACHER', 'STUDENT'] },
+    { name: 'Hostels & Boarding', path: '/dashboard/hostel', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'HOSTEL_WARDEN', 'STUDENT'] },
+    { name: 'School Bus & Transport', path: '/dashboard/transport', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TRANSPORT_MANAGER', 'STUDENT'] },
+    { name: 'ID Card Generator', path: '/dashboard/idcards', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT', 'PARENT'] },
+    { name: 'Career Portal (Placements)', path: '/dashboard/placement', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'STUDENT', 'TEACHER'] },
+    { name: 'Online Admissions', path: '/dashboard/admissions', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR'] },
+    { name: 'HR & Staff Payroll', path: '/dashboard/hr', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'ACCOUNTANT'] },
+    { name: 'Fees & Finance', path: '/dashboard/finance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'ACCOUNTANT'] },
+    { name: 'System Analytics', path: '/dashboard/analytics', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR'] },
+    { name: 'School Settings', path: '/dashboard/settings', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR'] },
+    { name: 'School Monitoring', path: '/dashboard/pulse', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR'] },
+    { name: 'Edit Profile Desk', path: '/dashboard/profile', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMINISTRATOR', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN'] }
   ];
 
   const handleRoleChange = (roleCode) => {

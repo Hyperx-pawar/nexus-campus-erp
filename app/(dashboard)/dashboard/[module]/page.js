@@ -246,7 +246,13 @@ function SettingsEditor({ activeTenant, activeRole }) {
     subdomain: '',
     board: 'CBSE',
     academicYear: '2026-2027',
-    logo: ''
+    logo: '',
+    bankName: 'State Bank of India',
+    accountName: '',
+    accountNo: '',
+    ifscCode: '',
+    upiId: '',
+    qrCode: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -257,7 +263,13 @@ function SettingsEditor({ activeTenant, activeRole }) {
         subdomain: activeTenant.subdomain || '',
         board: activeTenant.settings?.board || 'CBSE',
         academicYear: activeTenant.settings?.academicYear || '2026-2027',
-        logo: activeTenant.logo || ''
+        logo: activeTenant.logo || '',
+        bankName: activeTenant.settings?.bank?.bankName || 'State Bank of India',
+        accountName: activeTenant.settings?.bank?.accountName || '',
+        accountNo: activeTenant.settings?.bank?.accountNo || '',
+        ifscCode: activeTenant.settings?.bank?.ifscCode || '',
+        upiId: activeTenant.settings?.bank?.upiId || '',
+        qrCode: activeTenant.settings?.bank?.qrCode || ''
       });
     }
   }, [activeTenant]);
@@ -441,6 +453,145 @@ function SettingsEditor({ activeTenant, activeRole }) {
                   className="w-full text-xs bg-bg-main cursor-not-allowed opacity-60"
                   disabled
                 />
+              </div>
+            </div>
+
+            {/* School Bank Operations & UPI Scanner */}
+            <div className="border-t border-border pt-5 space-y-4">
+              <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                <Wallet size={16} className="text-accent" />
+                <span>Online Collections & Bank Payout Operations</span>
+              </h3>
+              <p className="text-[10px] text-text-secondary leading-relaxed">
+                Configure the school's bank account credentials and upload a UPI Scanner QR code. Parents will be prompted to pay fees online to these exact credentials.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Receiving Bank Name</label>
+                  <select 
+                    value={settings.bankName}
+                    onChange={(e) => setSettings({...settings, bankName: e.target.value})}
+                    className="w-full bg-bg-main border border-border rounded-xl py-3 px-3 text-xs text-text-primary outline-none cursor-pointer"
+                  >
+                    <option value="State Bank of India">State Bank of India</option>
+                    <option value="HDFC Bank">HDFC Bank</option>
+                    <option value="ICICI Bank">ICICI Bank</option>
+                    <option value="Axis Bank">Axis Bank</option>
+                    <option value="Punjab National Bank">Punjab National Bank</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Bank Account Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. IIT Delhi Principal Operations"
+                    value={settings.accountName}
+                    onChange={(e) => setSettings({...settings, accountName: e.target.value})}
+                    className="w-full text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Bank Account Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 10293847561"
+                    value={settings.accountNo}
+                    onChange={(e) => setSettings({...settings, accountNo: e.target.value})}
+                    className="w-full text-xs font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">IFSC Code</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. SBIN0000214"
+                    value={settings.ifscCode}
+                    onChange={(e) => setSettings({...settings, ifscCode: e.target.value})}
+                    className="w-full text-xs font-mono uppercase"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Merchant UPI ID (for QR collections)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. iitd@sbi"
+                    value={settings.upiId}
+                    onChange={(e) => setSettings({...settings, upiId: e.target.value})}
+                    className="w-full text-xs font-mono"
+                    required
+                  />
+                </div>
+
+                {/* QR Code Upload block */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">UPI Scanner QR Code Image</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-100 border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                      {settings.qrCode ? (
+                        <img src={settings.qrCode} alt="UPI QR Scanner" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[8px] font-black text-slate-400 uppercase text-center leading-none">NO QR</div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-text-primary text-[10px] font-bold rounded-xl cursor-pointer transition-all border border-border flex items-center gap-1 active:scale-95">
+                        <Upload size={12} />
+                        <span>Upload Scanner QR</span>
+                        <input type="file" accept="image/*" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const fileSizeMB = file.size / (1024 * 1024);
+                            if (fileSizeMB > 1) {
+                              toast.error(`QR Code size (${fileSizeMB.toFixed(2)} MB) exceeds 1MB limit. Please upload a smaller image.`);
+                              return;
+                            }
+                            toast.info(`Selected QR Scanner: ${file.name} (${fileSizeMB.toFixed(2)} MB / 1MB limit)`);
+                            try {
+                              toast.loading("Compressing QR image...");
+                              const compressedFile = await compressImage(file, 400, 400, 0.7);
+                              toast.dismiss();
+
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setSettings(prev => ({
+                                  ...prev,
+                                  qrCode: reader.result
+                                }));
+                                toast.success("QR Code Scanner uploaded! Click \"Save System Configuration\" to apply.");
+                              };
+                              reader.readAsDataURL(compressedFile);
+                            } catch (err) {
+                              toast.dismiss();
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setSettings(prev => ({ ...prev, qrCode: reader.result }));
+                                toast.success("QR Code Scanner loaded! Click \"Save System Configuration\" to apply.");
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }
+                        }} className="hidden" />
+                      </label>
+                      {settings.qrCode && (
+                        <button 
+                          type="button" 
+                          onClick={() => setSettings(prev => ({ ...prev, qrCode: '' }))}
+                          className="text-[9px] text-danger hover:underline font-bold uppercase text-left"
+                        >
+                          Remove QR Scanner
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

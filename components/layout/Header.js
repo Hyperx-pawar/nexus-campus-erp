@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Settings,
   ChevronDown,
+  ChevronRight,
   Command,
   Activity,
   School,
@@ -23,7 +24,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Header() {
-  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts } = useAuth();
+  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -213,6 +214,18 @@ export default function Header() {
                                {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
                              </div>
                              <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">{alert.body}</p>
+                             {alert.type === 'ONLINE_PAYMENT' && (activeRole === 'ACCOUNTANT' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ADMINISTRATOR') && (
+                                <div className="mt-1.5 mb-1">
+                                  <Link
+                                    href="/dashboard/finance?tab=online"
+                                    onClick={() => setShowNotifications(false)}
+                                    className="inline-flex items-center gap-1 text-[9px] bg-accent hover:bg-accent-hover text-white font-bold px-2 py-0.5 rounded-md transition-all shadow-sm"
+                                  >
+                                    <span>Verify Payment</span>
+                                    <ChevronRight size={8} />
+                                  </Link>
+                                </div>
+                              )}
                              <div className="flex items-center justify-between mt-1.5">
                                <span className="text-[9px] text-text-secondary opacity-50 font-mono">{alert.time}</span>
                                <button
@@ -266,7 +279,7 @@ export default function Header() {
                  <span className="text-[12px] font-bold text-text-primary leading-none mb-1">{activeUser?.name.split(' (')[0]}</span>
                  <div className="flex items-center gap-1">
                     <ShieldCheck size={10} className="text-accent" />
-                    <span className="text-[8px] text-text-secondary font-black uppercase tracking-wider">{activeRole}</span>
+                    <span className="text-[8px] text-text-secondary font-black uppercase tracking-wider">{realRole || activeRole}</span>
                  </div>
               </div>
               <ChevronDown size={14} className={`text-text-secondary transition-transform duration-300 ${isProfileOpen ? 'rotate-180' : ''}`} />

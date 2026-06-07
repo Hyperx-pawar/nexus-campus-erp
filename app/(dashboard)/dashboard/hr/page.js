@@ -36,7 +36,17 @@ export default function HRPayrollPage() {
     phone: '',
     email: '',
     avatar: '',
-    avatarFile: null
+    avatarFile: null,
+    bankName: 'State Bank of India',
+    accountNo: '',
+    ifscCode: ''
+  });
+
+  const [pendingPayoutEmployee, setPendingPayoutEmployee] = useState(null);
+  const [payoutForm, setPayoutForm] = useState({
+    bankName: 'State Bank of India',
+    accountNo: '',
+    ifscCode: ''
   });
 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'];
@@ -76,14 +86,29 @@ export default function HRPayrollPage() {
     profile_picture_url: s.profile_picture_url
   }));
 
-  const handleDisbursePayroll = (id, name) => {
+  const handleConfirmDisbursement = (e) => {
+    e.preventDefault();
+    if (!pendingPayoutEmployee) return;
+    if (!payoutForm.accountNo || !payoutForm.ifscCode) {
+      toast.error('Bank Account Number and IFSC Code are required.');
+      return;
+    }
+
     const updatedStaff = sharedStaff.map(emp => 
-      emp.id === id 
-        ? { ...emp, status: 'PAID', paid_at: new Date().toISOString().split('T')[0] } 
+      emp.id === pendingPayoutEmployee.id 
+        ? { 
+            ...emp, 
+            status: 'PAID', 
+            paid_at: new Date().toISOString().split('T')[0],
+            bank_name: payoutForm.bankName,
+            account_no: payoutForm.accountNo,
+            ifsc_code: payoutForm.ifscCode
+          } 
         : emp
     );
     setSharedStaff(updatedStaff);
-    toast.success(`Salary processed & credited to ${name}'s bank account. SMS slip dispatched.`);
+    toast.success(`Salary processed & credited to ${pendingPayoutEmployee.name}'s bank account (${payoutForm.bankName}). SMS slip dispatched.`);
+    setPendingPayoutEmployee(null);
   };
 
   const handleOnboard = async (e) => {
@@ -142,6 +167,9 @@ export default function HRPayrollPage() {
         email: formData.email,
         tenant_id: activeTenant.id,
         profile_picture_url: profilePicUrl,
+        bank_name: formData.bankName || 'State Bank of India',
+        account_no: formData.accountNo || 'N/A',
+        ifsc_code: formData.ifscCode || 'N/A',
         status: 'UNPAID',
         documents: []
       };
@@ -159,7 +187,10 @@ export default function HRPayrollPage() {
         phone: '',
         email: '',
         avatar: '',
-        avatarFile: null
+        avatarFile: null,
+        bankName: 'State Bank of India',
+        accountNo: '',
+        ifscCode: ''
       });
       setShowAddForm(false);
       setLoading(false);
@@ -291,8 +322,16 @@ export default function HRPayrollPage() {
                         <span className="px-2.5 py-1 bg-warning/15 border border-warning/35 text-warning text-[9px] font-black uppercase rounded">Awaiting disbursement</span>
                       ) : (
                         <button 
-                          onClick={() => handleDisbursePayroll(emp.id, emp.name)}
-                          className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-text-primary text-\[10px] font-bold rounded-lg transition-all"
+                          onClick={() => {
+                            const originalEmp = sharedStaff.find(s => s.id === emp.id);
+                            setPendingPayoutEmployee(emp);
+                            setPayoutForm({
+                              bankName: originalEmp?.bank_name || 'State Bank of India',
+                              accountNo: originalEmp?.account_no || '',
+                              ifscCode: originalEmp?.ifsc_code || ''
+                            });
+                          }}
+                          className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-lg transition-all"
                         >
                           Disburse Salary
                         </button>
@@ -494,7 +533,7 @@ export default function HRPayrollPage() {
                 💡 Onboarding Notice: Staff's default login password is set to their PAN (uppercase).
               </p>
             </div>
-            <div className="space-y-1.5">
+             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Basic Salary (₹ / month) *</label>
               <input 
                 type="number" 
@@ -503,6 +542,50 @@ export default function HRPayrollPage() {
                 className="w-full text-xs font-mono"
                 required
               />
+            </div>
+
+            {/* Bank Details section */}
+            <div className="md:col-span-2 p-5 bg-slate-100/50 border border-border rounded-2xl space-y-4">
+              <h4 className="text-xs font-bold text-accent uppercase tracking-wider font-outfit">Bank Account Payout Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Bank Name *</label>
+                  <select 
+                    value={formData.bankName}
+                    onChange={(e) => setFormData({...formData, bankName: e.target.value})}
+                    className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
+                    required
+                  >
+                    <option value="State Bank of India">State Bank of India</option>
+                    <option value="HDFC Bank">HDFC Bank</option>
+                    <option value="ICICI Bank">ICICI Bank</option>
+                    <option value="Axis Bank">Axis Bank</option>
+                    <option value="Punjab National Bank">Punjab National Bank</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Account Number *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 998877665544"
+                    value={formData.accountNo}
+                    onChange={(e) => setFormData({...formData, accountNo: e.target.value})}
+                    className="w-full text-xs font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">IFSC Code *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. SBIN0000214"
+                    value={formData.ifscCode}
+                    onChange={(e) => setFormData({...formData, ifscCode: e.target.value})}
+                    className="w-full text-xs font-mono uppercase"
+                    required
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Calculations Breakdown */}
@@ -523,6 +606,95 @@ export default function HRPayrollPage() {
               <span>Register Faculty Member</span>
             </button>
           </form>
+      </Modal>
+
+      {/* Confirm Bank Payout Modal */}
+      <Modal
+        open={!!pendingPayoutEmployee}
+        onClose={() => setPendingPayoutEmployee(null)}
+        title="Confirm Salary Bank Payout"
+        icon={<DollarSign size={18} />}
+        size="md"
+      >
+        {pendingPayoutEmployee && (
+          <form onSubmit={handleConfirmDisbursement} className="space-y-5">
+            <div className="p-4 bg-slate-100/50 border border-border rounded-2xl space-y-2">
+              <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Recipient Employee</span>
+              <div className="flex justify-between items-center text-xs">
+                <div>
+                  <p className="font-bold text-text-primary">{pendingPayoutEmployee.name}</p>
+                  <p className="text-[9px] text-text-secondary uppercase mt-0.5">{pendingPayoutEmployee.employee_id} • {pendingPayoutEmployee.designation}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] text-text-secondary uppercase block">Net Pay Amount</span>
+                  <span className="text-lg font-black text-accent font-mono">₹{pendingPayoutEmployee.basic.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest block ml-1">Verify or Edit Bank Payout Details</span>
+              
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Bank Name *</label>
+                <select 
+                  value={payoutForm.bankName}
+                  onChange={(e) => setPayoutForm({...payoutForm, bankName: e.target.value})}
+                  className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border font-sans"
+                  required
+                >
+                  <option value="State Bank of India">State Bank of India</option>
+                  <option value="HDFC Bank">HDFC Bank</option>
+                  <option value="ICICI Bank">ICICI Bank</option>
+                  <option value="Axis Bank">Axis Bank</option>
+                  <option value="Punjab National Bank">Punjab National Bank</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Account Number *</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter bank account no"
+                    value={payoutForm.accountNo}
+                    onChange={(e) => setPayoutForm({...payoutForm, accountNo: e.target.value})}
+                    className="w-full text-xs font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">IFSC Code *</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter IFSC code"
+                    value={payoutForm.ifscCode}
+                    onChange={(e) => setPayoutForm({...payoutForm, ifscCode: e.target.value})}
+                    className="w-full text-xs font-mono uppercase"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border flex justify-end gap-2">
+              <button 
+                type="button" 
+                onClick={() => setPendingPayoutEmployee(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 border border-border text-text-secondary text-xs font-bold rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="px-5 py-2.5 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-success/10 flex items-center gap-1.5 active:scale-95"
+              >
+                <CheckCircle2 size={14} />
+                <span>Confirm & Disburse</span>
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Salary Pay Slip Modal */}
@@ -553,13 +725,34 @@ export default function HRPayrollPage() {
                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Employee ID</span>
                   <span className="font-bold text-text-primary font-mono">{viewingSlipEmployee.employee_id}</span>
                 </div>
-                <div>
+                 <div>
                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Designation</span>
                   <span className="font-bold text-text-primary">{viewingSlipEmployee.designation}</span>
                 </div>
                 <div>
                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">PAN Code</span>
                   <span className="font-bold text-text-primary font-mono uppercase">{viewingSlipEmployee.pan}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Disbursement Bank</span>
+                  <span className="font-bold text-text-primary">
+                    {(() => {
+                      const originalEmp = sharedStaff.find(s => s.id === viewingSlipEmployee.id);
+                      return originalEmp?.bank_name || 'State Bank of India';
+                    })()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Account & IFSC Code</span>
+                  <span className="font-bold text-text-primary font-mono">
+                    {(() => {
+                      const originalEmp = sharedStaff.find(s => s.id === viewingSlipEmployee.id);
+                      const masked = originalEmp?.account_no 
+                        ? originalEmp.account_no.replace(/\d(?=\d{4})/g, "•") 
+                        : 'N/A';
+                      return `${masked} (${originalEmp?.ifsc_code || 'N/A'})`;
+                    })()}
+                  </span>
                 </div>
               </div>
 
