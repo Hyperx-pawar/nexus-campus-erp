@@ -55,6 +55,7 @@ export default function TransportLogisticsPage() {
     driverPhone: '',
     fee: 6000,
     gpsEnabled: false,
+    trackingMethod: 'HARDWARE',
     gpsDeviceID: '',
     gpsModel: 'Teltonika FMB920',
     gpsSimNo: ''
@@ -87,6 +88,19 @@ export default function TransportLogisticsPage() {
     }
  
     const uppercaseReg = newRoute.busReg.toUpperCase();
+    const trackingMethod = newRoute.gpsEnabled ? newRoute.trackingMethod : undefined;
+    const gpsDeviceID = newRoute.gpsEnabled 
+      ? (newRoute.gpsDeviceID || (trackingMethod === 'MOBILE' 
+          ? `MOB-DRV-${Math.floor(10000 + Math.random() * 90000)}` 
+          : `GPS-${uppercaseReg.replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`))
+      : undefined;
+    const gpsModel = newRoute.gpsEnabled 
+      ? (trackingMethod === 'MOBILE' ? newRoute.gpsModel || 'Android App' : newRoute.gpsModel) 
+      : undefined;
+    const gpsSimNo = newRoute.gpsEnabled 
+      ? (trackingMethod === 'MOBILE' ? newRoute.driverPhone || '+91 99999 88888' : newRoute.gpsSimNo) 
+      : undefined;
+
     const newRouteItem = {
       id: `route-${Date.now()}`,
       name: newRoute.name,
@@ -96,9 +110,10 @@ export default function TransportLogisticsPage() {
       phone: newRoute.driverPhone || '+91 99999 88888',
       tenant_id: activeTenant.id,
       gpsEnabled: newRoute.gpsEnabled,
-      gpsDeviceID: newRoute.gpsEnabled ? newRoute.gpsDeviceID || `GPS-${uppercaseReg.replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-      gpsModel: newRoute.gpsEnabled ? newRoute.gpsModel : undefined,
-      gpsSimNo: newRoute.gpsEnabled ? newRoute.gpsSimNo : undefined,
+      trackingMethod,
+      gpsDeviceID,
+      gpsModel,
+      gpsSimNo,
       latitude: newRoute.gpsEnabled ? 28.5276 : undefined,
       longitude: newRoute.gpsEnabled ? 77.2100 : undefined,
       etaMinutes: newRoute.gpsEnabled ? 12 : undefined,
@@ -115,6 +130,7 @@ export default function TransportLogisticsPage() {
       driverPhone: '',
       fee: 6000,
       gpsEnabled: false,
+      trackingMethod: 'HARDWARE',
       gpsDeviceID: '',
       gpsModel: 'Teltonika FMB920',
       gpsSimNo: ''
@@ -161,6 +177,7 @@ export default function TransportLogisticsPage() {
             return {
               ...r,
               gpsEnabled: true,
+              trackingMethod: r.trackingMethod || 'HARDWARE',
               gpsDeviceID: r.gpsDeviceID || `GPS-${r.bus.replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
               gpsModel: r.gpsModel || 'Teltonika FMB920',
               gpsSimNo: r.gpsSimNo || `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`,
@@ -486,42 +503,103 @@ export default function TransportLogisticsPage() {
             </div>
             {newRoute.gpsEnabled && (
               <div className="md:col-span-2 p-4 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fadeIn">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Device ID / IMEI *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. GPS-IMEI-84920"
-                    value={newRoute.gpsDeviceID}
-                    onChange={(e) => setNewRoute({...newRoute, gpsDeviceID: e.target.value})}
-                    className="w-full text-xs font-mono uppercase bg-white border border-border rounded-xl p-2.5"
-                    required={newRoute.gpsEnabled}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Hardware Model *</label>
+                <div className="sm:col-span-3 space-y-1 pb-2 border-b border-border">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Live Tracking Method *</label>
                   <select
-                    value={newRoute.gpsModel}
-                    onChange={(e) => setNewRoute({...newRoute, gpsModel: e.target.value})}
+                    value={newRoute.trackingMethod}
+                    onChange={(e) => {
+                      const method = e.target.value;
+                      setNewRoute({
+                        ...newRoute,
+                        trackingMethod: method,
+                        gpsDeviceID: '',
+                        gpsModel: method === 'MOBILE' ? 'Android App' : 'Teltonika FMB920',
+                        gpsSimNo: ''
+                      });
+                    }}
                     className="w-full text-xs bg-white text-text-primary border border-border rounded-xl p-2.5"
-                    required={newRoute.gpsEnabled}
+                    required
                   >
-                    <option value="Teltonika FMB920">Teltonika FMB920</option>
-                    <option value="Coban GPS103">Coban GPS103</option>
-                    <option value="TK103">TK103</option>
-                    <option value="Concox GT06">Concox GT06</option>
+                    <option value="HARDWARE">Dedicated GPS Hardware Tracker</option>
+                    <option value="MOBILE">Driver Mobile GPS App Tracking</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">SIM Card Number *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +91 99999 88888"
-                    value={newRoute.gpsSimNo}
-                    onChange={(e) => setNewRoute({...newRoute, gpsSimNo: e.target.value})}
-                    className="w-full text-xs bg-white border border-border rounded-xl p-2.5"
-                    required={newRoute.gpsEnabled}
-                  />
-                </div>
+                
+                {newRoute.trackingMethod === 'HARDWARE' ? (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Device ID / IMEI *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. GPS-IMEI-84920"
+                        value={newRoute.gpsDeviceID}
+                        onChange={(e) => setNewRoute({...newRoute, gpsDeviceID: e.target.value})}
+                        className="w-full text-xs font-mono uppercase bg-white border border-border rounded-xl p-2.5"
+                        required={newRoute.gpsEnabled && newRoute.trackingMethod === 'HARDWARE'}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Hardware Model *</label>
+                      <select
+                        value={newRoute.gpsModel}
+                        onChange={(e) => setNewRoute({...newRoute, gpsModel: e.target.value})}
+                        className="w-full text-xs bg-white text-text-primary border border-border rounded-xl p-2.5"
+                        required={newRoute.gpsEnabled && newRoute.trackingMethod === 'HARDWARE'}
+                      >
+                        <option value="Teltonika FMB920">Teltonika FMB920</option>
+                        <option value="Coban GPS103">Coban GPS103</option>
+                        <option value="TK103">TK103</option>
+                        <option value="Concox GT06">Concox GT06</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">SIM Card Number *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. +91 99999 88888"
+                        value={newRoute.gpsSimNo}
+                        onChange={(e) => setNewRoute({...newRoute, gpsSimNo: e.target.value})}
+                        className="w-full text-xs bg-white border border-border rounded-xl p-2.5"
+                        required={newRoute.gpsEnabled && newRoute.trackingMethod === 'HARDWARE'}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Driver Device Token / ID *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. MOB-DRV-84920"
+                        value={newRoute.gpsDeviceID}
+                        onChange={(e) => setNewRoute({...newRoute, gpsDeviceID: e.target.value})}
+                        className="w-full text-xs font-mono uppercase bg-white border border-border rounded-xl p-2.5"
+                        required={newRoute.gpsEnabled && newRoute.trackingMethod === 'MOBILE'}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Client Mobile OS *</label>
+                      <select
+                        value={newRoute.gpsModel}
+                        onChange={(e) => setNewRoute({...newRoute, gpsModel: e.target.value})}
+                        className="w-full text-xs bg-white text-text-primary border border-border rounded-xl p-2.5"
+                        required={newRoute.gpsEnabled && newRoute.trackingMethod === 'MOBILE'}
+                      >
+                        <option value="Android App">Android App</option>
+                        <option value="iOS App">iOS App</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Driver Phone (Tracking SIM)</label>
+                      <input
+                        type="text"
+                        value={newRoute.driverPhone || '+91 99999 88888'}
+                        className="w-full text-xs bg-slate-100 border border-border rounded-xl p-2.5 cursor-not-allowed text-text-secondary animate-pulse"
+                        disabled
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <button 
@@ -795,19 +873,33 @@ export default function TransportLogisticsPage() {
 
               {/* GPS Hardware Configuration */}
               <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
-                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">
+                  {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'GPS Mobile App Registration' : 'GPS Hardware Device Registration'}
+                </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
-                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Mobile Client OS' : 'Hardware Model'}
+                    </span>
+                    <span className="font-bold text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsModel || (activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Android App' : 'Teltonika FMB920')}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Device Token' : 'Device ID / IMEI'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">
+                      {activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Mobile Number' : 'Cellular SIM Number'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsSimNo || activeTrackedRoute.phone || 'N/A'}
+                    </span>
                   </div>
                 </div>
               </div>

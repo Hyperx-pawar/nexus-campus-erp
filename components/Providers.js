@@ -433,6 +433,7 @@ export default function Providers({ children }) {
       phone: '+91 98765 43210', 
       tenant_id: 'demo-tenant-1',
       gpsEnabled: true,
+      trackingMethod: 'HARDWARE',
       gpsDeviceID: 'GPS-DL1PD8492-9620',
       gpsModel: 'Teltonika FMB920',
       gpsSimNo: '+91 98888 77777',

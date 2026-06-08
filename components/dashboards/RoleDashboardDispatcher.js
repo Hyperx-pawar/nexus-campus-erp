@@ -768,19 +768,33 @@ function StudentDashboard() {
 
               {/* GPS Hardware Configuration */}
               <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
-                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">
+                  {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'GPS Mobile App Registration' : 'GPS Hardware Device Registration'}
+                </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
-                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Mobile Client OS' : 'Hardware Model'}
+                    </span>
+                    <span className="font-bold text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsModel || (activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Android App' : 'Teltonika FMB920')}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Device Token' : 'Device ID / IMEI'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">
+                      {activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Mobile Number' : 'Cellular SIM Number'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsSimNo || activeTrackedRoute.phone || 'N/A'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2670,19 +2684,33 @@ function ParentDashboard() {
 
               {/* GPS Hardware Configuration */}
               <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
-                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">
+                  {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'GPS Mobile App Registration' : 'GPS Hardware Device Registration'}
+                </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
-                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Mobile Client OS' : 'Hardware Model'}
+                    </span>
+                    <span className="font-bold text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsModel || (activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Android App' : 'Teltonika FMB920')}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Device Token' : 'Device ID / IMEI'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">
+                      {activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}
+                    </span>
                   </div>
                   <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
-                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
-                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">
+                      {activeTrackedRoute.trackingMethod === 'MOBILE' ? 'Driver Mobile Number' : 'Cellular SIM Number'}
+                    </span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">
+                      {activeTrackedRoute.gpsSimNo || activeTrackedRoute.phone || 'N/A'}
+                    </span>
                   </div>
                 </div>
               </div>
