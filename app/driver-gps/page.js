@@ -278,7 +278,7 @@ function DriverGPSTelemetryClient() {
                 No Active Mobile Routes Found
               </span>
               <p className="text-[10px] text-slate-500 leading-normal">
-                Go to the <span className="underline cursor-pointer text-slate-400 hover:text-slate-300" onClick={() => router.push('/dashboard/transport')}>Transport Dashboard</span> and enable "Driver Mobile GPS" for a route to generate a token.
+                Go to the <span className="underline cursor-pointer text-slate-400 hover:text-slate-300" onClick={() => router.push('/dashboard/transport')}>Transport Dashboard</span> and enable &quot;Driver Mobile GPS&quot; for a route to generate a token.
               </p>
             </div>
           )}

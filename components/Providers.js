@@ -89,50 +89,6 @@ export default function Providers({ children }) {
     return `rgba(${R}, ${G}, ${B}, ${alpha})`;
   };
 
-  // Dynamic white-label color accent application
-  useEffect(() => {
-    if (typeof window !== 'undefined' && activeTenant) {
-      const color = activeTenant.brandColor || (theme === 'dark' ? '#3B82F6' : '#2563EB');
-      const hoverColor = adjustColorBrightness(color, theme === 'dark' ? 15 : -15);
-      const glowColor = hexToRgba(color, theme === 'dark' ? 0.15 : 0.08);
-
-      document.documentElement.style.setProperty('--accent', color);
-      document.documentElement.style.setProperty('--accent-hover', hoverColor);
-      document.documentElement.style.setProperty('--accent-glow', glowColor);
-    }
-  }, [activeTenant, theme]);
-
-  // Live GPS simulation for enabled transit buses
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSharedTransportRoutes(prevRoutes => 
-        prevRoutes.map(route => {
-          if (!route.gpsEnabled) return route;
-          if (route.trackingMethod === 'MOBILE' && route.driverBroadcasting) return route;
-          
-          // Randomly shift coordinates slightly to simulate transit movement
-          const latDelta = (Math.random() - 0.48) * 0.0004;
-          const lngDelta = (Math.random() - 0.48) * 0.0004;
-          
-          let nextEta = route.etaMinutes;
-          if (Math.random() > 0.7) {
-            nextEta = route.etaMinutes > 1 ? route.etaMinutes - 1 : 15;
-          }
-          
-          return {
-            ...route,
-            latitude: Number((route.latitude + latDelta).toFixed(6)),
-            longitude: Number((route.longitude + lngDelta).toFixed(6)),
-            etaMinutes: nextEta,
-            lastUpdated: new Date().toISOString()
-          };
-        })
-      );
-    }, 5000);
-    
-    return () => clearInterval(timer);
-  }, []);
-
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -773,6 +729,50 @@ export default function Providers({ children }) {
       { subject: 'Organic Chemistry Class Test', marks: '22 / 25', grade: 'A2', desc: 'Class Avg: 20' }
     ]
   });
+
+  // Dynamic white-label color accent application
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeTenant) {
+      const color = activeTenant.brandColor || (theme === 'dark' ? '#3B82F6' : '#2563EB');
+      const hoverColor = adjustColorBrightness(color, theme === 'dark' ? 15 : -15);
+      const glowColor = hexToRgba(color, theme === 'dark' ? 0.15 : 0.08);
+
+      document.documentElement.style.setProperty('--accent', color);
+      document.documentElement.style.setProperty('--accent-hover', hoverColor);
+      document.documentElement.style.setProperty('--accent-glow', glowColor);
+    }
+  }, [activeTenant, theme]);
+
+  // Live GPS simulation for enabled transit buses
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSharedTransportRoutes(prevRoutes => 
+        prevRoutes.map(route => {
+          if (!route.gpsEnabled) return route;
+          if (route.trackingMethod === 'MOBILE' && route.driverBroadcasting) return route;
+          
+          // Randomly shift coordinates slightly to simulate transit movement
+          const latDelta = (Math.random() - 0.48) * 0.0004;
+          const lngDelta = (Math.random() - 0.48) * 0.0004;
+          
+          let nextEta = route.etaMinutes;
+          if (Math.random() > 0.7) {
+            nextEta = route.etaMinutes > 1 ? route.etaMinutes - 1 : 15;
+          }
+          
+          return {
+            ...route,
+            latitude: Number((route.latitude + latDelta).toFixed(6)),
+            longitude: Number((route.longitude + lngDelta).toFixed(6)),
+            etaMinutes: nextEta,
+            lastUpdated: new Date().toISOString()
+          };
+        })
+      );
+    }, 5000);
+    
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
