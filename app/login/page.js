@@ -43,12 +43,19 @@ export default function LoginPage() {
         
         {/* Brand Logo & Header */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/10 shrink-0 overflow-hidden">
-            <Shield size={24} />
+          <div 
+            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0 overflow-hidden"
+            style={{ backgroundColor: activeTenant?.brandColor || '#2563eb', boxShadow: `0 10px 15px -3px ${(activeTenant?.brandColor || '#2563eb')}20` }}
+          >
+            {activeTenant?.logo ? (
+              <img src={activeTenant.logo} alt="School Logo" className="w-full h-full object-cover" />
+            ) : (
+              <Shield size={24} />
+            )}
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-black font-outfit text-slate-900 tracking-tight">
-              Sign in to Campus Portal
+              Sign in to {activeTenant?.name ? activeTenant.name.split(' (')[0] : 'Campus Portal'}
             </h2>
             <p className="text-xs text-slate-500 font-medium">Enter your credentials to access your workspace</p>
           </div>
@@ -76,7 +83,7 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between ml-1 text-[10px] font-black uppercase tracking-widest">
               <label className="text-slate-500">Password</label>
-              <button type="button" className="text-blue-600 hover:text-blue-700 transition-colors">Forgot?</button>
+              <button type="button" className="transition-colors cursor-pointer" style={{ color: activeTenant?.brandColor || '#2563eb' }}>Forgot?</button>
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={18} />
@@ -102,7 +109,11 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-600/10 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-3.5 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            style={{ 
+              backgroundColor: activeTenant?.brandColor || '#2563eb',
+              boxShadow: `0 10px 15px -3px ${(activeTenant?.brandColor || '#2563eb')}20`
+            }}
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : (
               <>
@@ -119,7 +130,8 @@ export default function LoginPage() {
           <button 
             type="button"
             onClick={() => setIsDemoOpen(true)}
-            className="text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-all mt-1"
+            className="text-[11px] font-bold transition-all mt-1 cursor-pointer"
+            style={{ color: activeTenant?.brandColor || '#2563eb' }}
           >
             Access Demo Accounts
           </button>
