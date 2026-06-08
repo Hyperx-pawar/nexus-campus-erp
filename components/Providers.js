@@ -62,6 +62,7 @@ export default function Providers({ children }) {
       setSharedTransportRoutes(prevRoutes => 
         prevRoutes.map(route => {
           if (!route.gpsEnabled) return route;
+          if (route.trackingMethod === 'MOBILE' && route.driverBroadcasting) return route;
           
           // Randomly shift coordinates slightly to simulate transit movement
           const latDelta = (Math.random() - 0.48) * 0.0004;

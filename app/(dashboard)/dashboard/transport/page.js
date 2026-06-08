@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { 
   Bus, Search, Plus, Wrench, Calendar, 
   CreditCard, UserCheck, ShieldCheck, ArrowRight, Navigation, MapPin,
-  Clock
+  Clock, ExternalLink, Copy
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -39,6 +39,7 @@ export default function TransportLogisticsPage() {
   const [activeTab, setActiveTab] = useState('routes'); // 'routes' | 'maintenance'
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedTrackRoute, setSelectedTrackRoute] = useState(null);
+  const [selectedDriverLinkRoute, setSelectedDriverLinkRoute] = useState(null);
   
   const activeTrackedRoute = React.useMemo(() => {
     if (!selectedTrackRoute) return null;
@@ -759,6 +760,16 @@ export default function TransportLogisticsPage() {
                               <Navigation size={10} className="rotate-45" />
                               <span>Track Live</span>
                             </button>
+                            {activeRole !== 'STUDENT' && route.trackingMethod === 'MOBILE' && (
+                              <button
+                                onClick={() => setSelectedDriverLinkRoute(route)}
+                                className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-border text-text-primary text-[9px] font-black uppercase rounded transition-all flex items-center gap-1 cursor-pointer no-print"
+                                title="Get Driver Companion GPS Tracking Link"
+                              >
+                                <ExternalLink size={10} />
+                                <span>Driver Link</span>
+                              </button>
+                            )}
                             {activeRole !== 'STUDENT' && (
                               <button
                                 onClick={() => handleToggleRouteGPS(route.id)}
@@ -992,6 +1003,98 @@ export default function TransportLogisticsPage() {
                   <div className="opacity-40">[{new Date(Date.now() - 10000).toLocaleTimeString()}] GPS ping acknowledged: {(activeTrackedRoute.latitude - 0.0002)?.toFixed(6)}, {(activeTrackedRoute.longitude - 0.0002)?.toFixed(6)} | Speed: {speed > 0 ? speed - 1 : 0} km/h | satellites: 11</div>
                 </div>
               </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Driver companion app link sharing Modal */}
+      <Modal
+        open={!!selectedDriverLinkRoute}
+        onClose={() => setSelectedDriverLinkRoute(null)}
+        title="Driver GPS Telemetry Share Link"
+        icon={<ExternalLink size={18} className="text-accent" />}
+        size="md"
+      >
+        {selectedDriverLinkRoute && (() => {
+          const shareUrl = typeof window !== 'undefined' 
+            ? `${window.location.origin}/driver-gps?routeId=${selectedDriverLinkRoute.id}&token=${selectedDriverLinkRoute.gpsDeviceID}`
+            : `/driver-gps?routeId=${selectedDriverLinkRoute.id}&token=${selectedDriverLinkRoute.gpsDeviceID}`;
+          
+          const handleCopy = () => {
+            navigator.clipboard.writeText(shareUrl);
+            toast.success("Driver companion tracking link copied to clipboard!");
+          };
+
+          return (
+            <div className="space-y-6 text-text-primary text-xs">
+              <div className="space-y-1">
+                <span className="text-[10px] text-text-secondary uppercase font-black tracking-widest block">Transit Corridor</span>
+                <p className="text-sm font-bold text-text-primary">{selectedDriverLinkRoute.name} ({selectedDriverLinkRoute.bus})</p>
+              </div>
+
+              {/* Copyable Link Input */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Driver companion URL</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={shareUrl} 
+                    readOnly
+                    className="w-full bg-slate-100 dark:bg-slate-900 border border-border rounded-xl p-2.5 font-mono text-[10px] select-all outline-none"
+                  />
+                  <button
+                    onClick={handleCopy}
+                    className="px-4 bg-accent hover:bg-accent-hover text-white rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer font-bold uppercase tracking-wider text-[10px]"
+                  >
+                    <Copy size={12} />
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="p-6 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl flex flex-col items-center justify-center gap-4 text-center">
+                <div className="w-40 h-40 bg-white p-3 rounded-2xl border border-border flex flex-col justify-between relative shadow-sm">
+                  {/* Premium visual QR grid simulation */}
+                  <div className="grid grid-cols-7 gap-1 w-full h-full opacity-90">
+                    {[...Array(49)].map((_, i) => {
+                      // Draw mock QR finder patterns (corners)
+                      const isCorner = 
+                        (i < 3 || (i >= 7 && i < 10) || (i >= 14 && i < 17)) || // Top Left
+                        (i >= 4 && i < 7 || (i >= 11 && i < 14) || (i >= 18 && i < 21)) || // Top Right
+                        (i >= 28 && i < 31 || (i >= 35 && i < 38) || (i >= 42 && i < 45)); // Bottom Left
+                      
+                      const isRandomFill = Math.random() > 0.5;
+
+                      return (
+                        <div 
+                          key={i} 
+                          className={`rounded-[2px] ${isCorner ? 'bg-slate-900 dark:bg-slate-950' : (isRandomFill ? 'bg-slate-800 dark:bg-slate-700' : 'bg-transparent')}`}
+                        ></div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-text-primary uppercase tracking-wider block">Scan to Connect Phone</span>
+                  <p className="text-[9px] text-text-secondary max-w-xs leading-relaxed">
+                    Open this URL or scan the QR code on the driver's phone to launch the mobile GPS companion app. Keep the phone screen active during the transit commute.
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Launch test button */}
+              <button
+                onClick={() => {
+                  window.open(shareUrl, '_blank');
+                  setSelectedDriverLinkRoute(null);
+                }}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5"
+              >
+                <ExternalLink size={12} />
+                <span>Test Link In New Tab</span>
+              </button>
             </div>
           );
         })()}
