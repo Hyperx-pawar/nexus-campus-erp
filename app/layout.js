@@ -22,7 +22,6 @@ const caveat = Caveat({
 export const metadata = {
   title: "Campus ERP | School & College Management Suite",
   description: "Complete modular ERP system for schools and colleges.",
-  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }) {
