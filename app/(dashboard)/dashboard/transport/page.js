@@ -5,7 +5,8 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState } from 'react';
 import { 
   Bus, Search, Plus, Wrench, Calendar, 
-  CreditCard, UserCheck, ShieldCheck, ArrowRight, Navigation, MapPin
+  CreditCard, UserCheck, ShieldCheck, ArrowRight, Navigation, MapPin,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -53,7 +54,10 @@ export default function TransportLogisticsPage() {
     driverName: '',
     driverPhone: '',
     fee: 6000,
-    gpsEnabled: false
+    gpsEnabled: false,
+    gpsDeviceID: '',
+    gpsModel: 'Teltonika FMB920',
+    gpsSimNo: ''
   });
  
   const [newBill, setNewBill] = useState({
@@ -92,6 +96,9 @@ export default function TransportLogisticsPage() {
       phone: newRoute.driverPhone || '+91 99999 88888',
       tenant_id: activeTenant.id,
       gpsEnabled: newRoute.gpsEnabled,
+      gpsDeviceID: newRoute.gpsEnabled ? newRoute.gpsDeviceID || `GPS-${uppercaseReg.replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+      gpsModel: newRoute.gpsEnabled ? newRoute.gpsModel : undefined,
+      gpsSimNo: newRoute.gpsEnabled ? newRoute.gpsSimNo : undefined,
       latitude: newRoute.gpsEnabled ? 28.5276 : undefined,
       longitude: newRoute.gpsEnabled ? 77.2100 : undefined,
       etaMinutes: newRoute.gpsEnabled ? 12 : undefined,
@@ -107,7 +114,10 @@ export default function TransportLogisticsPage() {
       driverName: '',
       driverPhone: '',
       fee: 6000,
-      gpsEnabled: false
+      gpsEnabled: false,
+      gpsDeviceID: '',
+      gpsModel: 'Teltonika FMB920',
+      gpsSimNo: ''
     });
     setSelectedBusOption('NEW');
     setShowAddForm(false);
@@ -151,6 +161,9 @@ export default function TransportLogisticsPage() {
             return {
               ...r,
               gpsEnabled: true,
+              gpsDeviceID: r.gpsDeviceID || `GPS-${r.bus.replace(/\s+/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+              gpsModel: r.gpsModel || 'Teltonika FMB920',
+              gpsSimNo: r.gpsSimNo || `+91 9${Math.floor(100000000 + Math.random() * 900000000)}`,
               latitude: 28.5276,
               longitude: 77.2100,
               etaMinutes: 12,
@@ -471,6 +484,46 @@ export default function TransportLogisticsPage() {
                 className="w-4 h-4 cursor-pointer accent-accent"
               />
             </div>
+            {newRoute.gpsEnabled && (
+              <div className="md:col-span-2 p-4 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fadeIn">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Device ID / IMEI *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. GPS-IMEI-84920"
+                    value={newRoute.gpsDeviceID}
+                    onChange={(e) => setNewRoute({...newRoute, gpsDeviceID: e.target.value})}
+                    className="w-full text-xs font-mono uppercase bg-white border border-border rounded-xl p-2.5"
+                    required={newRoute.gpsEnabled}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Hardware Model *</label>
+                  <select
+                    value={newRoute.gpsModel}
+                    onChange={(e) => setNewRoute({...newRoute, gpsModel: e.target.value})}
+                    className="w-full text-xs bg-white text-text-primary border border-border rounded-xl p-2.5"
+                    required={newRoute.gpsEnabled}
+                  >
+                    <option value="Teltonika FMB920">Teltonika FMB920</option>
+                    <option value="Coban GPS103">Coban GPS103</option>
+                    <option value="TK103">TK103</option>
+                    <option value="Concox GT06">Concox GT06</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">SIM Card Number *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. +91 99999 88888"
+                    value={newRoute.gpsSimNo}
+                    onChange={(e) => setNewRoute({...newRoute, gpsSimNo: e.target.value})}
+                    className="w-full text-xs bg-white border border-border rounded-xl p-2.5"
+                    required={newRoute.gpsEnabled}
+                  />
+                </div>
+              </div>
+            )}
             <button 
               type="submit"
               className="md:col-span-2 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-4"
@@ -737,6 +790,25 @@ export default function TransportLogisticsPage() {
                   <span className="text-xs font-mono font-bold text-text-secondary mt-1 block">
                     {activeTrackedRoute.latitude?.toFixed(6)}, {activeTrackedRoute.longitude?.toFixed(6)}
                   </span>
+                </div>
+              </div>
+
+              {/* GPS Hardware Configuration */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
+                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
 

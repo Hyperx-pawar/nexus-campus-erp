@@ -766,6 +766,25 @@ function StudentDashboard() {
                 </div>
               </div>
 
+              {/* GPS Hardware Configuration */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
+                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* High-Fidelity SVG Route Tracker */}
               <div className="p-6 bg-slate-950 text-white rounded-3xl border border-slate-800 relative overflow-hidden h-64 flex flex-col justify-between">
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
@@ -2646,6 +2665,25 @@ function ParentDashboard() {
                   <span className="text-xs font-bold text-text-primary mt-0.5 block">
                     {activeTrackedRoute.driver} ({activeTrackedRoute.phone})
                   </span>
+                </div>
+              </div>
+
+              {/* GPS Hardware Configuration */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/20 border border-border rounded-2xl space-y-3">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">GPS Hardware Device Registration</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Hardware Model</span>
+                    <span className="font-bold text-text-primary mt-1 block">{activeTrackedRoute.gpsModel || 'Teltonika FMB920'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Device ID / IMEI</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block uppercase">{activeTrackedRoute.gpsDeviceID || 'GPS-N/A'}</span>
+                  </div>
+                  <div className="p-3.5 bg-white dark:bg-slate-950/40 border border-border rounded-xl">
+                    <span className="text-[8px] text-text-secondary uppercase block font-bold">Cellular SIM Number</span>
+                    <span className="font-bold font-mono text-text-primary mt-1 block">{activeTrackedRoute.gpsSimNo || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
 
