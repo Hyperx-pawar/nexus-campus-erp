@@ -599,6 +599,15 @@ export default function TransportLogisticsPage() {
                         disabled
                       />
                     </div>
+                    <div className="sm:col-span-3 p-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 rounded-xl space-y-1.5 animate-fadeIn">
+                      <span className="text-[9px] font-black uppercase tracking-wider block flex items-center gap-1">
+                        <CheckCircle size={10} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Driver Mobile GPS Setup Instructions</span>
+                      </span>
+                      <p className="text-[9px] leading-relaxed text-text-secondary">
+                        The <strong>Driver Device Token</strong> is a unique key (e.g. <code>MOB-DRV-84920</code>) used to link the driver's phone. After establishing this route, click the <strong>Driver Link</strong> action button in the routes table to share a copyable URL or a QR code. When the driver opens the link or scans the QR code, their device will automatically authenticate and begin broadcasting live GPS coordinates.
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
