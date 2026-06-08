@@ -498,7 +498,19 @@ export default function TransportLogisticsPage() {
               <input 
                 type="checkbox" 
                 checked={newRoute.gpsEnabled}
-                onChange={(e) => setNewRoute({...newRoute, gpsEnabled: e.target.checked})}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  const method = newRoute.trackingMethod || 'HARDWARE';
+                  const randomId = Math.floor(10000 + Math.random() * 90000);
+                  const deviceID = method === 'MOBILE' ? `MOB-DRV-${randomId}` : `GPS-IMEI-${randomId}`;
+                  const defaultSim = method === 'HARDWARE' ? `+91 9${Math.floor(100000000 + Math.random() * 900000000)}` : '';
+                  setNewRoute({
+                    ...newRoute,
+                    gpsEnabled: enabled,
+                    gpsDeviceID: enabled ? deviceID : '',
+                    gpsSimNo: enabled ? defaultSim : ''
+                  });
+                }}
                 className="w-4 h-4 cursor-pointer accent-accent"
               />
             </div>
@@ -510,12 +522,15 @@ export default function TransportLogisticsPage() {
                     value={newRoute.trackingMethod}
                     onChange={(e) => {
                       const method = e.target.value;
+                      const randomId = Math.floor(10000 + Math.random() * 90000);
+                      const deviceID = method === 'MOBILE' ? `MOB-DRV-${randomId}` : `GPS-IMEI-${randomId}`;
+                      const defaultSim = method === 'HARDWARE' ? `+91 9${Math.floor(100000000 + Math.random() * 900000000)}` : '';
                       setNewRoute({
                         ...newRoute,
                         trackingMethod: method,
-                        gpsDeviceID: '',
+                        gpsDeviceID: deviceID,
                         gpsModel: method === 'MOBILE' ? 'Android App' : 'Teltonika FMB920',
-                        gpsSimNo: ''
+                        gpsSimNo: defaultSim
                       });
                     }}
                     className="w-full text-xs bg-white text-text-primary border border-border rounded-xl p-2.5"
