@@ -141,6 +141,38 @@ export default function TransportLogisticsPage() {
     setShowAddForm(false);
   };
 
+  const handleToggleRouteGPS = (routeId) => {
+    setSharedTransportRoutes(prev => 
+      prev.map(r => {
+        if (r.id === routeId) {
+          const nextVal = !r.gpsEnabled;
+          if (nextVal) {
+            toast.success(`GPS hardware module initialized and online for bus ${r.bus}!`);
+            return {
+              ...r,
+              gpsEnabled: true,
+              latitude: 28.5276,
+              longitude: 77.2100,
+              etaMinutes: 12,
+              lastUpdated: new Date().toISOString()
+            };
+          } else {
+            toast.info(`GPS hardware deactivated for bus ${r.bus}.`);
+            return {
+              ...r,
+              gpsEnabled: false,
+              latitude: undefined,
+              longitude: undefined,
+              etaMinutes: undefined,
+              lastUpdated: undefined
+            };
+          }
+        }
+        return r;
+      })
+    );
+  };
+
   // Filter routes and bills by active campus tenant_id
   const tenantRoutes = sharedTransportRoutes.filter(r => r.tenant_id === activeTenant.id);
   const tenantBills = sharedMaintenanceBills.filter(b => b.tenant_id === activeTenant.id);
@@ -596,11 +628,31 @@ export default function TransportLogisticsPage() {
                               <Navigation size={10} className="rotate-45" />
                               <span>Track Live</span>
                             </button>
+                            {activeRole !== 'STUDENT' && (
+                              <button
+                                onClick={() => handleToggleRouteGPS(route.id)}
+                                className="px-2 py-1 bg-slate-100 hover:bg-danger/10 hover:text-danger border border-border text-text-secondary text-[9px] font-bold rounded transition-all cursor-pointer no-print"
+                                title="Deactivate GPS Tracker"
+                              >
+                                Deactivate
+                              </button>
+                            )}
                           </div>
                         ) : (
-                          <span className="px-2.5 py-1 bg-slate-100 border border-border text-text-secondary text-[9px] font-black uppercase rounded">
-                            GPS Offline
-                          </span>
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <span className="px-2.5 py-1 bg-slate-100 border border-border text-text-secondary text-[9px] font-black uppercase rounded">
+                              GPS Offline
+                            </span>
+                            {activeRole !== 'STUDENT' && (
+                              <button
+                                onClick={() => handleToggleRouteGPS(route.id)}
+                                className="px-2.5 py-1 bg-slate-200 hover:bg-accent hover:text-white text-text-primary text-[9px] font-black uppercase rounded transition-all cursor-pointer no-print"
+                                title="Install/Enable GPS Tracker Hardware"
+                              >
+                                Install GPS
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
