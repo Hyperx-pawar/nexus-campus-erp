@@ -56,16 +56,36 @@ export default function Providers({ children }) {
     }
   }, []);
 
-  // White-label page title dynamically
+  // Live GPS simulation for enabled transit buses
   useEffect(() => {
-    if (typeof window !== 'undefined' && activeTenant) {
-      if (activeRole === 'SUPER_ADMIN') {
-        document.title = "Campus ERP | Multi-Tenant Educational Suite";
-      } else {
-        document.title = `${activeTenant.name} | Campus Portal`;
-      }
-    }
-  }, [activeTenant, activeRole]);
+    const timer = setInterval(() => {
+      setSharedTransportRoutes(prevRoutes => 
+        prevRoutes.map(route => {
+          if (!route.gpsEnabled) return route;
+          
+          // Randomly shift coordinates slightly to simulate transit movement
+          const latDelta = (Math.random() - 0.48) * 0.0004;
+          const lngDelta = (Math.random() - 0.48) * 0.0004;
+          
+          let nextEta = route.etaMinutes;
+          if (Math.random() > 0.7) {
+            nextEta = route.etaMinutes > 1 ? route.etaMinutes - 1 : 15;
+          }
+          
+          return {
+            ...route,
+            latitude: Number((route.latitude + latDelta).toFixed(6)),
+            longitude: Number((route.longitude + lngDelta).toFixed(6)),
+            etaMinutes: nextEta,
+            lastUpdated: new Date().toISOString()
+          };
+        })
+      );
+    }, 5000);
+    
+    return () => clearInterval(timer);
+  }, []);
+
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -404,9 +424,40 @@ export default function Providers({ children }) {
   ]);
 
   const [sharedTransportRoutes, setSharedTransportRoutes] = useState([
-    { id: 'route-1', name: 'Route A - Saket / South Delhi Corridor', fee: 6000, bus: 'DL 1PD 8492', driver: 'Harpreet Singh', phone: '+91 98765 43210', tenant_id: 'demo-tenant-1' },
-    { id: 'route-2', name: 'Route B - Dwarka Expressway', fee: 8000, bus: 'DL 1PA 7730', driver: 'Rajinder Yadav', phone: '+91 87654 32109', tenant_id: 'demo-tenant-1' },
-    { id: 'route-3', name: 'Route C - Noida / NCR Sector 62', fee: 9000, bus: 'UP 14 AT 2233', driver: 'Anil Kumar', phone: '+91 76543 21098', tenant_id: 'demo-tenant-1' }
+    { 
+      id: 'route-1', 
+      name: 'Route A - Saket / South Delhi Corridor', 
+      fee: 6000, 
+      bus: 'DL 1PD 8492', 
+      driver: 'Harpreet Singh', 
+      phone: '+91 98765 43210', 
+      tenant_id: 'demo-tenant-1',
+      gpsEnabled: true,
+      latitude: 28.5276,
+      longitude: 77.2100,
+      etaMinutes: 12,
+      lastUpdated: new Date().toISOString()
+    },
+    { 
+      id: 'route-2', 
+      name: 'Route B - Dwarka Expressway', 
+      fee: 8000, 
+      bus: 'DL 1PA 7730', 
+      driver: 'Rajinder Yadav', 
+      phone: '+91 87654 32109', 
+      tenant_id: 'demo-tenant-1',
+      gpsEnabled: false
+    },
+    { 
+      id: 'route-3', 
+      name: 'Route C - Noida / NCR Sector 62', 
+      fee: 9000, 
+      bus: 'UP 14 AT 2233', 
+      driver: 'Anil Kumar', 
+      phone: '+91 76543 21098', 
+      tenant_id: 'demo-tenant-1',
+      gpsEnabled: false
+    }
   ]);
 
   const [sharedHostelBlocks, setSharedHostelBlocks] = useState([

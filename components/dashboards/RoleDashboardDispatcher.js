@@ -7,7 +7,7 @@ import {
   Clock, Plus, ArrowRight, ShieldCheck, Star, Sparkles, BookOpenCheck,
   AlertTriangle, CreditCard, ChevronRight, UserCheck, Megaphone, Package,
   BellRing, Receipt, Printer, Smartphone, Globe, Lock, Zap, IndianRupee,
-  QrCode, Building2, X, RefreshCw, BadgeCheck, History
+  QrCode, Building2, X, RefreshCw, BadgeCheck, History, Navigation
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -232,7 +232,11 @@ function StudentDashboard() {
     sharedStudentHistory,
     sharedAttendanceLogs
   } = useAuth();
-
+  const [selectedTrackRoute, setSelectedTrackRoute] = useState(null);
+  const activeTrackedRoute = useMemo(() => {
+    if (!selectedTrackRoute) return null;
+    return (sharedTransportRoutes || []).find(r => r.id === selectedTrackRoute.id);
+  }, [selectedTrackRoute, sharedTransportRoutes]);
 
   // Find active student record
   const myStudentProfile = useMemo(() => {
@@ -613,10 +617,21 @@ function StudentDashboard() {
       {/* School Bus & Transport Details */}
       {myTransportRoute && (
         <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
-          <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
-            <Bus size={16} className="text-accent" />
-            <span>Assigned School Bus & Route</span>
-          </h3>
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-border pb-3">
+            <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+              <Bus size={16} className="text-accent" />
+              <span>Assigned School Bus & Route</span>
+            </h3>
+            {myTransportRoute.gpsEnabled && (
+              <button
+                onClick={() => setSelectedTrackRoute(myTransportRoute)}
+                className="px-4 py-2 bg-success hover:bg-success-hover text-black text-xs font-black uppercase rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg animate-pulse"
+              >
+                <Navigation size={12} className="rotate-45" />
+                <span>Track Live ETA: {activeTrackedRoute?.etaMinutes || myTransportRoute.etaMinutes || 12}m</span>
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
               <div>
@@ -716,6 +731,115 @@ function StudentDashboard() {
           </div>
         );
       })()}
+      {/* Live GPS Tracking Modal */}
+      <Modal
+        open={!!activeTrackedRoute}
+        onClose={() => setSelectedTrackRoute(null)}
+        title={`Live Commute Tracking — ${activeTrackedRoute?.bus || ''}`}
+        icon={<Navigation size={18} className="text-success animate-pulse rotate-45" />}
+        size="lg"
+      >
+        {activeTrackedRoute && (() => {
+          const eta = activeTrackedRoute.etaMinutes || 12;
+          const pct = Math.max(5, Math.min(95, ((15 - eta) / 14) * 100));
+          const speed = eta > 1 ? 35 + Math.floor((pct % 7) * 2) : 0;
+          
+          return (
+            <div className="space-y-6 text-text-primary">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold">
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Commute Route</span>
+                  <span className="text-sm font-black mt-0.5 block">{activeTrackedRoute.name}</span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Estimated Arrival</span>
+                  <span className="text-sm font-black text-success mt-0.5 block flex items-center gap-1.5">
+                    <Clock size={14} className="animate-pulse" />
+                    {eta > 1 ? `${eta} mins` : 'Arrived at Campus'}
+                  </span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Driver Info</span>
+                  <span className="text-xs font-bold text-text-primary mt-0.5 block">
+                    {activeTrackedRoute.driver} ({activeTrackedRoute.phone})
+                  </span>
+                </div>
+              </div>
+
+              {/* High-Fidelity SVG Route Tracker */}
+              <div className="p-6 bg-slate-950 text-white rounded-3xl border border-slate-800 relative overflow-hidden h-64 flex flex-col justify-between">
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
+                
+                <div className="flex justify-between items-center z-10">
+                  <span className="text-[10px] bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-success rounded-full animate-ping"></span>
+                    Live GPS Telemetry Active
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Last ping: {activeTrackedRoute.lastUpdated ? new Date(activeTrackedRoute.lastUpdated).toLocaleTimeString() : 'N/A'}
+                  </span>
+                </div>
+
+                <div className="relative my-auto z-10 py-6">
+                  <svg className="w-full h-12" viewBox="0 0 100 12" preserveAspectRatio="none">
+                    <path d="M 5 6 Q 25 1, 50 6 T 95 6" fill="none" stroke="#334155" strokeWidth="1.5" strokeDasharray="3 3" />
+                    <path 
+                      d={`M 5 6 Q 25 1, 50 6 T 95 6`} 
+                      fill="none" 
+                      stroke="url(#accentGradient)" 
+                      strokeWidth="2" 
+                      strokeDasharray="100"
+                      strokeDashoffset={100 - pct} 
+                    />
+                    
+                    <defs>
+                      <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  <div 
+                    className="absolute -translate-y-9 -translate-x-1/2 transition-all duration-1000 ease-out flex flex-col items-center animate-pulse"
+                    style={{ left: `${pct}%` }}
+                  >
+                    <div className="px-2 py-1 bg-success text-[8px] font-black text-black rounded-lg shadow-lg border border-success-hover uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Bus size={10} />
+                      <span>{activeTrackedRoute.bus}</span>
+                    </div>
+                    <div className="w-4 h-4 bg-success rounded-full border-4 border-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                  </div>
+
+                  <div className="absolute left-[5%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Depot</span>
+                  </div>
+                  <div className="absolute left-[35%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop A</span>
+                  </div>
+                  <div className="absolute left-[65%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop B</span>
+                  </div>
+                  <div className="absolute left-[95%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                    <span className="text-[8px] text-emerald-400 font-black mt-1.5 uppercase tracking-wider">Campus Gate</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-900 pt-3 z-10 font-mono">
+                  <span>Speed: <strong className="text-white">{speed} km/h</strong></span>
+                  <span>Sats: <strong className="text-white">12 Connected</strong></span>
+                  <span>Accuracy: <strong className="text-success">0.82 (High)</strong></span>
+                  <span>Signal: <strong className="text-success">Strong</strong></span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }
@@ -1218,6 +1342,11 @@ function ParentDashboard() {
   const receiptRef = React.useRef(null);
   const [paymentTarget, setPaymentTarget] = useState(null); // { child, fees, feeBreakdown, totalFee }
   const [hostelPayTarget, setHostelPayTarget] = useState(null); // { child, alloc }
+  const [selectedTrackRoute, setSelectedTrackRoute] = useState(null);
+  const activeTrackedRoute = useMemo(() => {
+    if (!selectedTrackRoute) return null;
+    return (sharedTransportRoutes || []).find(r => r.id === selectedTrackRoute.id);
+  }, [selectedTrackRoute, sharedTransportRoutes]);
 
   // Find simulated parent profile restricted to active tenant
   const tenantParents = sharedParents.filter(p => p.tenant_id === activeTenant.id);
@@ -1922,10 +2051,21 @@ function ParentDashboard() {
                     const route = childTransportRoute(child.id);
                     return (
                       <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
-                        <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
-                          <Bus size={14} className="text-accent" />
-                          <span>Assigned School Bus & Route</span>
-                        </h3>
+                        <div className="flex justify-between items-center flex-wrap gap-4 border-b border-border pb-3">
+                          <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                            <Bus size={14} className="text-accent" />
+                            <span>Assigned School Bus & Route</span>
+                          </h3>
+                          {route.gpsEnabled && (
+                            <button
+                              onClick={() => setSelectedTrackRoute(route)}
+                              className="px-4 py-2 bg-success hover:bg-success-hover text-black text-xs font-black uppercase rounded-2xl transition-all flex items-center gap-1.5 cursor-pointer shadow-lg animate-pulse"
+                            >
+                              <Navigation size={12} className="rotate-45" />
+                              <span>Track Live ETA: {route.id === activeTrackedRoute?.id ? activeTrackedRoute?.etaMinutes : route.etaMinutes || 12}m</span>
+                            </button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="p-4 bg-bg-main/40 border border-border rounded-2xl space-y-3">
                             <div>
@@ -2472,6 +2612,116 @@ function ParentDashboard() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Live GPS Tracking Modal */}
+      <Modal
+        open={!!activeTrackedRoute}
+        onClose={() => setSelectedTrackRoute(null)}
+        title={`Live Child Commute Tracking — ${activeTrackedRoute?.bus || ''}`}
+        icon={<Navigation size={18} className="text-success animate-pulse rotate-45" />}
+        size="lg"
+      >
+        {activeTrackedRoute && (() => {
+          const eta = activeTrackedRoute.etaMinutes || 12;
+          const pct = Math.max(5, Math.min(95, ((15 - eta) / 14) * 100));
+          const speed = eta > 1 ? 35 + Math.floor((pct % 7) * 2) : 0;
+          
+          return (
+            <div className="space-y-6 text-text-primary">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold">
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Commute Route</span>
+                  <span className="text-sm font-black mt-0.5 block">{activeTrackedRoute.name}</span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Estimated Arrival</span>
+                  <span className="text-sm font-black text-success mt-0.5 block flex items-center gap-1.5">
+                    <Clock size={14} className="animate-pulse" />
+                    {eta > 1 ? `${eta} mins` : 'Arrived at Campus'}
+                  </span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Driver Info</span>
+                  <span className="text-xs font-bold text-text-primary mt-0.5 block">
+                    {activeTrackedRoute.driver} ({activeTrackedRoute.phone})
+                  </span>
+                </div>
+              </div>
+
+              {/* High-Fidelity SVG Route Tracker */}
+              <div className="p-6 bg-slate-950 text-white rounded-3xl border border-slate-800 relative overflow-hidden h-64 flex flex-col justify-between">
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
+                
+                <div className="flex justify-between items-center z-10">
+                  <span className="text-[10px] bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-success rounded-full animate-ping"></span>
+                    Live GPS Telemetry Active
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Last ping: {activeTrackedRoute.lastUpdated ? new Date(activeTrackedRoute.lastUpdated).toLocaleTimeString() : 'N/A'}
+                  </span>
+                </div>
+
+                <div className="relative my-auto z-10 py-6">
+                  <svg className="w-full h-12" viewBox="0 0 100 12" preserveAspectRatio="none">
+                    <path d="M 5 6 Q 25 1, 50 6 T 95 6" fill="none" stroke="#334155" strokeWidth="1.5" strokeDasharray="3 3" />
+                    <path 
+                      d={`M 5 6 Q 25 1, 50 6 T 95 6`} 
+                      fill="none" 
+                      stroke="url(#accentGradient)" 
+                      strokeWidth="2" 
+                      strokeDasharray="100"
+                      strokeDashoffset={100 - pct} 
+                    />
+                    
+                    <defs>
+                      <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  <div 
+                    className="absolute -translate-y-9 -translate-x-1/2 transition-all duration-1000 ease-out flex flex-col items-center animate-pulse"
+                    style={{ left: `${pct}%` }}
+                  >
+                    <div className="px-2 py-1 bg-success text-[8px] font-black text-black rounded-lg shadow-lg border border-success-hover uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Bus size={10} />
+                      <span>{activeTrackedRoute.bus}</span>
+                    </div>
+                    <div className="w-4 h-4 bg-success rounded-full border-4 border-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                  </div>
+
+                  <div className="absolute left-[5%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Depot</span>
+                  </div>
+                  <div className="absolute left-[35%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop A</span>
+                  </div>
+                  <div className="absolute left-[65%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop B</span>
+                  </div>
+                  <div className="absolute left-[95%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                    <span className="text-[8px] text-emerald-400 font-black mt-1.5 uppercase tracking-wider">Campus Gate</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-900 pt-3 z-10 font-mono">
+                  <span>Speed: <strong className="text-white">{speed} km/h</strong></span>
+                  <span>Sats: <strong className="text-white">12 Connected</strong></span>
+                  <span>Accuracy: <strong className="text-success">0.82 (High)</strong></span>
+                  <span>Signal: <strong className="text-success">Strong</strong></span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

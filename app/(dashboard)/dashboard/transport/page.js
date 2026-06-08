@@ -37,6 +37,13 @@ export default function TransportLogisticsPage() {
 
   const [activeTab, setActiveTab] = useState('routes'); // 'routes' | 'maintenance'
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedTrackRoute, setSelectedTrackRoute] = useState(null);
+  
+  const activeTrackedRoute = React.useMemo(() => {
+    if (!selectedTrackRoute) return null;
+    return sharedTransportRoutes.find(r => r.id === selectedTrackRoute.id);
+  }, [selectedTrackRoute, sharedTransportRoutes]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBusOption, setSelectedBusOption] = useState('NEW');
 
@@ -45,35 +52,36 @@ export default function TransportLogisticsPage() {
     busReg: '',
     driverName: '',
     driverPhone: '',
-    fee: 6000
+    fee: 6000,
+    gpsEnabled: false
   });
-
+ 
   const [newBill, setNewBill] = useState({
     vehicleId: '',
     service: '',
     cost: '',
     date: new Date().toISOString().split('T')[0]
   });
-
+ 
   // Transit statuses to simulate GPS/RTO live tracking
   const [transitStatuses] = useState({
     'route-1': 'IN_TRANSIT',
     'route-2': 'PARKED',
     'route-3': 'MAINTENANCE'
   });
-
+ 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="School Bus & Transport" />;
   }
-
+ 
   const handleAddRoute = (e) => {
     e.preventDefault();
     if (!newRoute.name || !newRoute.busReg || !newRoute.driverName) {
       toast.error('Route Name, Vehicle Registration, and Driver Name are required.');
       return;
     }
-
+ 
     const uppercaseReg = newRoute.busReg.toUpperCase();
     const newRouteItem = {
       id: `route-${Date.now()}`,
@@ -82,9 +90,14 @@ export default function TransportLogisticsPage() {
       bus: uppercaseReg,
       driver: newRoute.driverName,
       phone: newRoute.driverPhone || '+91 99999 88888',
-      tenant_id: activeTenant.id
+      tenant_id: activeTenant.id,
+      gpsEnabled: newRoute.gpsEnabled,
+      latitude: newRoute.gpsEnabled ? 28.5276 : undefined,
+      longitude: newRoute.gpsEnabled ? 77.2100 : undefined,
+      etaMinutes: newRoute.gpsEnabled ? 12 : undefined,
+      lastUpdated: newRoute.gpsEnabled ? new Date().toISOString() : undefined
     };
-
+ 
     setSharedTransportRoutes([...sharedTransportRoutes, newRouteItem]);
     toast.success(`Transit corridor "${newRoute.name}" registered successfully with vehicle ${uppercaseReg}!`);
     
@@ -93,7 +106,8 @@ export default function TransportLogisticsPage() {
       busReg: '',
       driverName: '',
       driverPhone: '',
-      fee: 6000
+      fee: 6000,
+      gpsEnabled: false
     });
     setSelectedBusOption('NEW');
     setShowAddForm(false);
@@ -413,6 +427,18 @@ export default function TransportLogisticsPage() {
                 required
               />
             </div>
+            <div className="md:col-span-2 flex items-center justify-between p-3.5 bg-bg-main border border-border rounded-xl">
+              <div>
+                <span className="text-[10px] font-bold text-text-primary block">Install Live GPS Hardware Tracker</span>
+                <span className="text-[8px] text-text-secondary uppercase tracking-wider block font-bold mt-0.5">Optional Service Integration</span>
+              </div>
+              <input 
+                type="checkbox" 
+                checked={newRoute.gpsEnabled}
+                onChange={(e) => setNewRoute({...newRoute, gpsEnabled: e.target.checked})}
+                className="w-4 h-4 cursor-pointer accent-accent"
+              />
+            </div>
             <button 
               type="submit"
               className="md:col-span-2 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 mt-4"
@@ -557,12 +583,24 @@ export default function TransportLogisticsPage() {
                       <td className="py-4 font-mono text-text-secondary">{route.phone}</td>
                       <td className="py-4 font-mono text-accent font-black">₹{route.fee.toLocaleString('en-IN')}</td>
                       <td className="py-4 text-right pr-2">
-                        {status === 'IN_TRANSIT' ? (
-                          <span className="px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">In Transit</span>
-                        ) : status === 'MAINTENANCE' ? (
-                          <span className="px-2.5 py-1 bg-danger/15 border border-danger/35 text-danger text-[9px] font-black uppercase rounded">In Workshop</span>
+                        {route.gpsEnabled ? (
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">
+                              <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
+                              Online
+                            </span>
+                            <button
+                              onClick={() => setSelectedTrackRoute(route)}
+                              className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-white text-[9px] font-black uppercase rounded transition-all flex items-center gap-1 cursor-pointer no-print"
+                            >
+                              <Navigation size={10} className="rotate-45" />
+                              <span>Track Live</span>
+                            </button>
+                          </div>
                         ) : (
-                          <span className="px-2.5 py-1 bg-slate-100 border border-border text-text-secondary text-[9px] font-black uppercase rounded">Parked</span>
+                          <span className="px-2.5 py-1 bg-slate-100 border border-border text-text-secondary text-[9px] font-black uppercase rounded">
+                            GPS Offline
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -614,6 +652,134 @@ export default function TransportLogisticsPage() {
           </div>
         </div>
       )}
+      {/* Live GPS Tracking Modal */}
+      <Modal
+        open={!!activeTrackedRoute}
+        onClose={() => setSelectedTrackRoute(null)}
+        title={`Live Transit Tracking — ${activeTrackedRoute?.bus || ''}`}
+        icon={<Navigation size={18} className="text-success animate-pulse rotate-45" />}
+        size="lg"
+      >
+        {activeTrackedRoute && (() => {
+          const eta = activeTrackedRoute.etaMinutes || 12;
+          const pct = Math.max(5, Math.min(95, ((15 - eta) / 14) * 100));
+          const speed = eta > 1 ? 35 + Math.floor((pct % 7) * 2) : 0;
+          
+          return (
+            <div className="space-y-6 text-text-primary">
+              {/* Route Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Commute Corridor</span>
+                  <span className="text-sm font-black mt-1 block">{activeTrackedRoute.name}</span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Estimated Arrival (ETA)</span>
+                  <span className="text-sm font-black text-success mt-1 block flex items-center gap-1.5">
+                    <Clock size={14} className="animate-pulse" />
+                    {eta > 1 ? `${eta} mins` : 'Arrived at Campus'}
+                  </span>
+                </div>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                  <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold">Last GPS Coordinate Ping</span>
+                  <span className="text-xs font-mono font-bold text-text-secondary mt-1 block">
+                    {activeTrackedRoute.latitude?.toFixed(6)}, {activeTrackedRoute.longitude?.toFixed(6)}
+                  </span>
+                </div>
+              </div>
+
+              {/* High-Fidelity SVG Route Tracker */}
+              <div className="p-6 bg-slate-950 text-white rounded-3xl border border-slate-800 relative overflow-hidden h-64 flex flex-col justify-between">
+                {/* Visual grid pattern background */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
+                
+                <div className="flex justify-between items-center z-10">
+                  <span className="text-[10px] bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-success rounded-full animate-ping"></span>
+                    Live GPS Telemetry active
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Last ping: {activeTrackedRoute.lastUpdated ? new Date(activeTrackedRoute.lastUpdated).toLocaleTimeString() : 'N/A'}
+                  </span>
+                </div>
+
+                {/* SVG Route Line & Moving Bus */}
+                <div className="relative my-auto z-10 py-6">
+                  {/* SVG Map Path */}
+                  <svg className="w-full h-12" viewBox="0 0 100 12" preserveAspectRatio="none">
+                    {/* Background path line */}
+                    <path d="M 5 6 Q 25 1, 50 6 T 95 6" fill="none" stroke="#334155" strokeWidth="1.5" strokeDasharray="3 3" />
+                    {/* Active completed path line */}
+                    <path 
+                      d={`M 5 6 Q 25 1, 50 6 T 95 6`} 
+                      fill="none" 
+                      stroke="url(#accentGradient)" 
+                      strokeWidth="2" 
+                      strokeDasharray="100"
+                      strokeDashoffset={100 - pct} 
+                    />
+                    
+                    <defs>
+                      <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+
+                  {/* Pulsing Bus Vehicle Pointer */}
+                  <div 
+                    className="absolute -translate-y-9 -translate-x-1/2 transition-all duration-1000 ease-out flex flex-col items-center animate-pulse"
+                    style={{ left: `${pct}%` }}
+                  >
+                    <div className="px-2 py-1 bg-success text-[8px] font-black text-black rounded-lg shadow-lg border border-success-hover uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Bus size={10} />
+                      <span>{activeTrackedRoute.bus}</span>
+                    </div>
+                    <div className="w-4 h-4 bg-success rounded-full border-4 border-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                  </div>
+
+                  {/* Stations/Stops along path */}
+                  <div className="absolute left-[5%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Depot</span>
+                  </div>
+                  <div className="absolute left-[35%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop A</span>
+                  </div>
+                  <div className="absolute left-[65%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-slate-950"></div>
+                    <span className="text-[8px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider">Stop B</span>
+                  </div>
+                  <div className="absolute left-[95%] top-1/2 -translate-y-1/2 flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                    <span className="text-[8px] text-emerald-400 font-black mt-1.5 uppercase tracking-wider">Campus Gate</span>
+                  </div>
+                </div>
+
+                {/* Telemetry Footer */}
+                <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-900 pt-3 z-10 font-mono">
+                  <span>Speed: <strong className="text-white">{speed} km/h</strong></span>
+                  <span>Sats: <strong className="text-white">12 Connected</strong></span>
+                  <span>Precision (HDOP): <strong className="text-success">0.82 (Excellent)</strong></span>
+                  <span>Hardware Status: <strong className="text-success">Healthy</strong></span>
+                </div>
+              </div>
+
+              {/* Live coordinates feed log */}
+              <div className="p-4 bg-bg-main border border-border rounded-2xl">
+                <span className="text-[9px] text-text-secondary uppercase tracking-widest block font-bold mb-2 ml-1">Live Telemetry Packet Pings</span>
+                <div className="bg-slate-900 text-slate-300 font-mono text-[9px] p-3 rounded-xl max-h-24 overflow-y-auto space-y-1 custom-scrollbar">
+                  <div>[{new Date().toLocaleTimeString()}] GPS ping acknowledged: {activeTrackedRoute.latitude?.toFixed(6)}, {activeTrackedRoute.longitude?.toFixed(6)} | Speed: {speed} km/h | satellites: 12</div>
+                  <div className="opacity-70">[{new Date(Date.now() - 5000).toLocaleTimeString()}] GPS ping acknowledged: {(activeTrackedRoute.latitude - 0.0001)?.toFixed(6)}, {(activeTrackedRoute.longitude - 0.0001)?.toFixed(6)} | Speed: {speed > 0 ? speed - 2 : 0} km/h | satellites: 12</div>
+                  <div className="opacity-40">[{new Date(Date.now() - 10000).toLocaleTimeString()}] GPS ping acknowledged: {(activeTrackedRoute.latitude - 0.0002)?.toFixed(6)}, {(activeTrackedRoute.longitude - 0.0002)?.toFixed(6)} | Speed: {speed > 0 ? speed - 1 : 0} km/h | satellites: 11</div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }
