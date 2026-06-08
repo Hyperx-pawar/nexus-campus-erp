@@ -228,6 +228,45 @@ export default function Providers({ children }) {
     'stud-3': '75.2%'
   });
 
+  const [sharedAttendanceLogs, setSharedAttendanceLogs] = useState(() => {
+    const logs = {};
+    const dates = ['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22'];
+    const students = ['stud-1', 'stud-2', 'stud-3'];
+    const staff = ['staff-1', 'staff-2', 'staff-3', 'staff-4', 'staff-5'];
+    
+    dates.forEach((date, dIdx) => {
+      // Students
+      students.forEach((studentId) => {
+        const subjects = studentId === 'stud-2' 
+          ? ['AC-121', 'BS-122'] 
+          : ['PH-121', 'MA-122', 'CY-123'];
+          
+        subjects.forEach(subj => {
+          let status = 'PRESENT';
+          if (studentId === 'stud-2' && dIdx === 2) {
+            status = 'ABSENT';
+          } else if (studentId === 'stud-3') {
+            if (dIdx === 1) status = 'ABSENT';
+            else if (dIdx === 3) status = 'LATE';
+          }
+          logs[`${date}_${subj}_${studentId}`] = status;
+          logs[`${date}_ALL_${studentId}`] = status;
+        });
+      });
+      
+      // Staff
+      staff.forEach((staffId) => {
+        let status = 'PRESENT';
+        if (staffId === 'staff-3' && dIdx === 2) {
+          status = 'ABSENT';
+        }
+        logs[`${date}_${staffId}`] = status;
+      });
+    });
+    
+    return logs;
+  });
+
   const [sharedRemarks, setSharedRemarks] = useState({
     'stud-1': [
       { teacher: 'Prof. Rajesh Iyer (Physics)', remark: 'Excellent understanding of concepts. Active participant in lab sessions.', date: 'May 15, 2026' },
@@ -1115,6 +1154,8 @@ export default function Providers({ children }) {
       setSharedFeeRecords,
       sharedAttendanceRecords,
       setSharedAttendanceRecords,
+      sharedAttendanceLogs,
+      setSharedAttendanceLogs,
       sharedRemarks,
       setSharedRemarks,
       activeParentId,
