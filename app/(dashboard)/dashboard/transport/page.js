@@ -773,10 +773,24 @@ export default function TransportLogisticsPage() {
                       <td className="py-4 text-right pr-2">
                         {route.gpsEnabled ? (
                           <div className="inline-flex items-center justify-end gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">
-                              <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
-                              Online
-                            </span>
+                            {route.trackingMethod === 'MOBILE' ? (
+                              route.driverBroadcasting ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 text-[9px] font-black uppercase rounded animate-pulse">
+                                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                                  Mobile Connected
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/15 border border-amber-500/35 text-amber-600 text-[9px] font-black uppercase rounded">
+                                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                  Awaiting Driver
+                                </span>
+                              )
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-success/15 border border-success/35 text-success text-[9px] font-black uppercase rounded">
+                                <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
+                                Online
+                              </span>
+                            )}
                             <button
                               onClick={() => setSelectedTrackRoute(route)}
                               className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-white text-[9px] font-black uppercase rounded transition-all flex items-center gap-1 cursor-pointer no-print"
@@ -945,9 +959,11 @@ export default function TransportLogisticsPage() {
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"></div>
                 
                 <div className="flex justify-between items-center z-10">
-                  <span className="text-[10px] bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-success rounded-full animate-ping"></span>
-                    Live GPS Telemetry active
+                  <span className={`text-[10px] ${activeTrackedRoute.trackingMethod === 'MOBILE' && !activeTrackedRoute.driverBroadcasting ? 'bg-amber-500/20 text-amber-500 border-amber-500/30' : 'bg-success/20 text-success border-success/30'} px-2.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1`}>
+                    <span className={`w-1.5 h-1.5 ${activeTrackedRoute.trackingMethod === 'MOBILE' && !activeTrackedRoute.driverBroadcasting ? 'bg-amber-500' : 'bg-success animate-ping'} rounded-full`}></span>
+                    {activeTrackedRoute.trackingMethod === 'MOBILE' 
+                      ? (activeTrackedRoute.driverBroadcasting ? 'Mobile App Streaming' : 'Awaiting Driver Broadcast') 
+                      : 'Live GPS Telemetry active'}
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono">
                     Last ping: {activeTrackedRoute.lastUpdated ? new Date(activeTrackedRoute.lastUpdated).toLocaleTimeString() : 'N/A'}
