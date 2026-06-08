@@ -247,6 +247,7 @@ function SettingsEditor({ activeTenant, activeRole }) {
     board: 'CBSE',
     academicYear: '2026-2027',
     logo: '',
+    brandColor: '#2563EB',
     bankName: 'State Bank of India',
     accountName: '',
     accountNo: '',
@@ -264,6 +265,7 @@ function SettingsEditor({ activeTenant, activeRole }) {
         board: activeTenant.settings?.board || 'CBSE',
         academicYear: activeTenant.settings?.academicYear || '2026-2027',
         logo: activeTenant.logo || '',
+        brandColor: activeTenant.brandColor || '#2563EB',
         bankName: activeTenant.settings?.bank?.bankName || 'State Bank of India',
         accountName: activeTenant.settings?.bank?.accountName || '',
         accountNo: activeTenant.settings?.bank?.accountNo || '',
@@ -433,6 +435,30 @@ function SettingsEditor({ activeTenant, activeRole }) {
                   placeholder="e.g. 2026-2027"
                   required
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Brand Accent Color</label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input 
+                      type="text" 
+                      value={settings.brandColor}
+                      onChange={(e) => setSettings({...settings, brandColor: e.target.value})}
+                      className="w-full text-xs pl-10 font-mono focus:ring-accent"
+                      placeholder="#2563EB"
+                      maxLength={7}
+                      required
+                    />
+                    <div className="absolute left-3.5 top-3.5 w-4 h-4 rounded-md border border-border" style={{ backgroundColor: settings.brandColor }}></div>
+                  </div>
+                  <input 
+                    type="color" 
+                    value={settings.brandColor}
+                    onChange={(e) => setSettings({...settings, brandColor: e.target.value})}
+                    className="w-10 h-10 p-1 bg-bg-main border border-border rounded-xl cursor-pointer"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">

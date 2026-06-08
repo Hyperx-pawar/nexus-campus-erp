@@ -33,6 +33,7 @@ export default function Providers({ children }) {
     email: 'admin@iitd.edu.in',
     affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited',
     estYear: '1961',
+    brandColor: '#2563EB',
     settings: { 
       currency: '₹',
       board: 'UGC',
@@ -55,6 +56,51 @@ export default function Providers({ children }) {
       document.documentElement.className = savedTheme;
     }
   }, []);
+
+  // Color adjusting helper functions
+  const adjustColorBrightness = (hex, percent) => {
+    let R = parseInt(hex.substring(1, 3), 16);
+    let G = parseInt(hex.substring(3, 5), 16);
+    let B = parseInt(hex.substring(5, 7), 16);
+
+    R = parseInt((R * (100 + percent)) / 100);
+    G = parseInt((G * (100 + percent)) / 100);
+    B = parseInt((B * (100 + percent)) / 100);
+
+    R = R < 255 ? R : 255;
+    G = G < 255 ? G : 255;
+    B = B < 255 ? B : 255;
+
+    R = R > 0 ? R : 0;
+    G = G > 0 ? G : 0;
+    B = B > 0 ? B : 0;
+
+    const rHex = R.toString(16).padStart(2, '0');
+    const gHex = G.toString(16).padStart(2, '0');
+    const bHex = B.toString(16).padStart(2, '0');
+
+    return `#${rHex}${gHex}${bHex}`;
+  };
+
+  const hexToRgba = (hex, alpha) => {
+    const R = parseInt(hex.substring(1, 3), 16);
+    const G = parseInt(hex.substring(3, 5), 16);
+    const B = parseInt(hex.substring(5, 7), 16);
+    return `rgba(${R}, ${G}, ${B}, ${alpha})`;
+  };
+
+  // Dynamic white-label color accent application
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeTenant) {
+      const color = activeTenant.brandColor || (theme === 'dark' ? '#3B82F6' : '#2563EB');
+      const hoverColor = adjustColorBrightness(color, theme === 'dark' ? 15 : -15);
+      const glowColor = hexToRgba(color, theme === 'dark' ? 0.15 : 0.08);
+
+      document.documentElement.style.setProperty('--accent', color);
+      document.documentElement.style.setProperty('--accent-hover', hoverColor);
+      document.documentElement.style.setProperty('--accent-glow', glowColor);
+    }
+  }, [activeTenant, theme]);
 
   // Live GPS simulation for enabled transit buses
   useEffect(() => {
@@ -115,6 +161,7 @@ export default function Providers({ children }) {
       email: 'admin@iitd.edu.in', 
       affiliation: 'UGC / AICTE Approved • NAAC A++ Accredited', 
       estYear: '1961',
+      brandColor: '#2563EB',
       settings: {
         board: 'UGC',
         academicYear: '2026-2027',
@@ -138,6 +185,7 @@ export default function Providers({ children }) {
       email: 'admin@dpsrkp.edu.in', 
       affiliation: 'CBSE Affiliated • School No. 1620009', 
       estYear: '1972',
+      brandColor: '#16A34A',
       settings: {
         board: 'CBSE',
         academicYear: '2026-2027',
@@ -161,6 +209,7 @@ export default function Providers({ children }) {
       email: 'admin@ststephens.edu.in', 
       affiliation: 'University of Delhi • NAAC A Accredited', 
       estYear: '1881',
+      brandColor: '#B91C1C',
       settings: {
         board: 'STATE',
         academicYear: '2026-2027',
@@ -1145,6 +1194,7 @@ export default function Providers({ children }) {
       name: tenantData.name,
       subdomain: tenantData.subdomain,
       logo: tenantData.logo,
+      brandColor: tenantData.brandColor || prev.brandColor,
       settings: {
         ...prev.settings,
         board: tenantData.board,
@@ -1167,6 +1217,7 @@ export default function Providers({ children }) {
             name: tenantData.name, 
             subdomain: tenantData.subdomain, 
             logo: tenantData.logo,
+            brandColor: tenantData.brandColor || t.brandColor,
             settings: {
               ...t.settings,
               board: tenantData.board,
