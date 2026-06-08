@@ -451,7 +451,14 @@ export default function Providers({ children }) {
       driver: 'Rajinder Yadav', 
       phone: '+91 87654 32109', 
       tenant_id: 'demo-tenant-1',
-      gpsEnabled: false
+      gpsEnabled: true,
+      trackingMethod: 'MOBILE',
+      gpsDeviceID: 'MOB-DRV-84920',
+      clientOS: 'ANDROID',
+      latitude: 28.5290,
+      longitude: 77.2150,
+      etaMinutes: 10,
+      lastUpdated: new Date().toISOString()
     },
     { 
       id: 'route-3', 
