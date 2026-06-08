@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Providers';
 import { 
   Bus, Navigation, Play, Square, CheckCircle, 
-  AlertTriangle, Compass, Signal, RefreshCw, Copy, ChevronLeft
+  AlertTriangle, Compass, Signal, RefreshCw, Copy, ChevronLeft,
+  Key, Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,19 +18,49 @@ function DriverGPSTelemetryClient() {
   const routeId = searchParams.get('routeId');
   const token = searchParams.get('token');
 
+  // Manual connection state
+  const [manualTokenInput, setManualTokenInput] = useState('');
+  const [resolvedRouteId, setResolvedRouteId] = useState(null);
+  const [resolvedToken, setResolvedToken] = useState(null);
+
   // Resolve target route
   const activeRoute = React.useMemo(() => {
-    if (!routeId) return null;
-    return sharedTransportRoutes.find(r => r.id === routeId);
-  }, [routeId, sharedTransportRoutes]);
+    const targetRouteId = routeId || resolvedRouteId;
+    if (!targetRouteId) return null;
+    return sharedTransportRoutes.find(r => r.id === targetRouteId);
+  }, [routeId, resolvedRouteId, sharedTransportRoutes]);
 
   // Authorization verification
   const isAuthorized = React.useMemo(() => {
     if (!activeRoute) return false;
     if (!activeRoute.gpsEnabled) return false;
     if (activeRoute.trackingMethod !== 'MOBILE') return false;
-    return activeRoute.gpsDeviceID === token;
-  }, [activeRoute, token]);
+    const targetToken = token || resolvedToken;
+    return activeRoute.gpsDeviceID?.toUpperCase() === targetToken?.toUpperCase();
+  }, [activeRoute, token, resolvedToken]);
+
+  const handleManualConnect = (e) => {
+    if (e) e.preventDefault();
+    const cleanedToken = manualTokenInput.trim().toUpperCase();
+    if (!cleanedToken) {
+      toast.error('Please enter your Driver Device Token.');
+      return;
+    }
+
+    const matchedRoute = sharedTransportRoutes.find(r => 
+      r.gpsEnabled && 
+      r.trackingMethod === 'MOBILE' && 
+      r.gpsDeviceID?.toUpperCase() === cleanedToken
+    );
+
+    if (matchedRoute) {
+      setResolvedRouteId(matchedRoute.id);
+      setResolvedToken(matchedRoute.gpsDeviceID);
+      toast.success(`Successfully connected to ${matchedRoute.name}!`);
+    } else {
+      toast.error('Token not recognized. Please check and try again.');
+    }
+  };
 
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [currentLat, setCurrentLat] = useState(activeRoute?.latitude || 28.5276);
@@ -160,21 +191,101 @@ function DriverGPSTelemetryClient() {
   };
 
   if (!isAuthorized) {
+    const showWarning = routeId || token;
+    const mobileRoutes = sharedTransportRoutes.filter(r => r.gpsEnabled && r.trackingMethod === 'MOBILE');
+
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-outfit">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
-          <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto border border-danger/20">
-            <AlertTriangle size={32} />
+          <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
+            <Smartphone size={32} className="animate-pulse" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl font-black uppercase tracking-wider text-slate-100">Telemetry Access Denied</h1>
+            <h1 className="text-xl font-black uppercase tracking-wider text-slate-100">Driver Telemetry Portal</h1>
             <p className="text-xs text-slate-400 leading-relaxed">
-              The provided tracking token is invalid, expired, or does not match a mobile-configured active transit corridor.
+              Connect your mobile device to start broadcasting live GPS coordinates for your assigned transit corridor.
             </p>
           </div>
+
+          {showWarning && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-left">
+              <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-red-300 leading-normal">
+                The connection link you used is invalid or expired. Please enter your device token manually below.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleManualConnect} className="space-y-4 text-left">
+            <div className="space-y-1.5">
+              <label htmlFor="deviceToken" className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                Driver Device Token
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-3.5 text-slate-600">
+                  <Key size={14} />
+                </span>
+                <input
+                  id="deviceToken"
+                  type="text"
+                  placeholder="Enter token (e.g. MOB-DRV-84920)"
+                  value={manualTokenInput}
+                  onChange={(e) => setManualTokenInput(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 focus:border-emerald-500/50 rounded-xl text-xs font-mono text-emerald-400 placeholder:text-slate-600 focus:outline-none transition-all uppercase tracking-wider"
+                />
+              </div>
+            </div>
+            
+            <button 
+              type="submit"
+              className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl transition-all uppercase tracking-wider text-[11px] shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98]"
+            >
+              Authenticate & Link Device
+            </button>
+          </form>
+
+          {mobileRoutes.length > 0 ? (
+            <div className="pt-4 border-t border-slate-800 text-left space-y-2">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">
+                Active Mobile Routes (Simulation Helpers)
+              </span>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                {mobileRoutes.map((route) => (
+                  <button
+                    key={route.id}
+                    onClick={() => {
+                      setManualTokenInput(route.gpsDeviceID || '');
+                      setResolvedRouteId(route.id);
+                      setResolvedToken(route.gpsDeviceID);
+                      toast.success(`Connected to ${route.name}!`);
+                    }}
+                    className="w-full text-left p-2.5 bg-slate-950/40 hover:bg-slate-950 hover:border-slate-800/80 border border-transparent rounded-xl transition-all flex justify-between items-center text-[10px]"
+                  >
+                    <div className="truncate pr-2">
+                      <span className="font-bold text-slate-300 block truncate">{route.name}</span>
+                      <span className="text-slate-500 font-mono text-[9px]">{route.bus}</span>
+                    </div>
+                    <span className="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shrink-0 font-bold">
+                      {route.gpsDeviceID}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="pt-4 border-t border-slate-800 text-left space-y-1.5">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">
+                No Active Mobile Routes Found
+              </span>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                Go to the <span className="underline cursor-pointer text-slate-400 hover:text-slate-300" onClick={() => router.push('/dashboard/transport')}>Transport Dashboard</span> and enable "Driver Mobile GPS" for a route to generate a token.
+              </p>
+            </div>
+          )}
+
           <button 
             onClick={() => router.push('/login')} 
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl transition-all uppercase tracking-wider"
+            className="w-full py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800/60 text-[10px] font-bold rounded-xl text-slate-400 hover:text-slate-300 transition-all uppercase tracking-wider"
           >
             Return to Login Portal
           </button>
@@ -198,6 +309,19 @@ function DriverGPSTelemetryClient() {
         </div>
         
         <div className="flex items-center gap-2">
+          {resolvedRouteId && (
+            <button
+              onClick={() => {
+                setIsBroadcasting(false);
+                setResolvedRouteId(null);
+                setResolvedToken(null);
+                toast.info('Disconnected manually.');
+              }}
+              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[9px] font-bold text-slate-400 hover:text-slate-200 rounded-md transition-all uppercase tracking-wider"
+            >
+              Disconnect
+            </button>
+          )}
           <div className="flex items-center gap-0.5 text-slate-500">
             <Signal size={12} className={isBroadcasting ? "text-emerald-400" : ""} />
             <span className="text-[8px] font-bold font-mono">LTE</span>
@@ -225,7 +349,7 @@ function DriverGPSTelemetryClient() {
             </div>
             <div>
               <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest block">Device Token</span>
-              <span className="text-xs font-bold font-mono text-slate-200 mt-1 block truncate">{token}</span>
+              <span className="text-xs font-bold font-mono text-slate-200 mt-1 block truncate">{activeRoute.gpsDeviceID}</span>
             </div>
           </div>
 
