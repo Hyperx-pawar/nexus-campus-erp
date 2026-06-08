@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { 
   Bus, Search, Plus, Wrench, Calendar, 
   CreditCard, UserCheck, ShieldCheck, ArrowRight, Navigation, MapPin,
-  Clock, ExternalLink, Copy
+  Clock, ExternalLink, Copy, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
