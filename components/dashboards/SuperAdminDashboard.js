@@ -55,7 +55,7 @@ export default function SuperAdminDashboard() {
 
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newSchool, setNewSchool] = useState({ name: '', subdomain: '', email: '', phone: '' });
+  const [newSchool, setNewSchool] = useState({ name: '', subdomain: '', customDomain: '', email: '', phone: '' });
   const [newAdmin, setNewAdmin] = useState({ email: '', password: '', firstName: '', lastName: '', tenantId: '' });
   const [filterActiveOnly, setFilterActiveOnly] = useState(true);
 
@@ -227,7 +227,10 @@ export default function SuperAdminDashboard() {
     try {
       const { data, error } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      setTenants(data);
+      setTenants((data || []).map(t => ({
+        ...t,
+        customDomain: t.custom_domain || t.customDomain || ''
+      })));
     } catch (err) {
       const errMsg = err?.message || '';
       if (errMsg.includes('Failed to fetch') || errMsg.includes('fetch') || (typeof navigator !== 'undefined' && !navigator.onLine)) {
@@ -272,6 +275,7 @@ export default function SuperAdminDashboard() {
         {
           name: newSchool.name,
           subdomain: subClean,
+          custom_domain: newSchool.customDomain.toLowerCase().trim() || null,
           email: newSchool.email,
           phone: newSchool.phone
         }
@@ -288,6 +292,7 @@ export default function SuperAdminDashboard() {
         id: insertedId,
         name: newSchool.name,
         subdomain: subClean,
+        customDomain: newSchool.customDomain.toLowerCase().trim(),
         logo: '',
         address: 'New Delhi, India',
         phone: newSchool.phone || '+91 98765 43210',
@@ -311,7 +316,7 @@ export default function SuperAdminDashboard() {
 
       setAvailableTenants(prev => [...prev, newTenant]);
       toast.success(`School "${newSchool.name}" successfully onboarded!`);
-      setNewSchool({ name: '', subdomain: '', email: '', phone: '' });
+      setNewSchool({ name: '', subdomain: '', customDomain: '', email: '', phone: '' });
       
       setTimeout(() => {
         fetchTenants();
@@ -755,6 +760,15 @@ export default function SuperAdminDashboard() {
                           <p className="text-sm font-bold text-text-primary">{tenant.name}</p>
                           <div className="flex flex-wrap items-center gap-3 text-[10px] text-text-secondary">
                             <span className="font-bold text-accent">{tenant.subdomain}.campuserp.in</span>
+                            {tenant.customDomain && (
+                              <>
+                                <span className="opacity-40">•</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                                  <span>🌐</span>
+                                  <span>{tenant.customDomain}</span>
+                                </span>
+                              </>
+                            )}
                             <span className="opacity-40">•</span>
                             <span>{tenant.email || 'No email'}</span>
                             <span className="opacity-40">•</span>
@@ -857,6 +871,13 @@ export default function SuperAdminDashboard() {
                   {subdomainValidation.message}
                 </p>
               </div>
+              <input 
+                type="text" 
+                placeholder="Custom Domain (Optional - e.g. portal.dpsdelhi.in)"
+                value={newSchool.customDomain}
+                onChange={(e) => setNewSchool({...newSchool, customDomain: e.target.value})}
+                className="w-full text-xs font-mono"
+              />
               <input 
                 type="email" 
                 placeholder="Contact Email"

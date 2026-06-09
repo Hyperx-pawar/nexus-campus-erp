@@ -244,6 +244,7 @@ function SettingsEditor({ activeTenant, activeRole }) {
   const [settings, setSettings] = useState({
     name: '',
     subdomain: '',
+    customDomain: '',
     board: 'CBSE',
     academicYear: '2026-2027',
     logo: '',
@@ -262,6 +263,7 @@ function SettingsEditor({ activeTenant, activeRole }) {
       setSettings({
         name: activeTenant.name || '',
         subdomain: activeTenant.subdomain || '',
+        customDomain: activeTenant.customDomain || '',
         board: activeTenant.settings?.board || 'CBSE',
         academicYear: activeTenant.settings?.academicYear || '2026-2027',
         logo: activeTenant.logo || '',
@@ -408,6 +410,17 @@ function SettingsEditor({ activeTenant, activeRole }) {
                     {activeRole === 'SUPER_ADMIN' ? '.campuserp.in' : '.campus.in'}
                   </span>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Custom Domain (Optional)</label>
+                <input 
+                  type="text" 
+                  value={settings.customDomain}
+                  onChange={(e) => setSettings({...settings, customDomain: e.target.value})}
+                  className="w-full text-xs font-mono"
+                  placeholder="e.g. portal.dpsdelhi.edu.in"
+                />
               </div>
 
               <div className="space-y-1">

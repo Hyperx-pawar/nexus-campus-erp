@@ -28,6 +28,7 @@ export default function Providers({ children }) {
     id: 'demo-tenant-1',
     name: 'Indian Institute of Technology (IIT) Delhi',
     subdomain: 'iitd',
+    customDomain: 'portal.iitd.ac.in',
     address: 'Hauz Khas, New Delhi – 110016, Delhi, India',
     phone: '+91-11-2659-1777',
     email: 'admin@iitd.edu.in',
@@ -111,6 +112,7 @@ export default function Providers({ children }) {
       id: 'demo-tenant-1', 
       name: 'Indian Institute of Technology (IIT) Delhi', 
       subdomain: 'iitd', 
+      customDomain: 'portal.iitd.ac.in',
       logo: '', 
       address: 'Hauz Khas, New Delhi – 110016, Delhi, India', 
       phone: '+91-11-2659-1777', 
@@ -135,6 +137,7 @@ export default function Providers({ children }) {
       id: 'demo-tenant-2', 
       name: 'Delhi Public School (DPS) RK Puram', 
       subdomain: 'dpsrkp', 
+      customDomain: 'portal.dpsrkp.in',
       logo: '', 
       address: 'Sector 4, R.K. Puram, New Delhi – 110022', 
       phone: '+91-11-2617-6940', 
@@ -159,6 +162,7 @@ export default function Providers({ children }) {
       id: 'demo-tenant-3', 
       name: "St. Stephen's College", 
       subdomain: 'ststephens', 
+      customDomain: 'stephens.edu',
       logo: '', 
       address: 'University Enclave, Delhi – 110007', 
       phone: '+91-11-2766-7271', 
@@ -774,6 +778,36 @@ export default function Providers({ children }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Client-side hostname active tenant resolver (Subdomain or Custom Domain)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname.toLowerCase();
+      // Ignore base dev environments or generic deployments
+      if (
+        hostname !== 'localhost' && 
+        hostname !== '127.0.0.1' && 
+        hostname !== 'nexus-erp-snowy.vercel.app'
+      ) {
+        // Try custom domain match first
+        let matchedTenant = availableTenants.find(t => t.customDomain && t.customDomain.toLowerCase() === hostname);
+        
+        // Try subdomain match second
+        if (!matchedTenant) {
+          const parts = hostname.split('.');
+          if (parts.length > 2) {
+            const possibleSub = parts[0];
+            matchedTenant = availableTenants.find(t => t.subdomain.toLowerCase() === possibleSub);
+          }
+        }
+        
+        if (matchedTenant && matchedTenant.id !== activeTenant.id) {
+          setActiveTenant(matchedTenant);
+          console.log(`[White-Label] Auto-resolved active campus from domain hostname: ${matchedTenant.name}`);
+        }
+      }
+    }
+  }, [availableTenants, activeTenant.id]);
+
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -1193,6 +1227,7 @@ export default function Providers({ children }) {
       ...prev,
       name: tenantData.name,
       subdomain: tenantData.subdomain,
+      customDomain: tenantData.customDomain,
       logo: tenantData.logo,
       brandColor: tenantData.brandColor || prev.brandColor,
       settings: {
@@ -1216,6 +1251,7 @@ export default function Providers({ children }) {
             ...t, 
             name: tenantData.name, 
             subdomain: tenantData.subdomain, 
+            customDomain: tenantData.customDomain,
             logo: tenantData.logo,
             brandColor: tenantData.brandColor || t.brandColor,
             settings: {
