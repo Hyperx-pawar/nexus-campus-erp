@@ -1248,6 +1248,7 @@ export default function Providers({ children }) {
       realRole: activeRole,
       activeTenant,
       availableTenants,
+      setAvailableTenants,
       login,
       logout,
       switchRole,
