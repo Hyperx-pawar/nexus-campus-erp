@@ -187,9 +187,9 @@ export default function Providers({ children }) {
 
   // Shared state for multi-role dynamic simulation
   const [sharedStudents, setSharedStudents] = useState([
-    { id: 'stud-1', first_name: 'Aarav', last_name: 'Patel', admission_no: 'ADM2026/049', roll_no: '24', date_of_birth: '2010-04-12', gender: 'MALE', category: 'GENERAL', aadhaar_no: '4839 2840 9283', address: 'Saket, New Delhi', parent_id: 'parent-1', class_id: 'class-1', tenant_id: 'demo-tenant-1' },
-    { id: 'stud-2', first_name: 'Diya', last_name: 'Sharma', admission_no: 'ADM2026/102', roll_no: '12', date_of_birth: '2011-08-19', gender: 'FEMALE', category: 'OBC', aadhaar_no: '9283 4839 1049', address: 'Indiranagar, Bangalore', parent_id: 'parent-2', class_id: 'class-2', tenant_id: 'demo-tenant-1' },
-    { id: 'stud-3', first_name: 'Kabir', last_name: 'Verma', admission_no: 'ADM2026/182', roll_no: '08', date_of_birth: '2010-12-05', gender: 'MALE', category: 'SC', aadhaar_no: '8839 2039 1204', address: 'Salt Lake, Kolkata', parent_id: 'parent-3', class_id: 'class-3', tenant_id: 'demo-tenant-1' }
+    { id: 'stud-1', first_name: 'Aarav', last_name: 'Patel', admission_no: 'ADM2026/049', roll_no: 'A-01', date_of_birth: '2010-04-12', gender: 'MALE', category: 'GENERAL', aadhaar_no: '4839 2840 9283', address: 'Saket, New Delhi', parent_id: 'parent-1', class_id: 'class-1', tenant_id: 'demo-tenant-1' },
+    { id: 'stud-2', first_name: 'Diya', last_name: 'Sharma', admission_no: 'ADM2026/102', roll_no: 'D-01', date_of_birth: '2011-08-19', gender: 'FEMALE', category: 'OBC', aadhaar_no: '9283 4839 1049', address: 'Indiranagar, Bangalore', parent_id: 'parent-2', class_id: 'class-2', tenant_id: 'demo-tenant-1' },
+    { id: 'stud-3', first_name: 'Kabir', last_name: 'Verma', admission_no: 'ADM2026/182', roll_no: 'K-01', date_of_birth: '2010-12-05', gender: 'MALE', category: 'SC', aadhaar_no: '8839 2039 1204', address: 'Salt Lake, Kolkata', parent_id: 'parent-3', class_id: 'class-3', tenant_id: 'demo-tenant-1' }
   ]);
 
   const [sharedParents, setSharedParents] = useState([

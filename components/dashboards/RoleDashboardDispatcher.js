@@ -1534,16 +1534,17 @@ function ParentDashboard() {
       + (addons.transport.enabled ? addons.transport.fee : 0)
       + (addons.hostel.enabled ? addons.hostel.fee : 0);
 
-    const prevFees = sharedFeeRecords[child.id] || { total: totalFee, paid: 0, remaining: totalFee, status: 'UNPAID', history: [] };
+    const prevFees = sharedFeeRecords[child.id] || { total: totalFee, paid: 0, remaining: totalFee, status: 'UNPAID', history: [], discount: 0 };
     const amountPaid = amountPaidOverride !== undefined ? amountPaidOverride : prevFees.remaining;
     const newPaid = prevFees.paid + amountPaid;
-    const newRemaining = Math.max(0, prevFees.remaining - amountPaid);
-    const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+    const newRemaining = Math.max(0, totalFee - newPaid - (prevFees.discount || 0));
+    const newStatus = newRemaining === 0 ? 'PAID' : (newPaid > 0 || (prevFees.discount || 0) > 0) ? 'PARTIAL' : 'UNPAID';
     const receiptId = `ONL-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
 
     // Update fee records
     const updatedRecord = {
+      ...prevFees,
       total: totalFee,
       paid: newPaid,
       remaining: newRemaining,
@@ -2566,19 +2567,27 @@ function ParentDashboard() {
 
                   {/* Totals */}
                   <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
-                    {[
-                      { label: 'Total Fee', val: selectedReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' },
-                      { label: 'Previously Paid', val: selectedReceipt.newPaid - selectedReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
-                      { label: 'Amount Paid Now', val: selectedReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
-                      { label: 'Balance Remaining', val: selectedReceipt.newRemaining, color: selectedReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true },
-                    ].map((r, i) => (
-                      <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-                        <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
-                        <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
-                          {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
-                        </span>
-                      </div>
-                    ))}
+                    {(() => {
+                      const rows = [
+                        { label: 'Total Fee', val: selectedReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' }
+                      ];
+                      if (selectedReceipt.discount > 0) {
+                        rows.push({ label: 'Discount Applied Now', val: selectedReceipt.discount, color: 'text-amber-600', bg: 'bg-amber-50', bold: true });
+                      }
+                      rows.push(
+                        { label: 'Previously Paid', val: selectedReceipt.newPaid - selectedReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
+                        { label: 'Amount Paid Now', val: selectedReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
+                        { label: 'Balance Remaining', val: selectedReceipt.newRemaining, color: selectedReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true }
+                      );
+                      return rows.map((r, i) => (
+                        <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+                          <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
+                          <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
+                            {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
+                          </span>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
 

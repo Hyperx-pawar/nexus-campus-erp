@@ -12,6 +12,30 @@ import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Modal from '@/components/Modal';
 import { uploadFileToBucket } from '@/lib/storage';
+
+// Helper to suggest alphabetical roll number sequentially per class
+const suggestRollNumber = (firstName, classId, existingStudents, tenantId) => {
+  if (!firstName || !classId) return '';
+  const initial = firstName.trim().charAt(0).toUpperCase();
+  if (!/^[A-Z]$/.test(initial)) return '';
+  const classStudents = existingStudents.filter(s => s.class_id === classId && (s.tenant_id || 'demo-tenant-1') === tenantId);
+  
+  const matchRegex = new RegExp(`^${initial}-(\\d+)$`);
+  let maxSeq = 0;
+  classStudents.forEach(s => {
+    if (s.roll_no) {
+      const match = s.roll_no.match(matchRegex);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+  });
+  
+  const nextSeqStr = String(maxSeq + 1).padStart(2, '0');
+  return `${initial}-${nextSeqStr}`;
+};
+
 export default function AdmissionsPage() {
   const router = useRouter();
   const {
@@ -144,7 +168,7 @@ export default function AdmissionsPage() {
     setSelectedCandidate(app);
     
     const baseClassFee = sharedClasses.find(c => c.id === app.class_id)?.base_fee || 0;
-    const randomRoll = Math.floor(10 + Math.random() * 80).toString();
+    const suggestedRoll = suggestRollNumber(app.first_name, app.class_id, sharedStudents, activeTenant.id);
     
     // Compute next sequential admission number
     const year = new Date().getFullYear();
@@ -165,7 +189,7 @@ export default function AdmissionsPage() {
       firstName: app.first_name || '',
       lastName: app.last_name || '',
       admissionNo: admNo,
-      rollNo: randomRoll,
+      rollNo: suggestedRoll,
       dateOfBirth: '2010-06-15',
       gender: 'MALE',
       bloodGroup: 'O+',
@@ -298,7 +322,29 @@ export default function AdmissionsPage() {
         setSharedAdmissions(updatedApps);
       }
 
-      toast.success(`Candidate "${approveFormData.firstName}" approved! Enrolled in Student Registry...`);
+      const cleanInitial = approveFormData.firstName.trim().toLowerCase().replace(/\s+/g, '');
+      const cleanLast = approveFormData.lastName.trim().toLowerCase().replace(/\s+/g, '');
+      const stdEmail = cleanLast ? `${cleanInitial}.${cleanLast}@${activeTenant.subdomain}.edu.in` : `${cleanInitial}@${activeTenant.subdomain}.edu.in`;
+
+      toast.success(
+        <div className="space-y-1.5 p-1">
+          <p className="font-black text-xs text-emerald-600 uppercase tracking-wider">🎉 Candidate Approved & Enrolled!</p>
+          <div className="text-[10px] text-text-secondary space-y-1">
+            <div>
+              <span className="font-bold text-text-primary block">Student Credentials:</span>
+              Login ID: <span className="font-mono text-accent font-bold select-all">{stdEmail}</span><br />
+              Password (Aadhaar): <span className="font-mono text-accent font-bold select-all">{rawAadhaar || 'N/A'}</span>
+            </div>
+            <div className="h-px bg-slate-200/60 my-1" />
+            <div>
+              <span className="font-bold text-text-primary block">Parent Credentials:</span>
+              Login ID: <span className="font-mono text-accent font-bold select-all">{parent.email}</span><br />
+              Password (Phone): <span className="font-mono text-accent font-bold select-all">{parent.phone}</span>
+            </div>
+          </div>
+        </div>,
+        { duration: 15000 }
+      );
       setShowApproveModal(false);
       setLoading(false);
 
@@ -874,6 +920,19 @@ export default function AdmissionsPage() {
                     onChange={(e) => setApproveFormData({...approveFormData, admissionNo: e.target.value})}
                     className="w-full text-xs"
                     required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Roll Number</label>
+                    <span className="text-[8px] text-accent font-black uppercase tracking-wider bg-accent/5 px-2 py-0.5 rounded border border-accent/10">Auto-suggested</span>
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. A-01"
+                    value={approveFormData.rollNo}
+                    onChange={(e) => setApproveFormData({...approveFormData, rollNo: e.target.value})}
+                    className="w-full text-xs font-mono"
                   />
                 </div>
 

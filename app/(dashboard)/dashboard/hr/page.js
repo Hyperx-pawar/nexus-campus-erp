@@ -175,7 +175,22 @@ export default function HRPayrollPage() {
       };
 
       setSharedStaff([newStaff, ...sharedStaff]);
-      toast.success(`Faculty member "${formData.firstName} ${formData.lastName}" onboarded successfully with ID: ${empId}!`);
+      toast.success(
+        <div className="space-y-1.5 p-1">
+          <p className="font-black text-xs text-emerald-600 uppercase tracking-wider">🎉 Staff Onboarded Successfully!</p>
+          <div className="text-[10px] text-text-secondary space-y-1">
+            <div>
+              Faculty: <span className="font-bold text-text-primary">{newStaff.first_name} {newStaff.last_name}</span> (ID: <span className="font-mono text-text-primary font-bold">{empId}</span>)
+            </div>
+            <div className="h-px bg-slate-200/60 my-1" />
+            <div>
+              Login ID (Email): <span className="font-mono text-accent font-bold select-all">{newStaff.email}</span><br />
+              Password (PAN): <span className="font-mono text-accent font-bold select-all">{uppercasePan}</span>
+            </div>
+          </div>
+        </div>,
+        { duration: 15000 }
+      );
       
       setFormData({
         firstName: '',

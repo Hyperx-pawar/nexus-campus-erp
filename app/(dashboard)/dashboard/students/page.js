@@ -12,7 +12,32 @@ import { toast } from 'sonner';
 import Modal from '@/components/Modal';
 import { uploadFileToBucket } from '@/lib/storage';
 import * as XLSX from 'xlsx';
+
+// Helper to suggest alphabetical roll number sequentially per class
+const suggestRollNumber = (firstName, classId, existingStudents, tenantId) => {
+  if (!firstName || !classId) return '';
+  const initial = firstName.trim().charAt(0).toUpperCase();
+  if (!/^[A-Z]$/.test(initial)) return '';
+  const classStudents = existingStudents.filter(s => s.class_id === classId && (s.tenant_id || 'demo-tenant-1') === tenantId);
+  
+  const matchRegex = new RegExp(`^${initial}-(\\d+)$`);
+  let maxSeq = 0;
+  classStudents.forEach(s => {
+    if (s.roll_no) {
+      const match = s.roll_no.match(matchRegex);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    }
+  });
+  
+  const nextSeqStr = String(maxSeq + 1).padStart(2, '0');
+  return `${initial}-${nextSeqStr}`;
+};
+
 export default function StudentRegistryPage() {
+  const [isRollNoManuallyEdited, setIsRollNoManuallyEdited] = useState(false);
   const {
     supabase, 
     activeTenant, 
@@ -349,6 +374,7 @@ export default function StudentRegistryPage() {
   const handleOpenEditForm = (student) => {
     const parent = sharedParents.find(p => p.id === student.parent_id) || {};
     setEditingStudentId(student.id);
+    setIsRollNoManuallyEdited(true);
     const rawAadhaar = student.aadhaar_no ? student.aadhaar_no.replace(/\s+/g, '') : '';
     setFormData({
       firstName: student.first_name || '',
@@ -505,6 +531,22 @@ export default function StudentRegistryPage() {
     sharedHostelBlocks
   ]);
 
+  // Auto-generate roll number based on First Name and Class ID when not manually edited
+  useEffect(() => {
+    if (!editingStudentId && !isRollNoManuallyEdited) {
+      const suggestion = suggestRollNumber(
+        formData.firstName,
+        formData.classId,
+        sharedStudents,
+        activeTenant.id
+      );
+      setFormData(prev => ({
+        ...prev,
+        rollNo: suggestion
+      }));
+    }
+  }, [formData.firstName, formData.classId, editingStudentId, isRollNoManuallyEdited, sharedStudents, activeTenant.id]);
+
   const handleOnboard = async (e) => {
     e.preventDefault();
     if (!formData.firstName || !formData.lastName || !formData.admissionNo || !formData.classId) {
@@ -647,7 +689,33 @@ export default function StudentRegistryPage() {
         };
 
         addStudentAndParent(student, parent);
-        toast.success(`Student "${formData.firstName}" and Parent "${formData.parentFirstName}" linked successfully! (Term Fee: ₹${(formData.totalFee || 0).toLocaleString('en-IN')})`);
+        
+        const cleanInitial = formData.firstName.trim().toLowerCase().replace(/\s+/g, '');
+        const cleanLast = formData.lastName.trim().toLowerCase().replace(/\s+/g, '');
+        const stdEmail = cleanLast ? `${cleanInitial}.${cleanLast}@${activeTenant.subdomain}.edu.in` : `${cleanInitial}@${activeTenant.subdomain}.edu.in`;
+
+        toast.success(
+          <div className="space-y-1.5 p-1">
+            <p className="font-black text-xs text-emerald-600 uppercase tracking-wider">🎉 Enrollment Success!</p>
+            <div className="text-[10px] text-text-secondary space-y-1">
+              <div>
+                <span className="font-bold text-text-primary block">Student Credentials:</span>
+                Login ID: <span className="font-mono text-accent font-bold select-all">{stdEmail}</span><br />
+                Password (Aadhaar): <span className="font-mono text-accent font-bold select-all">{rawAadhaar || 'N/A'}</span>
+              </div>
+              <div className="h-px bg-slate-200/60 my-1" />
+              <div>
+                <span className="font-bold text-text-primary block">Parent Credentials:</span>
+                Login ID: <span className="font-mono text-accent font-bold select-all">{parent.email}</span><br />
+                Password (Phone): <span className="font-mono text-accent font-bold select-all">{parent.phone}</span>
+              </div>
+              <div className="text-[8.5px] text-text-secondary mt-1 block">
+                Term Tuition Fee Allocated: <span className="font-bold text-text-primary">₹{(formData.totalFee || 0).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>,
+          { duration: 15000 }
+        );
       }
       
       // Reset form
@@ -668,6 +736,237 @@ export default function StudentRegistryPage() {
       setLoading(false);
       toast.error('Failed to submit student record.');
     }
+  };
+
+  const handleRegenerateRollNumbers = () => {
+    if (!selectedClassFilter) return;
+    const targetClass = sharedClasses.find(c => c.id === selectedClassFilter);
+    const className = targetClass ? targetClass.name : 'Selected Class';
+
+    if (!confirm(`Are you sure you want to auto-assign alphabetical roll numbers starting from 01 for all students in ${className}? This will overwrite their current roll numbers.`)) {
+      return;
+    }
+
+    // Filter students in this class
+    const classStudents = sharedStudents.filter(s => s.class_id === selectedClassFilter && (s.tenant_id || 'demo-tenant-1') === activeTenant.id);
+    
+    if (classStudents.length === 0) {
+      toast.error(`No students found in ${className} to assign roll numbers.`);
+      return;
+    }
+
+    // Sort them alphabetically by First Name, then Last Name
+    const sorted = [...classStudents].sort((a, b) => {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    // Generate roll numbers: sequential per initial
+    const initialCounts = {};
+    const updatedRollNos = {};
+    sorted.forEach(s => {
+      const initial = (s.first_name || 'A').trim().charAt(0).toUpperCase();
+      const cleanInitial = /^[A-Z]$/.test(initial) ? initial : 'A';
+      if (!initialCounts[cleanInitial]) {
+        initialCounts[cleanInitial] = 0;
+      }
+      initialCounts[cleanInitial] += 1;
+      updatedRollNos[s.id] = `${cleanInitial}-${String(initialCounts[cleanInitial]).padStart(2, '0')}`;
+    });
+
+    // Update state
+    const updatedStudentsList = sharedStudents.map(s => {
+      if (s.class_id === selectedClassFilter && (s.tenant_id || 'demo-tenant-1') === activeTenant.id) {
+        return {
+          ...s,
+          roll_no: updatedRollNos[s.id] || s.roll_no
+        };
+      }
+      return s;
+    });
+
+    setSharedStudents(updatedStudentsList);
+    toast.success(`Successfully auto-sequenced roll numbers alphabetically for all ${sorted.length} students in ${className}!`);
+  };
+
+  const handlePrintDirectory = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Pop-up blocker is preventing export. Please allow pop-ups for this site.');
+      return;
+    }
+
+    const className = selectedClassFilter ? getClassName(selectedClassFilter) : 'All Classes';
+    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Generate table rows
+    const rowsHtml = filteredStudents.map((s, idx) => {
+      const initial = s.first_name.trim().toLowerCase().replace(/\s+/g, '');
+      const last = s.last_name.trim().toLowerCase().replace(/\s+/g, '');
+      const stdEmail = last ? `${initial}.${last}@${activeTenant.subdomain}.edu.in` : `${initial}@${activeTenant.subdomain}.edu.in`;
+      
+      const parent = sharedParents.find(p => p.id === s.parent_id) || {};
+      const parentName = parent.first_name ? `${parent.first_name} ${parent.last_name || ''}` : 'Unlinked';
+      const parentEmail = parent.email || 'N/A';
+
+      // Format Aadhaar
+      const rawAadhaar = s.aadhaar_no ? s.aadhaar_no.replace(/\s+/g, '') : 'N/A';
+
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td style="font-weight: bold;">${s.first_name} ${s.last_name}</td>
+          <td>${getClassName(s.class_id)}</td>
+          <td style="font-family: monospace;">${s.admission_no}</td>
+          <td style="font-family: monospace; font-weight: bold;">${s.roll_no || 'N/A'}</td>
+          <td style="font-family: monospace;">${stdEmail}</td>
+          <td>${parentName}<br/><small style="color: #64748b;">${parentEmail}</small></td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${activeTenant.name} - Student Directory Ledger</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap');
+            body {
+              font-family: 'Outfit', sans-serif;
+              color: #0f172a;
+              padding: 40px;
+              margin: 0;
+              background-color: #ffffff;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 25px;
+              border-bottom: 2px solid #f1f5f9;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              font-size: 26px;
+              font-weight: 900;
+              margin: 0 0 4px 0;
+              letter-spacing: -0.025em;
+              color: ${activeTenant.brandColor || '#3b82f6'};
+            }
+            .header h2 {
+              font-size: 11px;
+              font-weight: 700;
+              margin: 0 0 10px 0;
+              text-transform: uppercase;
+              color: #64748b;
+              letter-spacing: 0.1em;
+            }
+            .meta-grid {
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              margin-bottom: 25px;
+              font-weight: 500;
+              color: #475569;
+              background-color: #f8fafc;
+              padding: 12px 18px;
+              border-radius: 16px;
+              border: 1px solid #f1f5f9;
+            }
+            .meta-grid div:last-child {
+              text-align: right;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11px;
+              text-align: left;
+            }
+            th {
+              background-color: #f8fafc;
+              border-bottom: 2px solid #e2e8f0;
+              color: #334155;
+              font-weight: 800;
+              text-transform: uppercase;
+              font-size: 9px;
+              letter-spacing: 0.05em;
+              padding: 12px 10px;
+            }
+            td {
+              border-bottom: 1px solid #f1f5f9;
+              padding: 12px 10px;
+              vertical-align: middle;
+            }
+            tr:nth-child(even) td {
+              background-color: #fafafa;
+            }
+            .footer {
+              text-align: center;
+              font-size: 9px;
+              color: #94a3b8;
+              margin-top: 50px;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 20px;
+            }
+            @media print {
+              body {
+                padding: 10px;
+              }
+              .meta-grid {
+                background-color: transparent !important;
+                border: none;
+                padding: 12px 0;
+              }
+              th {
+                background-color: transparent !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${activeTenant.name}</h1>
+            <h2>Student Directory & Access Credentials Ledger</h2>
+          </div>
+          <div class="meta-grid">
+            <div>
+              <strong>Class Filter:</strong> ${className}<br/>
+              <strong>Total Records:</strong> ${filteredStudents.length} Students
+            </div>
+            <div>
+              <strong>Academic Session:</strong> ${(activeTenant.settings?.academicYear || '2025-2026')}<br/>
+              <strong>Exported On:</strong> ${dateStr}
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px;">S.No</th>
+                <th>Student Name</th>
+                <th>Class</th>
+                <th>Admission No</th>
+                <th>Roll No</th>
+                <th>Student Login ID</th>
+                <th>Parent Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated by ${activeTenant.name} ERP Administration Portal • Secure Credentials Sheet
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const getParentName = (parentId) => {
@@ -760,6 +1059,7 @@ export default function StudentRegistryPage() {
     const nextNumStr = String(maxNum + 1).padStart(3, '0');
     const nextAdmNo = `ADM${year}/${nextNumStr}`;
 
+    setIsRollNoManuallyEdited(false);
     setFormData({
       firstName: '',
       lastName: '',
@@ -910,6 +1210,8 @@ export default function StudentRegistryPage() {
       }
     });
 
+    const batchRollSequence = {};
+
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -934,13 +1236,38 @@ export default function StudentRegistryPage() {
       const nextNumStr = String(maxNum + 1 + result.length).padStart(3, '0');
       const admNo = `ADM${year}/${nextNumStr}`;
 
+      // Calculate next sequential alphabetical roll number
+      const initial = firstName.trim().charAt(0).toUpperCase();
+      let rollNo = 'A-01'; // Fallback
+      if (/^[A-Z]$/.test(initial)) {
+        const classKey = `${resolvedClass.id}_${initial}`;
+        if (batchRollSequence[classKey] === undefined) {
+          // Find max existing sequence in database
+          const classStudents = sharedStudents.filter(s => s.class_id === resolvedClass.id && (s.tenant_id || 'demo-tenant-1') === activeTenant.id);
+          const matchRegex = new RegExp(`^${initial}-(\\d+)$`);
+          let maxSeq = 0;
+          classStudents.forEach(s => {
+            if (s.roll_no) {
+              const match = s.roll_no.match(matchRegex);
+              if (match) {
+                const seq = parseInt(match[1], 10);
+                if (seq > maxSeq) maxSeq = seq;
+              }
+            }
+          });
+          batchRollSequence[classKey] = maxSeq;
+        }
+        batchRollSequence[classKey] += 1;
+        rollNo = `${initial}-${String(batchRollSequence[classKey]).padStart(2, '0')}`;
+      }
+
       result.push({
         student: {
           id: `stud-bulk-${idx}-${Date.now()}`,
           first_name: firstName,
           last_name: lastName || '',
           admission_no: admNo,
-          roll_no: Math.floor(10 + Math.random() * 80).toString(),
+          roll_no: rollNo,
           date_of_birth: '2010-06-15',
           gender: 'MALE',
           blood_group: 'O+',
@@ -1001,6 +1328,14 @@ export default function StudentRegistryPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
+            <button 
+              onClick={handlePrintDirectory}
+              className="px-5 py-3 bg-bg-sidebar hover:bg-slate-50 border border-border text-text-primary text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
+              title="Print active student list or save as PDF"
+            >
+              <FileText size={14} className="text-accent" />
+              <span>Export PDF / Print</span>
+            </button>
             <button 
               onClick={() => setShowBulkModal(true)}
               className="px-5 py-3 bg-bg-sidebar hover:bg-slate-50 border border-border text-text-primary text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
@@ -1296,6 +1631,24 @@ export default function StudentRegistryPage() {
                     onChange={(e) => setFormData({...formData, admissionNo: e.target.value})}
                     className="w-full text-xs"
                     required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Roll Number</label>
+                    {!editingStudentId && (
+                      <span className="text-[8px] text-accent font-black uppercase tracking-wider bg-accent/5 px-2 py-0.5 rounded border border-accent/10">Auto-suggesting</span>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. A-01"
+                    value={formData.rollNo}
+                    onChange={(e) => {
+                      setIsRollNoManuallyEdited(true);
+                      setFormData({...formData, rollNo: e.target.value});
+                    }}
+                    className="w-full text-xs font-mono"
                   />
                 </div>
 
@@ -2030,22 +2383,36 @@ export default function StudentRegistryPage() {
             />
           </div>
 
-          {/* Class Filter Dropdown (Class View Promotion Integration) */}
-          <div className="flex items-center gap-2 bg-slate-100/50 border border-border rounded-2xl px-4 py-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary whitespace-nowrap">Filter Class:</span>
-            <select
-              value={selectedClassFilter}
-              onChange={(e) => {
-                setSelectedClassFilter(e.target.value);
-                setSelectedStudentIds([]); // Reset bulk selections on class change
-              }}
-              className="bg-transparent text-xs text-text-primary outline-none py-1.5 cursor-pointer font-bold font-outfit"
-            >
-              <option value="" className="bg-bg-sidebar">All Classes</option>
-              {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
-                <option key={cls.id} value={cls.id} className="bg-bg-sidebar">{cls.name}</option>
-              ))}
-            </select>
+          {/* Class Filter Dropdown & Auto-Sequence Roll Numbers */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-100/50 border border-border rounded-2xl px-4 py-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary whitespace-nowrap">Filter Class:</span>
+              <select
+                value={selectedClassFilter}
+                onChange={(e) => {
+                  setSelectedClassFilter(e.target.value);
+                  setSelectedStudentIds([]); // Reset bulk selections on class change
+                }}
+                className="bg-transparent text-xs text-text-primary outline-none py-1.5 cursor-pointer font-bold font-outfit"
+              >
+                <option value="" className="bg-bg-sidebar">All Classes</option>
+                {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
+                  <option key={cls.id} value={cls.id} className="bg-bg-sidebar">{cls.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {isAdmin && selectedClassFilter && (
+              <button
+                type="button"
+                onClick={handleRegenerateRollNumbers}
+                className="px-4 py-2 bg-accent/10 border border-accent/30 hover:bg-accent hover:text-white text-accent text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-sm"
+                title="Sort all students in this class alphabetically and assign sequential roll numbers (e.g. A-01, A-02, B-01...)"
+              >
+                <Sparkles size={12} />
+                <span>Auto-Sequence Roll Nos</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2151,8 +2518,15 @@ export default function StudentRegistryPage() {
                       </div>
                     )}
                     <div>
-                      <span>{student.first_name} {student.last_name}</span>
-                      <span className="text-[9px] text-text-secondary block font-normal">{student.address || 'Address unlisted'}</span>
+                      <span className="block">{student.first_name} {student.last_name}</span>
+                      <span className="text-[9px] text-text-secondary block font-semibold font-mono select-all mt-0.5" title="Student Login ID">
+                        {(() => {
+                          const initial = student.first_name.trim().toLowerCase().replace(/\s+/g, '');
+                          const last = student.last_name.trim().toLowerCase().replace(/\s+/g, '');
+                          return last ? `${initial}.${last}@${activeTenant.subdomain}.edu.in` : `${initial}@${activeTenant.subdomain}.edu.in`;
+                        })()}
+                      </span>
+                      <span className="text-[8px] text-text-secondary/80 block font-normal">{student.address || 'Address unlisted'}</span>
                     </div>
                   </td>
                   <td className="py-4">

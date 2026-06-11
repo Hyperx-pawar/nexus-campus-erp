@@ -71,6 +71,7 @@ export default function FinanceFeesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Razorpay UPI');
   const [classFilter, setClassFilter] = useState('all');
   const [expandedDays, setExpandedDays] = useState({});
@@ -409,6 +410,7 @@ export default function FinanceFeesPage() {
       setShowReceiptModal(true);
       setShowCollectModal(false);
       setPaymentAmount('');
+      setDiscountAmount('');
       setSelectedStudentId(null);
       setCollectSearch('');
       setSelectedInventoryAllocId('');
@@ -447,15 +449,18 @@ export default function FinanceFeesPage() {
       return;
     }
 
-    const currentFee = sharedFeeRecords[selectedStudentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
-    if (payAmt > currentFee.remaining) {
-      toast.error(`Payment amount (₹${payAmt.toLocaleString('en-IN')}) exceeds outstanding balance (₹${currentFee.remaining.toLocaleString('en-IN')}).`);
+    const currentFee = sharedFeeRecords[selectedStudentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [], discount: 0 };
+    const discountAmt = Number(discountAmount || 0);
+
+    if (payAmt + discountAmt > currentFee.remaining) {
+      toast.error(`Payment + Discount (₹${(payAmt + discountAmt).toLocaleString('en-IN')}) exceeds outstanding balance (₹${currentFee.remaining.toLocaleString('en-IN')}).`);
       return;
     }
 
     const newPaid = currentFee.paid + payAmt;
-    const newRemaining = currentFee.total - newPaid;
-    const newStatus = newRemaining === 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+    const newDiscount = (currentFee.discount || 0) + discountAmt;
+    const newRemaining = Math.max(0, currentFee.total - newPaid - newDiscount);
+    const newStatus = newRemaining === 0 ? 'PAID' : (newPaid > 0 || newDiscount > 0) ? 'PARTIAL' : 'UNPAID';
 
     const receipt = {
       id: receiptId,
@@ -463,6 +468,7 @@ export default function FinanceFeesPage() {
       dateDisplay: dateStr,
       time: timeStr,
       amount: payAmt,
+      discount: discountAmt,
       method: paymentMethod,
       studentName: `${student.first_name} ${student.last_name}`,
       admissionNo: student.admission_no,
@@ -495,9 +501,10 @@ export default function FinanceFeesPage() {
       [selectedStudentId]: {
         total: currentFee.total,
         paid: newPaid,
+        discount: newDiscount,
         remaining: newRemaining,
         status: newStatus,
-        history: [{ id: receiptId, date: receipt.date, amount: payAmt, method: paymentMethod }, ...currentFee.history]
+        history: [{ id: receiptId, date: receipt.date, amount: payAmt, discount: discountAmt, method: paymentMethod }, ...currentFee.history]
       }
     }));
 
@@ -517,13 +524,14 @@ export default function FinanceFeesPage() {
           tenant_id: activeTenant.id,
           recipient_id: parent.id,
           title: `📄 Fee Receipt Confirmed: ${student.first_name} ${student.last_name}`,
-          body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} paid via ${paymentMethod}. Outstanding balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
+          body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} paid via ${paymentMethod}${discountAmt > 0 ? ` (Discount of ₹${discountAmt.toLocaleString('en-IN')} applied)` : ''}. Outstanding balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
           type: 'FEE_PAYMENT',
           date: now.toISOString().split('T')[0],
           read: false,
           metadata: { 
             receiptId, 
             amount: payAmt, 
+            discount: discountAmt,
             studentId: student.id,
             receiptDetails: receipt 
           }
@@ -536,7 +544,7 @@ export default function FinanceFeesPage() {
       setSharedNotices(prev => [{
         id: Date.now(),
         title: `Fee Receipt: ${student.first_name} ${student.last_name}`,
-        body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} collected via ${paymentMethod}. Balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
+        body: `Receipt ${receiptId}: ₹${payAmt.toLocaleString('en-IN')} collected via ${paymentMethod}${discountAmt > 0 ? ` with ₹${discountAmt.toLocaleString('en-IN')} discount` : ''}. Balance: ₹${newRemaining.toLocaleString('en-IN')}.`,
         ...notifBase
       }, ...prev]);
     }
@@ -545,6 +553,7 @@ export default function FinanceFeesPage() {
     setShowReceiptModal(true);
     setShowCollectModal(false);
     setPaymentAmount('');
+    setDiscountAmount('');
     setSelectedStudentId(null);
     setCollectSearch('');
   };
@@ -575,20 +584,20 @@ export default function FinanceFeesPage() {
     if (affectedStudents.length > 0) {
       const updatedFeeRecords = { ...sharedFeeRecords };
       affectedStudents.forEach(student => {
-        const currentRecord = updatedFeeRecords[student.id] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
+        const currentRecord = updatedFeeRecords[student.id] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [], discount: 0 };
         const classStructures = [...tenantFeeStructures.filter(fs => fs.class_id === student.class_id), structure];
         const newBaseFee = classStructures.reduce((sum, fs) => sum + fs.amount, 0);
         const addons = sharedStudentFeeAddons[student.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
         const transportFee = addons.transport.enabled ? addons.transport.fee : 0;
         const hostelFee = addons.hostel.enabled ? addons.hostel.fee : 0;
         const newTotal = newBaseFee + transportFee + hostelFee;
-        const newRemaining = newTotal - currentRecord.paid;
+        const newRemaining = newTotal - currentRecord.paid - (currentRecord.discount || 0);
 
         updatedFeeRecords[student.id] = {
           ...currentRecord,
           total: newTotal,
           remaining: Math.max(0, newRemaining),
-          status: newRemaining <= 0 ? 'PAID' : currentRecord.paid > 0 ? 'PARTIAL' : 'UNPAID'
+          status: newRemaining <= 0 ? 'PAID' : (currentRecord.paid > 0 || currentRecord.discount > 0) ? 'PARTIAL' : 'UNPAID'
         };
       });
       setSharedFeeRecords(updatedFeeRecords);
@@ -610,20 +619,20 @@ export default function FinanceFeesPage() {
     if (affectedStudents.length > 0) {
       const updatedFeeRecords = { ...sharedFeeRecords };
       affectedStudents.forEach(student => {
-        const currentRecord = updatedFeeRecords[student.id] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
+        const currentRecord = updatedFeeRecords[student.id] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [], discount: 0 };
         const remainingStructures = tenantFeeStructures.filter(fs => fs.class_id === student.class_id && fs.id !== structureId);
         const newBaseFee = remainingStructures.reduce((sum, fs) => sum + fs.amount, 0);
         const addons = sharedStudentFeeAddons[student.id] || { transport: { enabled: false, fee: 0 }, hostel: { enabled: false, fee: 0 } };
         const transportFee = addons.transport.enabled ? addons.transport.fee : 0;
         const hostelFee = addons.hostel.enabled ? addons.hostel.fee : 0;
         const newTotal = newBaseFee + transportFee + hostelFee;
-        const newRemaining = newTotal - currentRecord.paid;
+        const newRemaining = newTotal - currentRecord.paid - (currentRecord.discount || 0);
 
         updatedFeeRecords[student.id] = {
           ...currentRecord,
           total: newTotal,
           remaining: Math.max(0, newRemaining),
-          status: newRemaining <= 0 ? 'PAID' : currentRecord.paid > 0 ? 'PARTIAL' : 'UNPAID'
+          status: newRemaining <= 0 ? 'PAID' : (currentRecord.paid > 0 || currentRecord.discount > 0) ? 'PARTIAL' : 'UNPAID'
         };
       });
       setSharedFeeRecords(updatedFeeRecords);
@@ -656,8 +665,8 @@ export default function FinanceFeesPage() {
     const classStructures = tenantFeeStructures.filter(fs => fs.class_id === student.class_id);
     const baseFee = classStructures.reduce((sum, fs) => sum + fs.amount, 0);
     const newTotal = baseFee + transportFee + hostelFee;
-    const currentRecord = sharedFeeRecords[studentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [] };
-    const newRemaining = newTotal - currentRecord.paid;
+    const currentRecord = sharedFeeRecords[studentId] || { total: 0, paid: 0, remaining: 0, status: 'UNPAID', history: [], discount: 0 };
+    const newRemaining = newTotal - currentRecord.paid - (currentRecord.discount || 0);
 
     setSharedFeeRecords(prev => ({
       ...prev,
@@ -665,7 +674,7 @@ export default function FinanceFeesPage() {
         ...currentRecord,
         total: newTotal,
         remaining: Math.max(0, newRemaining),
-        status: newRemaining <= 0 ? 'PAID' : currentRecord.paid > 0 ? 'PARTIAL' : 'UNPAID'
+        status: newRemaining <= 0 ? 'PAID' : (currentRecord.paid > 0 || currentRecord.discount > 0) ? 'PARTIAL' : 'UNPAID'
       }
     }));
 
@@ -1522,6 +1531,12 @@ export default function FinanceFeesPage() {
                   <span>Total Expected</span>
                   <span className="font-mono text-accent font-black">₹{unifiedTotalExpected.toLocaleString('en-IN')}</span>
                 </div>
+                {fee.discount > 0 && (
+                  <div className="flex justify-between text-amber-600 font-bold">
+                    <span>Total Discount Applied</span>
+                    <span className="font-mono">- ₹{fee.discount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-success">
                   <span>Total Paid</span>
                   <span className="font-mono font-bold">- ₹{unifiedTotalPaid.toLocaleString('en-IN')}</span>
@@ -1560,6 +1575,11 @@ export default function FinanceFeesPage() {
                             <span className="text-text-secondary ml-2">{tx.method}</span>
                           </div>
                           <div className="text-right">
+                            {tx.discount > 0 && (
+                              <span className="text-amber-600 font-bold font-mono mr-2">
+                                (Disc: ₹{tx.discount.toLocaleString('en-IN')})
+                              </span>
+                            )}
                             <span className="text-success font-bold font-mono">₹{tx.amount.toLocaleString('en-IN')}</span>
                             <span className="text-text-secondary ml-2 font-mono">{tx.date}</span>
                           </div>
@@ -2102,7 +2122,14 @@ export default function FinanceFeesPage() {
                             </span>
                           </td>
                           <td className="py-3 text-right pr-2 font-mono font-black text-text-primary">
-                            ₹{tx.amount.toLocaleString('en-IN')}
+                            <div>
+                              <span>₹{tx.amount.toLocaleString('en-IN')}</span>
+                              {tx.discount > 0 && (
+                                <span className="block text-[8px] text-amber-600 font-bold leading-none mt-0.5">
+                                  Disc: ₹{tx.discount.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2122,7 +2149,7 @@ export default function FinanceFeesPage() {
       {/* ===== COLLECT FEE MODAL (with quick search + class filter) ===== */}
       <Modal
         open={showCollectModal}
-        onClose={() => { setShowCollectModal(false); setSelectedStudentId(null); setPaymentAmount(''); }}
+        onClose={() => { setShowCollectModal(false); setSelectedStudentId(null); setPaymentAmount(''); setDiscountAmount(''); }}
         title="Collect Fee Payment"
         icon={<CreditCard size={16} />}
         size="lg"
@@ -2316,7 +2343,7 @@ export default function FinanceFeesPage() {
                 )}
 
                 <form onSubmit={handleCollectPayment} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`grid grid-cols-1 ${paymentType === 'tuition' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Amount to Collect (₹) *</label>
                       <input
@@ -2337,6 +2364,20 @@ export default function FinanceFeesPage() {
                         autoFocus
                       />
                     </div>
+                    {paymentType === 'tuition' && (
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Discount (Optional) (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 1000"
+                          value={discountAmount}
+                          onChange={e => setDiscountAmount(e.target.value)}
+                          className="w-full text-xs font-mono text-amber-600 font-bold"
+                          max={Math.max(0, (fee.remaining || 0) - Number(paymentAmount || 0))}
+                          min={0}
+                        />
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Method *</label>
                       <select
@@ -2658,19 +2699,27 @@ export default function FinanceFeesPage() {
 
                   {/* Totals */}
                   <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden">
-                    {[
-                      { label: 'Total Fee', val: lastReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' },
-                      { label: 'Previously Paid', val: lastReceipt.newPaid - lastReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
-                      { label: 'Amount Paid Now', val: lastReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
-                      { label: 'Balance Remaining', val: lastReceipt.newRemaining, color: lastReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true },
-                    ].map((r, i) => (
-                      <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-                        <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
-                        <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
-                          {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
-                        </span>
-                      </div>
-                    ))}
+                    {(() => {
+                      const rows = [
+                        { label: 'Total Fee', val: lastReceipt.totalFee, color: 'text-slate-700', bg: 'bg-white' }
+                      ];
+                      if (lastReceipt.discount > 0) {
+                        rows.push({ label: 'Discount Applied Now', val: lastReceipt.discount, color: 'text-amber-600', bg: 'bg-amber-50', bold: true });
+                      }
+                      rows.push(
+                        { label: 'Previously Paid', val: lastReceipt.newPaid - lastReceipt.amount, color: 'text-slate-500', bg: 'bg-slate-50' },
+                        { label: 'Amount Paid Now', val: lastReceipt.amount, color: 'text-emerald-600', bg: 'bg-emerald-50', bold: true },
+                        { label: 'Balance Remaining', val: lastReceipt.newRemaining, color: lastReceipt.newRemaining > 0 ? 'text-amber-600' : 'text-emerald-600', bg: 'bg-white', bold: true }
+                      );
+                      return rows.map((r, i) => (
+                        <div key={i} className={`flex justify-between items-center px-4 py-2 ${r.bg} ${i > 0 ? 'border-t border-slate-100' : ''}`}>
+                          <span className={`text-[11px] ${r.color} ${r.bold ? 'font-black' : ''}`}>{r.label}</span>
+                          <span className={`text-[11px] font-mono ${r.color} ${r.bold ? 'font-black' : ''}`}>
+                            {r.val === 0 && r.label === 'Balance Remaining' ? 'FULLY CLEARED' : `₹${r.val.toLocaleString('en-IN')}`}
+                          </span>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
 
