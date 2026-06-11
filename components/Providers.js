@@ -1111,7 +1111,8 @@ export default function Providers({ children }) {
     const hostelFee = studentData.hostelFee || 0;
     const totalFee = studentData.totalFee || (baseFeeTotal + transportFee + hostelFee);
     const paidFee = studentData.paidFee || 0;
-    const remainingFee = totalFee - paidFee;
+    const discountVal = studentData.discount || 0;
+    const remainingFee = Math.max(0, totalFee - paidFee - discountVal);
 
     // Store student fee add-ons
     setSharedStudentFeeAddons(prev => ({
@@ -1135,8 +1136,9 @@ export default function Providers({ children }) {
       [studentId]: {
         total: totalFee,
         paid: paidFee,
+        discount: discountVal,
         remaining: remainingFee,
-        status: paidFee === totalFee ? 'PAID' : paidFee > 0 ? 'PARTIAL' : 'UNPAID',
+        status: remainingFee === 0 ? 'PAID' : (paidFee > 0 || discountVal > 0) ? 'PARTIAL' : 'UNPAID',
         history: paidFee > 0 ? [{ id: `rcpt-${Date.now()}`, date: new Date().toISOString().split('T')[0], amount: paidFee, method: 'Razorpay UPI' }] : []
       }
     }));

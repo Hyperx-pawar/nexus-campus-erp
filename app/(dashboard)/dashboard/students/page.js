@@ -401,6 +401,7 @@ export default function StudentRegistryPage() {
       parentOccupation: parent.occupation || 'Business Owner',
       totalFee: student.totalFee || 0,
       paidFee: student.paidFee || 0,
+      discount: sharedFeeRecords[student.id]?.discount || 0,
       initialAttendance: student.initialAttendance || '85.0%',
       avatar: student.profile_picture_url || '',
       avatarFile: null
@@ -437,6 +438,7 @@ export default function StudentRegistryPage() {
     parentOccupation: 'Business Owner',
     totalFee: 0,
     paidFee: 0,
+    discount: '',
     initialAttendance: '85.0%',
     avatar: '',
     avatarFile: null
@@ -651,6 +653,28 @@ export default function StudentRegistryPage() {
 
         setSharedStudents(updatedStudents);
         setSharedParents(updatedParents);
+
+        if (setSharedFeeRecords) {
+          setSharedFeeRecords(prev => {
+            const currentFee = prev[editingStudentId] || { total: Number(formData.totalFee), paid: Number(formData.paidFee), remaining: Number(formData.totalFee) - Number(formData.paidFee), status: 'UNPAID', history: [], discount: 0 };
+            const newDiscount = Number(formData.discount || 0);
+            const newTotal = Number(formData.totalFee);
+            const newPaid = Number(formData.paidFee);
+            const newRemaining = Math.max(0, newTotal - newPaid - newDiscount);
+            return {
+              ...prev,
+              [editingStudentId]: {
+                ...currentFee,
+                total: newTotal,
+                paid: newPaid,
+                discount: newDiscount,
+                remaining: newRemaining,
+                status: newRemaining === 0 ? 'PAID' : (newPaid > 0 || newDiscount > 0) ? 'PARTIAL' : 'UNPAID'
+              }
+            };
+          });
+        }
+
         toast.success(`Student "${formData.firstName}" updated successfully!`);
       } else {
         // --- ADD MODE ---
@@ -667,6 +691,7 @@ export default function StudentRegistryPage() {
           address: formData.address,
           totalFee: Number(formData.totalFee),
           paidFee: Number(formData.paidFee),
+          discount: Number(formData.discount || 0),
           initialAttendance: formData.initialAttendance,
           class_id: formData.classId,
           tenant_id: activeTenant.id,
@@ -726,7 +751,7 @@ export default function StudentRegistryPage() {
         enableTransport: false, transportRouteId: '', customTransportFee: '',
         enableHostel: false, hostelBlockId: '', customHostelFee: '',
         parentFirstName: '', parentLastName: '', parentEmail: '', parentPhone: '', parentOccupation: 'Business Owner',
-        totalFee: 0, paidFee: 0, initialAttendance: '85.0%',
+        totalFee: 0, paidFee: 0, discount: '', initialAttendance: '85.0%',
         avatar: '', avatarFile: null
       });
       setEditingStudentId(null);
@@ -1085,6 +1110,7 @@ export default function StudentRegistryPage() {
       parentOccupation: 'Business Owner',
       totalFee: 0,
       paidFee: 0,
+      discount: '',
       initialAttendance: '85.0%',
       avatar: '',
       avatarFile: null,
@@ -1922,7 +1948,7 @@ export default function StudentRegistryPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Fee Amount Paid (₹) *</label>
                   <input 
@@ -1933,6 +1959,18 @@ export default function StudentRegistryPage() {
                     max={formData.totalFee}
                     min={0}
                     required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Fee Discount (Optional) (₹)</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 1500"
+                    value={formData.discount}
+                    onChange={(e) => setFormData({...formData, discount: e.target.value})}
+                    className="w-full text-xs font-mono text-amber-600 font-bold"
+                    max={Math.max(0, (formData.totalFee || 0) - Number(formData.paidFee || 0))}
+                    min={0}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1950,7 +1988,7 @@ export default function StudentRegistryPage() {
               <div className="flex justify-between items-center text-xs p-3 bg-slate-50/50 rounded-xl border border-border">
                 <span className="text-text-secondary">Outstanding Balance Due:</span>
                 <span className="font-mono font-black text-warning">
-                  ₹{((formData.totalFee || 0) - (Number(formData.paidFee) || 0)).toLocaleString('en-IN')}
+                  ₹{((formData.totalFee || 0) - (Number(formData.paidFee) || 0) - (Number(formData.discount) || 0)).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>

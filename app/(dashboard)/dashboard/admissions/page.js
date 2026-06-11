@@ -98,6 +98,7 @@ export default function AdmissionsPage() {
     parentOccupation: 'Government Employee',
     totalFee: 0,
     paidFee: 0,
+    discount: '',
     initialAttendance: '90.0%',
     avatar: '',
     avatarFile: null
@@ -212,6 +213,7 @@ export default function AdmissionsPage() {
       parentOccupation: 'Government Employee',
       totalFee: baseClassFee,
       paidFee: 0,
+      discount: '',
       initialAttendance: '90.0%',
       avatar: '',
       avatarFile: null
@@ -290,6 +292,7 @@ export default function AdmissionsPage() {
         address: approveFormData.address,
         totalFee: Number(approveFormData.totalFee),
         paidFee: Number(approveFormData.paidFee),
+        discount: Number(approveFormData.discount || 0),
         initialAttendance: approveFormData.initialAttendance,
         class_id: approveFormData.classId,
         tenant_id: activeTenant.id,
@@ -1206,7 +1209,7 @@ export default function AdmissionsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Fee Amount Paid (₹) *</label>
                   <input 
@@ -1217,6 +1220,18 @@ export default function AdmissionsPage() {
                     max={approveFormData.totalFee}
                     min={0}
                     required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Fee Discount (Optional) (₹)</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 1500"
+                    value={approveFormData.discount}
+                    onChange={(e) => setApproveFormData({...approveFormData, discount: e.target.value})}
+                    className="w-full text-xs font-mono text-amber-600 font-bold"
+                    max={Math.max(0, (approveFormData.totalFee || 0) - Number(approveFormData.paidFee || 0))}
+                    min={0}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1234,7 +1249,7 @@ export default function AdmissionsPage() {
               <div className="flex justify-between items-center text-xs p-3 bg-slate-50/50 rounded-xl border border-border">
                 <span className="text-text-secondary">Outstanding Balance Due:</span>
                 <span className="font-mono font-black text-warning">
-                  ₹{((approveFormData.totalFee || 0) - (Number(approveFormData.paidFee) || 0)).toLocaleString('en-IN')}
+                  ₹{((approveFormData.totalFee || 0) - (Number(approveFormData.paidFee) || 0) - (Number(approveFormData.discount) || 0)).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
