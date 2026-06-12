@@ -21,7 +21,8 @@ export default function HostelManagementPage() {
     setSharedHostelInventoryAllocations,
     sharedParents,
     activeRole,
-    activeUser
+    activeUser,
+    sharedClasses
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'hostels' | 'rooms' | 'allotments' | 'inventory'
@@ -79,6 +80,7 @@ export default function HostelManagementPage() {
   const [newRoom, setNewRoom] = useState({ hostelId: '', number: '', type: 'Double Sharing', beds: 2 });
   const [newAllotment, setNewAllotment] = useState({ studentId: '', hostelId: '', roomNumber: '', bedNo: 'A', date: new Date().toISOString().split('T')[0] });
   const [newIssue, setNewIssue] = useState({ studentId: '', date: new Date().toISOString().split('T')[0], items: [{ name: '', quantity: 1, price: '' }] });
+  const [issueClassFilter, setIssueClassFilter] = useState('');
 
   // Resolve student ID for student role
   const myStudentProfile = React.useMemo(() => {
@@ -1356,7 +1358,24 @@ export default function HostelManagementPage() {
         <form onSubmit={handleIssueItem} className="space-y-6">
           <p className="text-xs text-text-secondary -mt-3">Record multiple items given to students at once.</p>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Filter by Class</label>
+              <select
+                value={issueClassFilter}
+                onChange={(e) => {
+                  setIssueClassFilter(e.target.value);
+                  setNewIssue(prev => ({ ...prev, studentId: '' }));
+                }}
+                className="w-full bg-bg-sidebar border border-border rounded-xl py-3 px-3 text-xs text-text-primary cursor-pointer"
+              >
+                <option value="">All Classes</option>
+                {sharedClasses?.filter(c => c.tenant_id === activeTenant.id).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Select Student *</label>
               <select
@@ -1366,9 +1385,18 @@ export default function HostelManagementPage() {
                 required
               >
                 <option value="">Select Hostel Student</option>
-                {tenantStudents.map(s => (
-                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.admission_no})</option>
-                ))}
+                {tenantStudents
+                  .filter(s => !issueClassFilter || s.class_id === issueClassFilter)
+                  .map(s => {
+                    const cls = sharedClasses?.find(c => c.id === s.class_id);
+                    const classNameStr = cls ? ` [${cls.name}]` : '';
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.first_name} {s.last_name}{classNameStr} ({s.admission_no})
+                      </option>
+                    );
+                  })
+                }
               </select>
             </div>
             
