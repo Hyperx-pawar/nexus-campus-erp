@@ -343,39 +343,79 @@ export default function FinanceFeesPage() {
     const receiptId = `RCPT-${paymentType === 'hostel_inventory' ? 'INV-' : ''}${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     if (paymentType === 'hostel_inventory') {
-      if (!selectedInventoryAllocId) {
-        toast.error('Please select a hostel inventory item to collect payment for.');
-        return;
-      }
-      const alloc = (sharedHostelInventoryAllocations || []).find(a => a.id === selectedInventoryAllocId);
-      if (!alloc) return;
-
-      const outstanding = alloc.cost - (alloc.paid || 0);
-      if (payAmt > outstanding) {
-        toast.error(`Payment amount (₹${payAmt.toLocaleString('en-IN')}) exceeds outstanding balance (₹${outstanding.toLocaleString('en-IN')}).`);
+      const pendingAllocs = (sharedHostelInventoryAllocations || [])
+        .filter(a => a.studentId === student.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
+      
+      const totalPending = pendingAllocs.reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+      if (payAmt > totalPending) {
+        toast.error(`Payment amount (₹${payAmt.toLocaleString('en-IN')}) exceeds outstanding balance (₹${totalPending.toLocaleString('en-IN')}).`);
         return;
       }
 
-      const newPaid = (alloc.paid || 0) + payAmt;
-      const newStatus = newPaid >= alloc.cost ? 'PAID' : 'PARTIAL';
+      // Distribute payment sequentially (FIFO)
+      let remainingPayment = payAmt;
+      const updatedAllocValues = {}; // map of allocId -> { newPaid, newStatus, paidThisTime, item }
 
-      const paymentRecord = {
-        id: receiptId,
-        date: now.toISOString().split('T')[0],
-        amount: payAmt,
-        method: paymentMethod
-      };
+      for (const alloc of pendingAllocs) {
+        if (remainingPayment <= 0) break;
+        const outstanding = alloc.cost - (alloc.paid || 0);
+        const paymentToThisAlloc = Math.min(remainingPayment, outstanding);
+        
+        const newPaid = (alloc.paid || 0) + paymentToThisAlloc;
+        const newStatus = newPaid >= alloc.cost ? 'PAID' : 'PARTIAL';
 
+        updatedAllocValues[alloc.id] = {
+          newPaid,
+          newStatus,
+          paidThisTime: paymentToThisAlloc,
+          item: alloc.item,
+          totalCost: alloc.cost
+        };
+
+        remainingPayment -= paymentToThisAlloc;
+      }
+
+      // Update state
       setSharedHostelInventoryAllocations(prev => prev.map(a => {
-        if (a.id === selectedInventoryAllocId) {
+        if (updatedAllocValues[a.id]) {
+          const val = updatedAllocValues[a.id];
+          const itemPaymentRecord = {
+            id: receiptId,
+            date: now.toISOString().split('T')[0],
+            amount: val.paidThisTime,
+            method: paymentMethod
+          };
           return {
             ...a,
-            paid: newPaid,
-            status: newStatus,
-            payments: [...(a.payments || []), paymentRecord]
+            paid: val.newPaid,
+            status: val.newStatus,
+            payments: [...(a.payments || []), itemPaymentRecord]
           };
         }
         return a;
+      }));
+
+      // Gather paid details for receipt and toast
+      const paidItemsDescription = Object.values(updatedAllocValues)
+        .map(v => `${v.item} (₹${v.paidThisTime})`)
+        .join(', ');
+
+      const totalHostelCost = (sharedHostelInventoryAllocations || [])
+        .filter(a => a.studentId === student.id && a.tenant_id === activeTenant.id)
+        .reduce((sum, a) => sum + a.cost, 0);
+
+      const totalHostelPaidBefore = (sharedHostelInventoryAllocations || [])
+        .filter(a => a.studentId === student.id && a.tenant_id === activeTenant.id)
+        .reduce((sum, a) => sum + (a.paid || 0), 0);
+
+      const totalHostelPaidNew = totalHostelPaidBefore + payAmt;
+      const totalHostelRemaining = totalHostelCost - totalHostelPaidNew;
+      const totalHostelStatus = totalHostelRemaining <= 0 ? 'PAID' : 'PARTIAL';
+
+      const feeBreakdown = Object.values(updatedAllocValues).map(v => ({
+        label: `${v.item} (Hostel Inventory)`,
+        code: 'HINV',
+        amount: v.paidThisTime
       }));
 
       const receipt = {
@@ -389,10 +429,10 @@ export default function FinanceFeesPage() {
         admissionNo: student.admission_no,
         className: getClassName(student.class_id),
         schoolName: activeTenant.name,
-        totalFee: alloc.cost,
-        newPaid,
-        newRemaining: alloc.cost - newPaid,
-        newStatus,
+        totalFee: totalHostelCost,
+        newPaid: totalHostelPaidNew,
+        newRemaining: totalHostelRemaining,
+        newStatus: totalHostelStatus,
         collectedBy: activeUser?.name?.split(' (')[0] || 'Cashier',
         schoolAddress: activeTenant.address || '',
         schoolPhone: activeTenant.phone || '',
@@ -401,9 +441,7 @@ export default function FinanceFeesPage() {
         schoolEstYear: activeTenant.estYear || '',
         schoolLogo: activeTenant.logo || '',
         schoolSubdomain: activeTenant.subdomain || '',
-        feeBreakdown: [
-          { label: `${alloc.item} (Hostel Inventory Item)`, code: 'HINV', amount: alloc.cost }
-        ]
+        feeBreakdown: feeBreakdown
       };
 
       setLastReceipt(receipt);
@@ -419,7 +457,7 @@ export default function FinanceFeesPage() {
       const notifBase = { date: dateStr, author: `Fee Counter — ${activeTenant.name}`, tenant_id: activeTenant.id };
       const parent = sharedParents?.find(p => p.id === student.parent_id && p.tenant_id === activeTenant.id);
 
-      toast.success(`✅ Receipt ${receiptId} generated! ₹${payAmt.toLocaleString('en-IN')} collected for ${alloc.item}.`);
+      toast.success(`✅ Receipt ${receiptId} generated! ₹${payAmt.toLocaleString('en-IN')} collected for: ${paidItemsDescription}.`);
       setTimeout(() => toast.info(`📨 School Admin notified: Hostel payment of ₹${payAmt.toLocaleString('en-IN')} received.`), 600);
       if (parent) {
         setTimeout(() => toast.success(`👨‍👩‍👧 Parent (${parent.first_name} ${parent.last_name}) notified.`), 1200);
@@ -979,8 +1017,8 @@ export default function FinanceFeesPage() {
                                         .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
                                       if (pendingAllocs.length > 0) {
                                         setPaymentType('hostel_inventory');
-                                        setSelectedInventoryAllocId(pendingAllocs[0].id);
-                                        setPaymentAmount(pendingAllocs[0].cost - (pendingAllocs[0].paid || 0));
+                                        const totalPending = pendingAllocs.reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+                                        setPaymentAmount(totalPending);
                                       }
                                     }
                                   }}
@@ -2266,11 +2304,7 @@ export default function FinanceFeesPage() {
                       type="button"
                       onClick={() => {
                         setPaymentType('hostel_inventory');
-                        const firstAlloc = pendingHostelAllocations[0];
-                        if (firstAlloc) {
-                          setSelectedInventoryAllocId(firstAlloc.id);
-                          setPaymentAmount(firstAlloc.cost - (firstAlloc.paid || 0));
-                        }
+                        setPaymentAmount(totalPendingHostelInv);
                       }}
                       className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all uppercase ${
                         paymentType === 'hostel_inventory'
@@ -2282,7 +2316,7 @@ export default function FinanceFeesPage() {
                     </button>
                   </div>
                 )}
-
+ 
                 {paymentType === 'tuition' ? (
                   /* Fee summary */
                   <div className="grid grid-cols-3 gap-2 text-center animate-slide-up">
@@ -2297,50 +2331,28 @@ export default function FinanceFeesPage() {
                       </div>
                     ))}
                   </div>
-                ) : (
-                  /* Hostel Inventory selection and details */
-                  <div className="space-y-3.5 animate-slide-up">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Select Pending Inventory Item *</label>
-                      <select
-                        value={selectedInventoryAllocId}
-                        onChange={e => {
-                          setSelectedInventoryAllocId(e.target.value);
-                          const alloc = pendingHostelAllocations.find(a => a.id === e.target.value);
-                          if (alloc) {
-                            setPaymentAmount(alloc.cost - (alloc.paid || 0));
-                          }
-                        }}
-                        className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border outline-none focus:border-accent"
-                      >
-                        {pendingHostelAllocations.map(a => (
-                          <option key={a.id} value={a.id}>{a.item} (Total: ₹{a.cost}, Pending: ₹{a.cost - (a.paid || 0)})</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {(() => {
-                      const selectedAlloc = pendingHostelAllocations.find(a => a.id === selectedInventoryAllocId);
-                      if (!selectedAlloc) return null;
-                      const outstanding = selectedAlloc.cost - (selectedAlloc.paid || 0);
-                      return (
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          {[
-                            { label: 'Item Cost', val: `₹${selectedAlloc.cost.toLocaleString('en-IN')}`, color: 'text-text-primary' },
-                            { label: 'Paid So Far', val: `₹${(selectedAlloc.paid || 0).toLocaleString('en-IN')}`, color: 'text-success' },
-                            { label: 'Remaining Due', val: `₹${outstanding.toLocaleString('en-IN')}`, color: 'text-warning' },
-                          ].map((item, i) => (
-                            <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
-                              <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
-                              <p className={`text-xs font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
-                            </div>
-                          ))}
+                ) : (() => {
+                  const allHostelAllocations = (sharedHostelInventoryAllocations || []).filter(a => a.studentId === selectedStudentId && a.tenant_id === activeTenant.id);
+                  const totalCost = allHostelAllocations.reduce((sum, a) => sum + a.cost, 0);
+                  const totalPaid = allHostelAllocations.reduce((sum, a) => sum + (a.paid || 0), 0);
+                  const totalOutstanding = totalCost - totalPaid;
+                  return (
+                    /* Hostel Inventory summary */
+                    <div className="grid grid-cols-3 gap-2 text-center animate-slide-up">
+                      {[
+                        { label: 'Total Inv Cost', val: `₹${totalCost.toLocaleString('en-IN')}`, color: 'text-text-primary' },
+                        { label: 'Total Paid', val: `₹${totalPaid.toLocaleString('en-IN')}`, color: 'text-success' },
+                        { label: 'Outstanding', val: `₹${totalOutstanding.toLocaleString('en-IN')}`, color: 'text-warning' },
+                      ].map((item, i) => (
+                        <div key={i} className="p-3 bg-bg-main border border-border rounded-xl">
+                          <p className="text-[9px] text-text-secondary uppercase tracking-widest">{item.label}</p>
+                          <p className={`text-xs font-black font-mono mt-1 ${item.color}`}>{item.val}</p>
                         </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
+                      ))}
+                    </div>
+                  );
+                })()}
+ 
                 <form onSubmit={handleCollectPayment} className="space-y-3">
                   <div className={`grid grid-cols-1 ${paymentType === 'tuition' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
                     <div className="space-y-1">
@@ -2353,8 +2365,7 @@ export default function FinanceFeesPage() {
                         className="w-full text-xs font-mono"
                         max={(() => {
                           if (paymentType === 'hostel_inventory') {
-                            const alloc = pendingHostelAllocations.find(a => a.id === selectedInventoryAllocId);
-                            return alloc ? (alloc.cost - (alloc.paid || 0)) : 0;
+                            return totalPendingHostelInv;
                           }
                           return fee.remaining || 0;
                         })()}
