@@ -1147,7 +1147,7 @@ function PlacementPortal({ activeTenant, activeRole }) {
     }
   };
 
-  const eligibleStudents = useMemo(() => {
+  const eligibleStudents = React.useMemo(() => {
     const tenantStudents = (sharedStudents || []).filter(s => s.tenant_id === activeTenant.id);
     return tenantStudents.map((s, idx) => {
       const gpa = s.gpa || +(7.0 + (idx * 0.4) % 3.0).toFixed(2);
