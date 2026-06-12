@@ -969,25 +969,24 @@ export default function FinanceFeesPage() {
                               ) : (
                                 <button
                                   onClick={() => {
-                                    setSelectedStudentId(isSelected ? null : stud.id);
-                                    if (!isSelected) {
-                                      if (fee.remaining > 0) {
-                                        setPaymentType('tuition');
-                                        setPaymentAmount(fee.remaining);
-                                      } else {
-                                        const pendingAllocs = (sharedHostelInventoryAllocations || [])
-                                          .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
-                                        if (pendingAllocs.length > 0) {
-                                          setPaymentType('hostel_inventory');
-                                          setSelectedInventoryAllocId(pendingAllocs[0].id);
-                                          setPaymentAmount(pendingAllocs[0].cost - (pendingAllocs[0].paid || 0));
-                                        }
+                                    setSelectedStudentId(stud.id);
+                                    setShowCollectModal(true);
+                                    if (fee.remaining > 0) {
+                                      setPaymentType('tuition');
+                                      setPaymentAmount(fee.remaining);
+                                    } else {
+                                      const pendingAllocs = (sharedHostelInventoryAllocations || [])
+                                        .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID');
+                                      if (pendingAllocs.length > 0) {
+                                        setPaymentType('hostel_inventory');
+                                        setSelectedInventoryAllocId(pendingAllocs[0].id);
+                                        setPaymentAmount(pendingAllocs[0].cost - (pendingAllocs[0].paid || 0));
                                       }
                                     }
                                   }}
-                                  className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-text-primary text-\[10px] font-bold rounded-lg transition-all"
+                                  className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-text-primary text-[10px] font-bold rounded-lg transition-all"
                                 >
-                                  {isSelected ? 'Cancel' : 'Collect'}
+                                  Collect
                                 </button>
                               );
                             })()}
