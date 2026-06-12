@@ -224,7 +224,7 @@ export default function CoursesLMSPage() {
       const fileName = `assignment-${activeLmsSubjectId}-${Date.now()}.${fileExt}`;
       const filePath = `${activeTenant.id}/assignments/${fileName}`;
       
-      const publicUrl = await uploadFileToBucket(supabase, 'documents', filePath, selectedFile);
+      const publicUrl = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, selectedFile);
       toast.dismiss();
 
       if (publicUrl) {
@@ -284,7 +284,7 @@ export default function CoursesLMSPage() {
         const fileExt = materialFile.name.split('.').pop();
         const fileName = `note-${activeLmsSubjectId}-${Date.now()}.${fileExt}`;
         const filePath = `${activeTenant.id}/notes/${fileName}`;
-        const url = await uploadFileToBucket(supabase, 'documents', filePath, materialFile);
+        const url = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, materialFile);
         toast.dismiss();
         noteFileName = materialFile.name;
       }

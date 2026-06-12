@@ -251,7 +251,7 @@ export default function AdmissionsPage() {
         const fileExt = approveFormData.avatarFile.name.split('.').pop();
         const fileName = `${studentId}-${Date.now()}.${fileExt}`;
         const filePath = `${activeTenant.id}/avatars/${fileName}`;
-        const uploadedUrl = await uploadFileToBucket(supabase, 'avatars', filePath, approveFormData.avatarFile);
+        const uploadedUrl = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, approveFormData.avatarFile);
         if (uploadedUrl) {
           profilePicUrl = uploadedUrl;
         }

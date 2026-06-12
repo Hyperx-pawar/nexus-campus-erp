@@ -67,7 +67,7 @@ export default function StaffRegistryPage() {
       const filePath = `${activeTenant.id}/documents/${fileName}`;
       
       toast.loading(`Uploading ${docType} to Supabase...`);
-      const publicUrl = await uploadFileToBucket(supabase, 'documents', filePath, file);
+      const publicUrl = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, file);
       toast.dismiss();
 
       if (publicUrl) {
@@ -121,7 +121,7 @@ export default function StaffRegistryPage() {
         const fileExt = formData.avatarFile.name.split('.').pop();
         const fileName = `${staffId}-${Date.now()}.${fileExt}`;
         const filePath = `${activeTenant.id}/avatars/${fileName}`;
-        const uploadedUrl = await uploadFileToBucket(supabase, 'avatars', filePath, formData.avatarFile);
+        const uploadedUrl = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, formData.avatarFile);
         if (uploadedUrl) {
           profilePicUrl = uploadedUrl;
         }

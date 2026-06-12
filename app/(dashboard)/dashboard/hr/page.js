@@ -136,7 +136,7 @@ export default function HRPayrollPage() {
         const fileExt = formData.avatarFile.name.split('.').pop();
         const fileName = `${staffId}-${Date.now()}.${fileExt}`;
         const filePath = `${activeTenant.id}/avatars/${fileName}`;
-        const uploadedUrl = await uploadFileToBucket(supabase, 'avatars', filePath, formData.avatarFile);
+        const uploadedUrl = await uploadFileToBucket(supabase, activeTenant.bucket_name, filePath, formData.avatarFile);
         if (uploadedUrl) {
           profilePicUrl = uploadedUrl;
         }
