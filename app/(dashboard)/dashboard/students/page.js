@@ -2543,7 +2543,10 @@ export default function StudentRegistryPage() {
                       />
                     </td>
                   )}
-                  <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2">
+                  <td 
+                    onClick={() => setSelectedStudentForDossier(student)}
+                    className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2 cursor-pointer hover:text-accent transition-colors"
+                  >
                     {student.profile_picture_url ? (
                       <img 
                         src={student.profile_picture_url} 

@@ -66,13 +66,24 @@ export default function IDCardGeneratorPage() {
     sharedStaff, 
     activeRole,
     activeUser,
-    sharedClasses
+    sharedClasses,
+    sharedParents
   } = useAuth();
 
   // Filter students & staff by tenant
-  const tenantStudents = useMemo(() => sharedStudents.filter(s => s.tenant_id === activeTenant.id), [sharedStudents, activeTenant.id]);
-  const tenantStaff = useMemo(() => sharedStaff.filter(s => s.tenant_id === activeTenant.id), [sharedStaff, activeTenant.id]);
-  const tenantClasses = useMemo(() => sharedClasses.filter(c => c.tenant_id === activeTenant.id), [sharedClasses, activeTenant.id]);
+  const tenantStudents = useMemo(() => sharedStudents?.filter(s => s.tenant_id === activeTenant.id) || [], [sharedStudents, activeTenant.id]);
+  const tenantStaff = useMemo(() => sharedStaff?.filter(s => s.tenant_id === activeTenant.id) || [], [sharedStaff, activeTenant.id]);
+  const tenantClasses = useMemo(() => sharedClasses?.filter(c => c.tenant_id === activeTenant.id) || [], [sharedClasses, activeTenant.id]);
+
+  // Resolve parent profile & children
+  const parentProfile = useMemo(() => {
+    return sharedParents?.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email) || sharedParents?.find(p => p.tenant_id === activeTenant.id);
+  }, [sharedParents, activeTenant.id, activeUser]);
+
+  const parentChildren = useMemo(() => {
+    if (!parentProfile) return [];
+    return tenantStudents?.filter(s => s.parent_id === parentProfile.id) || [];
+  }, [tenantStudents, parentProfile]);
 
   // States
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -102,7 +113,7 @@ export default function IDCardGeneratorPage() {
       if (me) setSelectedPersonId(me.id);
     } else if (activeRole === 'PARENT') {
       setSelectedType('student');
-      const child = tenantStudents.find(s => s.parent_id === activeUser.id) || tenantStudents[0];
+      const child = parentChildren[0];
       if (child) setSelectedPersonId(child.id);
     } else if (activeRole === 'TEACHER') {
       setSelectedType('staff');
@@ -112,7 +123,7 @@ export default function IDCardGeneratorPage() {
       setSelectedType('student');
       if (tenantStudents.length > 0) setSelectedPersonId(tenantStudents[0].id);
     }
-  }, [activeRole, activeUser, activeTenant]);
+  }, [activeRole, activeUser, activeTenant, parentChildren, tenantStudents, tenantStaff]);
 
   // List of people for the search selector
   const availablePeople = selectedType === 'student' ? tenantStudents : tenantStaff;
@@ -681,8 +692,38 @@ export default function IDCardGeneratorPage() {
                   )
                 )}
               </div>
+            ) : activeRole === 'PARENT' ? (
+              <div className="space-y-3">
+                <div className="p-4 bg-slate-100/60 border border-border rounded-2xl flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center text-accent">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block">Security Context Locked</span>
+                    <span className="text-xs font-bold text-text-primary">Parent Access: Linked Children Only</span>
+                  </div>
+                </div>
+                {parentChildren.length > 1 ? (
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Select Child</span>
+                    <select
+                      value={selectedPersonId}
+                      onChange={(e) => setSelectedPersonId(e.target.value)}
+                      className="bg-bg-main border border-border rounded-xl py-2.5 px-3 text-xs text-text-primary outline-none cursor-pointer font-bold w-full"
+                    >
+                      {parentChildren.map(s => (
+                        <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="text-xs font-bold text-accent px-1">
+                    Child: {activeRecord ? `${activeRecord.first_name} ${activeRecord.last_name}` : 'Unknown'}
+                  </div>
+                )}
+              </div>
             ) : (
-              // Student/Parent Lock View
+              // Student Lock View
               <div className="p-4 bg-slate-100/60 border border-border rounded-2xl flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center text-accent">
                   <CheckCircle2 size={16} />

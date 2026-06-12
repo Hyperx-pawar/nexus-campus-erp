@@ -874,7 +874,18 @@ export default function FinanceFeesPage() {
                             : 'bg-bg-main/85 border-border text-text-secondary hover:border-border'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div 
+                          onClick={() => {
+                            setSelectedStudentId(stud.id);
+                            setShowCollectModal(true);
+                            const pendingHostelInv = (sharedHostelInventoryAllocations || [])
+                              .filter(a => a.studentId === stud.id && a.tenant_id === activeTenant.id && a.status !== 'PAID')
+                              .reduce((sum, a) => sum + (a.cost - (a.paid || 0)), 0);
+                            setPaymentAmount((fee.remaining || 0) + pendingHostelInv);
+                            setPaymentType(fee.remaining > 0 ? 'tuition' : 'hostel_inventory');
+                          }}
+                          className="flex items-center gap-3 cursor-pointer hover:text-accent transition-colors"
+                        >
                           <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black">
                             {stud.first_name[0]}{stud.last_name[0]}
                           </div>

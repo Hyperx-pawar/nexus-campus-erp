@@ -88,14 +88,26 @@ export default function HostelManagementPage() {
   }, [sharedStudents, activeTenant.id, activeUser]);
   const myStudentId = myStudentProfile ? myStudentProfile.id : '';
 
+  // Resolve parent profile & children
+  const myParentProfile = React.useMemo(() => {
+    return sharedParents?.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email);
+  }, [sharedParents, activeTenant.id, activeUser]);
+
+  const parentChildrenIds = React.useMemo(() => {
+    if (!myParentProfile) return [];
+    return sharedStudents?.filter(s => s.parent_id === myParentProfile.id && s.tenant_id === activeTenant.id).map(s => s.id) || [];
+  }, [sharedStudents, myParentProfile, activeTenant.id]);
+
   // Auto set selectedStudentId for student role
   React.useEffect(() => {
     if (activeRole === 'STUDENT' && myStudentId) {
       setSelectedStudentId(myStudentId);
+    } else if (activeRole === 'PARENT' && parentChildrenIds.length > 0) {
+      setSelectedStudentId(parentChildrenIds[0]);
     }
-  }, [activeRole, myStudentId]);
+  }, [activeRole, myStudentId, parentChildrenIds]);
 
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'HOSTEL_WARDEN', 'STUDENT'];
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'HOSTEL_WARDEN', 'STUDENT', 'PARENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Hostels & Boarding" />;
   }
@@ -106,12 +118,14 @@ export default function HostelManagementPage() {
   const tenantAllotments = allotments.filter(a => {
     if (a.tenant_id !== activeTenant.id) return false;
     if (activeRole === 'STUDENT') return a.studentId === myStudentId;
+    if (activeRole === 'PARENT') return parentChildrenIds.includes(a.studentId);
     return true;
   });
   const tenantStudents = sharedStudents.filter(s => s.tenant_id === activeTenant.id);
   const tenantAllocations = sharedHostelInventoryAllocations.filter(a => {
     if (a.tenant_id !== activeTenant.id) return false;
     if (activeRole === 'STUDENT') return a.studentId === myStudentId;
+    if (activeRole === 'PARENT') return parentChildrenIds.includes(a.studentId);
     return true;
   });
 
@@ -366,10 +380,14 @@ export default function HostelManagementPage() {
     return matchesQuery && (isHostelResident || searchQuery.length > 0);
   });
 
-  if (activeRole === 'STUDENT') {
+  if (activeRole === 'STUDENT' || activeRole === 'PARENT') {
+    // Determine target student ID
+    const currentViewStudentId = activeRole === 'STUDENT' ? myStudentId : selectedStudentId;
+    const currentStudent = tenantStudents.find(s => s.id === currentViewStudentId);
+
     // Resolve student allotment
-    const myAllotment = allotments.find(a => a.studentId === myStudentId && a.tenant_id === activeTenant.id);
-    const myAllocations = sharedHostelInventoryAllocations.filter(a => a.studentId === myStudentId && a.tenant_id === activeTenant.id);
+    const myAllotment = allotments.find(a => a.studentId === currentViewStudentId && a.tenant_id === activeTenant.id);
+    const myAllocations = sharedHostelInventoryAllocations.filter(a => a.studentId === currentViewStudentId && a.tenant_id === activeTenant.id);
     
     // Sums
     const totalCharges = myAllocations.reduce((acc, c) => acc + c.cost, 0);
@@ -381,14 +399,40 @@ export default function HostelManagementPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Hostel Desk</h2>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">
+              {activeRole === 'PARENT' ? "Child's Hostel Desk" : "My Hostel Desk"}
+            </h2>
             <p className="text-text-secondary text-sm font-medium mt-1">
-              View your room assignment details, issued equipment, and billing status.
+              {activeRole === 'PARENT' 
+                ? `View room assignment details, issued equipment, and billing status for ${currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : 'your child'}.`
+                : "View your room assignment details, issued equipment, and billing status."}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
-            <ShieldCheck size={14} />
-            <span>Hostel Ledger Secured</span>
+          <div className="flex items-center gap-4">
+            {activeRole === 'PARENT' && parentChildrenIds.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-secondary">Select Child:</span>
+                <select
+                  value={selectedStudentId || ''}
+                  onChange={(e) => {
+                    setSelectedStudentId(e.target.value);
+                    // Reset payment form allocation choice when child changes
+                    setPaymentForm({ allocationId: '', amount: '', method: 'Razorpay UPI' });
+                  }}
+                  className="bg-bg-sidebar border border-border rounded-xl py-2 px-3.5 text-xs text-text-primary font-bold cursor-pointer outline-none focus:border-accent/40"
+                >
+                  {parentChildrenIds.map(childId => (
+                    <option key={childId} value={childId}>
+                      {getStudentName(childId)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
+              <ShieldCheck size={14} />
+              <span>Hostel Ledger Secured</span>
+            </div>
           </div>
         </div>
 
@@ -396,7 +440,7 @@ export default function HostelManagementPage() {
         <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
           <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
             <Home size={16} className="text-accent" />
-            <span>My Room Assignment</span>
+            <span>Room Assignment</span>
           </h3>
           {myAllotment ? (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
@@ -419,7 +463,7 @@ export default function HostelManagementPage() {
             </div>
           ) : (
             <p className="text-xs text-text-secondary italic py-4 text-center border border-dashed border-border rounded-xl">
-              No hostel room is currently allotted to you. Please contact the campus warden office for booking assistance.
+              No hostel room is currently allotted to {activeRole === 'PARENT' ? (currentStudent ? `${currentStudent.first_name}` : 'your child') : 'you'}. Please contact the campus warden office for booking assistance.
             </p>
           )}
         </div>
@@ -485,7 +529,7 @@ export default function HostelManagementPage() {
                   {myAllocations.length === 0 && (
                     <tr>
                       <td colSpan={5} className="text-center py-6 text-xs text-text-secondary italic">
-                        No equipment items issued to your profile.
+                        No equipment items issued to {activeRole === 'PARENT' ? (currentStudent ? `${currentStudent.first_name}'s profile` : "your child's profile") : 'your profile'}.
                       </td>
                     </tr>
                   )}
@@ -494,33 +538,109 @@ export default function HostelManagementPage() {
             </div>
           </div>
 
-          {/* Right: Payment Receipts History */}
-          <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
-            <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
-              <Receipt size={14} className="text-accent" />
-              <span>Settlement Receipts</span>
-            </h3>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-              {myAllocations
-                .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
-                .map((pay, i) => (
-                  <div key={i} className="p-3.5 bg-bg-main border border-border rounded-xl flex justify-between items-center text-xs">
-                    <div>
-                      <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
-                      <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono font-black text-success block">₹{pay.amount}</span>
-                      <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Settled</span>
-                    </div>
+          {/* Right: Payment & Receipts */}
+          <div className="space-y-6">
+            {/* Pay Outstanding Balance Form */}
+            {outstanding > 0 && (
+              <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
+                <h3 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary flex items-center gap-2">
+                  <CreditCard size={15} className="text-accent" />
+                  <span>Pay Outstanding Balance</span>
+                </h3>
+                
+                <form onSubmit={handleRecordPayment} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Choose Outstanding Item *</label>
+                    <select
+                      value={paymentForm.allocationId}
+                      onChange={(e) => {
+                        const alloc = myAllocations.find(a => a.id === e.target.value);
+                        setPaymentForm({
+                          ...paymentForm,
+                          allocationId: e.target.value,
+                          amount: alloc ? (alloc.cost - alloc.paid).toString() : ''
+                        });
+                      }}
+                      className="w-full bg-bg-main text-text-primary border border-border rounded-xl py-2.5 px-3 text-xs cursor-pointer outline-none focus:border-accent/40"
+                      required
+                    >
+                      <option value="">Select outstanding fee...</option>
+                      {myAllocations
+                        .filter(a => a.status !== 'PAID')
+                        .map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.item} (₹{a.cost - a.paid} outstanding)
+                          </option>
+                        ))
+                      }
+                    </select>
                   </div>
-                ))
-              }
-              {myAllocations.flatMap(a => a.payments || []).length === 0 && (
-                <p className="text-center py-6 text-xs text-text-secondary/70 italic border border-dashed border-border rounded-xl">
-                  No payment transactions logged yet.
-                </p>
-              )}
+
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Amount (₹) *</label>
+                    <input 
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                      className="w-full text-xs font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Method *</label>
+                    <select
+                      value={paymentForm.method}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                      className="w-full bg-bg-main text-text-primary border border-border rounded-xl py-2.5 px-3 text-xs outline-none focus:border-accent/40"
+                      required
+                    >
+                      <option value="Razorpay UPI">Razorpay UPI</option>
+                      <option value="Credit/Debit Card">Credit/Debit Card</option>
+                      <option value="Net Banking">Net Banking</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-success/15 active:scale-95 mt-2"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Pay Fee Instantly</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Payment Receipts History */}
+            <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
+              <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
+                <Receipt size={14} className="text-accent" />
+                <span>Settlement Receipts</span>
+              </h3>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                {myAllocations
+                  .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
+                  .map((pay, i) => (
+                    <div key={i} className="p-3.5 bg-bg-main border border-border rounded-xl flex justify-between items-center text-xs">
+                      <div>
+                        <p className="font-mono font-bold text-text-primary">Receipt: #{pay.id}</p>
+                        <span className="text-[9px] text-text-secondary">{pay.item} • {pay.date}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-black text-success block">₹{pay.amount}</span>
+                        <span className="text-[8px] bg-success/10 text-success font-black px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Settled</span>
+                      </div>
+                    </div>
+                  ))
+                }
+                {myAllocations.flatMap(a => a.payments || []).length === 0 && (
+                  <p className="text-center py-6 text-xs text-text-secondary/70 italic border border-dashed border-border rounded-xl">
+                    No payment transactions logged yet.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -621,7 +741,14 @@ export default function HostelManagementPage() {
             
             <div className="space-y-3">
               {tenantAllotments.map(al => (
-                <div key={al.id} className="p-4 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-2xl flex justify-between items-center gap-4 hover:border-accent/15 transition-all">
+                <div 
+                  key={al.id} 
+                  onClick={() => {
+                    setSelectedStudentId(al.studentId);
+                    setActiveTab('inventory');
+                  }}
+                  className="p-4 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-2xl flex justify-between items-center gap-4 hover:border-accent/15 transition-all cursor-pointer hover:text-accent"
+                >
                   <div>
                     <h4 className="text-sm font-bold text-text-primary">{getStudentName(al.studentId)}</h4>
                     <p className="text-[10px] text-text-secondary font-mono mt-0.5">
@@ -782,7 +909,13 @@ export default function HostelManagementPage() {
               <tbody className="divide-y divide-border">
                 {tenantAllotments.map(al => (
                   <tr key={al.id} className="hover:bg-slate-50/50">
-                    <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2">
+                    <td 
+                      onClick={() => {
+                        setSelectedStudentId(al.studentId);
+                        setActiveTab('inventory');
+                      }}
+                      className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2 cursor-pointer hover:text-accent transition-colors"
+                    >
                       <div className="w-8 h-8 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center text-accent">
                         <User size={14} />
                       </div>
@@ -1088,7 +1221,10 @@ export default function HostelManagementPage() {
                       
                       return (
                         <tr key={stud.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2">
+                          <td 
+                            onClick={() => setSelectedStudentId(stud.id)}
+                            className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2 cursor-pointer hover:text-accent transition-colors"
+                          >
                             <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black">
                               {stud.first_name[0]}{stud.last_name[0]}
                             </div>

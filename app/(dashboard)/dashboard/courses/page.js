@@ -346,7 +346,7 @@ export default function CoursesLMSPage() {
   };
 
   // Role Gate check - placed after all hooks
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'];
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Syllabus & LMS" />;
   }

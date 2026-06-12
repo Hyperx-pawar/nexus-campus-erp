@@ -47,26 +47,32 @@ export default function SmartTimetablePage() {
   // Resolve logged in teacher's staff ID
   const myStaffId = React.useMemo(() => {
     if (activeRole !== 'TEACHER') return null;
-    const myStaffRecord = sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
+    const myStaffRecord = sharedStaff?.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
     return myStaffRecord ? myStaffRecord.id : null;
   }, [sharedStaff, activeTenant.id, activeRole, activeUser]);
+
+  // Resolve parent profile & children
+  const parentProfile = React.useMemo(() => {
+    return sharedParents?.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email) || sharedParents?.find(p => p.tenant_id === activeTenant.id);
+  }, [sharedParents, activeTenant.id, activeUser]);
+
+  const parentChildren = React.useMemo(() => {
+    if (!parentProfile) return [];
+    return sharedStudents?.filter(s => s.parent_id === parentProfile.id && s.tenant_id === activeTenant.id) || [];
+  }, [sharedStudents, parentProfile, activeTenant.id]);
 
   // Resolve logged in student's class ID
   const myClassId = React.useMemo(() => {
     if (activeRole === 'STUDENT') {
-      const myStudentProfile = sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
+      const myStudentProfile = sharedStudents?.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
       return myStudentProfile ? myStudentProfile.class_id : null;
     } else if (activeRole === 'PARENT') {
-      const parentProfile = sharedParents.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email) || sharedParents.find(p => p.tenant_id === activeTenant.id);
-      if (parentProfile) {
-        const linkedStudents = sharedStudents.filter(s => s.parent_id === parentProfile.id && s.tenant_id === activeTenant.id);
-        if (linkedStudents.length > 0) {
-          return linkedStudents[0].class_id;
-        }
+      if (parentChildren.length > 0) {
+        return parentChildren[0].class_id;
       }
     }
     return null;
-  }, [sharedStudents, sharedParents, activeTenant.id, activeRole, activeUser]);
+  }, [sharedStudents, parentChildren, activeTenant.id, activeRole, activeUser]);
 
   // Auto-set selectedClassId on load or tenant change
   React.useEffect(() => {
@@ -544,7 +550,7 @@ Wednesday, 02:30 PM, Class XII, Accounts, Room L-201, T.S. Grewal`;
     time: ''
   });
 
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'];
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Timetable" />;
   }
@@ -691,18 +697,46 @@ Wednesday, 02:30 PM, Class XII, Accounts, Room L-201, T.S. Grewal`;
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
               <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider">Weekly Class Schedule</h3>
               
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Select Class:</span>
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="bg-bg-main border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-accent"
-                >
-                  {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
-                    <option key={cls.id} value={cls.id}>{cls.name}</option>
-                  ))}
-                </select>
-              </div>
+              {(activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'TEACHER') ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Select Class:</span>
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    className="bg-bg-main border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-accent"
+                  >
+                    {sharedClasses.filter(c => c.tenant_id === activeTenant.id).map(cls => (
+                      <option key={cls.id} value={cls.id}>{cls.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : activeRole === 'PARENT' ? (
+                parentChildren.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Select Child Class:</span>
+                    <select
+                      value={selectedClassId}
+                      onChange={(e) => setSelectedClassId(e.target.value)}
+                      className="bg-bg-main border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-accent"
+                    >
+                      {parentChildren.map(s => {
+                        const clsName = sharedClasses?.find(c => c.id === s.class_id)?.name || 'Class';
+                        return (
+                          <option key={s.id} value={s.class_id}>{s.first_name}'s Class ({clsName})</option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="text-xs font-bold text-accent">
+                    Class: {sharedClasses?.find(c => c.id === selectedClassId)?.name || 'General Class'}
+                  </div>
+                )
+              ) : (
+                <div className="text-xs font-bold text-accent">
+                  Class: {sharedClasses?.find(c => c.id === selectedClassId)?.name || 'General Class'}
+                </div>
+              )}
             </div>
             
             <div className="space-y-6">

@@ -20,21 +20,56 @@ export default function TransportLogisticsPage() {
     sharedMaintenanceBills,
     setSharedMaintenanceBills,
     sharedStudents,
+    sharedParents,
     activeRole,
     activeUser
   } = useAuth();
 
+  // Resolve parent profile & children
+  const myParentProfile = React.useMemo(() => {
+    return sharedParents?.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email);
+  }, [sharedParents, activeTenant.id, activeUser]);
+
+  const parentChildrenIds = React.useMemo(() => {
+    if (!myParentProfile) return [];
+    return sharedStudents?.filter(s => s.parent_id === myParentProfile.id && s.tenant_id === activeTenant.id).map(s => s.id) || [];
+  }, [sharedStudents, myParentProfile, activeTenant.id]);
+
+  const [selectedChildId, setSelectedChildId] = useState('');
+
+  // Auto set selectedChildId for parent role
+  React.useEffect(() => {
+    if (activeRole === 'PARENT' && parentChildrenIds.length > 0) {
+      setSelectedChildId(parentChildrenIds[0]);
+    }
+  }, [activeRole, parentChildrenIds]);
+
   // Resolve student ID for student role
   const myStudentProfile = React.useMemo(() => {
-    return sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
+    return sharedStudents?.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
   }, [sharedStudents, activeTenant.id, activeUser]);
 
+  const targetStudentProfile = React.useMemo(() => {
+    if (activeRole === 'STUDENT') {
+      return myStudentProfile;
+    }
+    if (activeRole === 'PARENT') {
+      return sharedStudents.find(s => s.id === selectedChildId && s.tenant_id === activeTenant.id);
+    }
+    return null;
+  }, [activeRole, myStudentProfile, selectedChildId, sharedStudents, activeTenant.id]);
+
   const myRoute = React.useMemo(() => {
-    if (!myStudentProfile || !myStudentProfile.enableTransport || !myStudentProfile.transportRouteId) {
+    if (!targetStudentProfile || !targetStudentProfile.enableTransport || !targetStudentProfile.transportRouteId) {
       return null;
     }
-    return sharedTransportRoutes.find(r => r.id === myStudentProfile.transportRouteId);
-  }, [myStudentProfile, sharedTransportRoutes]);
+    return sharedTransportRoutes.find(r => r.id === targetStudentProfile.transportRouteId);
+  }, [targetStudentProfile, sharedTransportRoutes]);
+
+  const getStudentName = (studentId) => {
+    const s = sharedStudents.find(x => x.id === studentId);
+    return s ? `${s.first_name} ${s.last_name}` : 'Unknown Student';
+  };
 
   const [activeTab, setActiveTab] = useState('routes'); // 'routes' | 'maintenance'
   const [showAddForm, setShowAddForm] = useState(false);
@@ -76,7 +111,7 @@ export default function TransportLogisticsPage() {
     'route-3': 'MAINTENANCE'
   });
  
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT'];
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TRANSPORT_MANAGER', 'STUDENT', 'PARENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="School Bus & Transport" />;
   }
@@ -243,20 +278,42 @@ export default function TransportLogisticsPage() {
     );
   });
 
-  if (activeRole === 'STUDENT') {
+  if (activeRole === 'STUDENT' || activeRole === 'PARENT') {
     return (
       <div className="space-y-8 animate-slide-up">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Transport Desk</h2>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">
+              {activeRole === 'PARENT' ? "Child's Transport Desk" : "My Transport Desk"}
+            </h2>
             <p className="text-text-secondary text-sm font-medium mt-1">
-              View your assigned school bus route, driver details, and monthly corridor fees.
+              {activeRole === 'PARENT'
+                ? `View assigned school bus route, driver details, and monthly corridor fees for ${targetStudentProfile ? `${targetStudentProfile.first_name} ${targetStudentProfile.last_name}` : 'your child'}.`
+                : "View your assigned school bus route, driver details, and monthly corridor fees."}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
-            <ShieldCheck size={14} />
-            <span>Transit Registry Secured</span>
+          <div className="flex items-center gap-4">
+            {activeRole === 'PARENT' && parentChildrenIds.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-text-secondary">Select Child:</span>
+                <select
+                  value={selectedChildId || ''}
+                  onChange={(e) => setSelectedChildId(e.target.value)}
+                  className="bg-bg-sidebar border border-border rounded-xl py-2 px-3.5 text-xs text-text-primary font-bold cursor-pointer outline-none focus:border-accent/40"
+                >
+                  {parentChildrenIds.map(childId => (
+                    <option key={childId} value={childId}>
+                      {getStudentName(childId)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
+              <ShieldCheck size={14} />
+              <span>Transit Registry Secured</span>
+            </div>
           </div>
         </div>
 
@@ -264,7 +321,7 @@ export default function TransportLogisticsPage() {
         <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-4">
           <h3 className="text-base font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-2">
             <Bus size={16} className="text-accent" />
-            <span>My School Bus Route Assignment</span>
+            <span>School Bus Route Assignment</span>
           </h3>
           {myRoute ? (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-medium">
@@ -287,7 +344,7 @@ export default function TransportLogisticsPage() {
             </div>
           ) : (
             <p className="text-xs text-text-secondary italic py-6 text-center border border-dashed border-border rounded-xl">
-              You are currently registered as a day scholar. No transport route or bus assignment found for your profile.
+              {activeRole === 'PARENT' ? (targetStudentProfile ? `${targetStudentProfile.first_name} is` : 'Your child is') : 'You are'} currently registered as a day scholar. No transport route or bus assignment found.
             </p>
           )}
         </div>

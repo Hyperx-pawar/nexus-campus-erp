@@ -56,11 +56,21 @@ export default function LibraryPage() {
 
   // Resolve staff ID
   const myStaffProfile = React.useMemo(() => {
-    return sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
+    return sharedStaff?.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
   }, [sharedStaff, activeTenant.id, activeUser]);
   const myStaffId = myStaffProfile ? myStaffProfile.id : '';
 
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'LIBRARIAN', 'TEACHER', 'STUDENT'];
+  // Resolve parent profile & children
+  const myParentProfile = React.useMemo(() => {
+    return sharedParents?.find(p => p.tenant_id === activeTenant.id && p.email === activeUser?.email);
+  }, [sharedParents, activeTenant.id, activeUser]);
+
+  const parentChildrenIds = React.useMemo(() => {
+    if (!myParentProfile) return [];
+    return sharedStudents?.filter(s => s.parent_id === myParentProfile.id && s.tenant_id === activeTenant.id).map(s => s.id) || [];
+  }, [sharedStudents, myParentProfile, activeTenant.id]);
+
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Library Books" />;
   }
@@ -68,11 +78,14 @@ export default function LibraryPage() {
   const myBorrowerId = activeRole === 'STUDENT' ? myStudentId : (activeRole === 'TEACHER' ? myStaffId : '');
 
   // Filters by tenant_id
-  const tenantBooks = sharedBooks.filter(b => b.tenant_id === activeTenant.id);
-  const tenantCirculations = sharedCirculations.filter(c => {
+  const tenantBooks = sharedBooks?.filter(b => b.tenant_id === activeTenant.id) || [];
+  const tenantCirculations = sharedCirculations?.filter(c => {
     if (c.tenant_id !== activeTenant.id) return false;
     if (activeRole === 'STUDENT' || activeRole === 'TEACHER') {
       return c.studentId === myBorrowerId;
+    }
+    if (activeRole === 'PARENT') {
+      return parentChildrenIds.includes(c.studentId);
     }
     return true;
   });
@@ -364,15 +377,19 @@ export default function LibraryPage() {
     );
   });
 
-  if (activeRole === 'STUDENT') {
+  if (activeRole === 'STUDENT' || activeRole === 'PARENT') {
     return (
       <div className="space-y-8 animate-slide-up">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">My Borrowed Books</h2>
+            <h2 className="text-3xl font-black font-outfit text-text-primary tracking-tight">
+              {activeRole === 'STUDENT' ? 'My Borrowed Books' : "Child's Borrowed Books"}
+            </h2>
             <p className="text-text-secondary text-sm font-medium mt-1">
-              Active school library checkouts and upcoming return due dates.
+              {activeRole === 'STUDENT' 
+                ? 'Active school library checkouts and upcoming return due dates.'
+                : "Active checkouts and return status for linked children."}
             </p>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-black text-success bg-success/5 border border-success/20 px-3.5 py-2.5 rounded-xl uppercase tracking-wider">
@@ -386,7 +403,8 @@ export default function LibraryPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border text-[10px] font-black uppercase text-text-secondary tracking-widest">
-                  <th className="pb-3 pl-4">Book Title</th>
+                  {activeRole === 'PARENT' && <th className="pb-3 pl-4">Child Name</th>}
+                  <th className={`pb-3 ${activeRole === 'PARENT' ? '' : 'pl-4'}`}>Book Title</th>
                   <th className="pb-3">Issued Date</th>
                   <th className="pb-3 pr-4 text-right">Due Date</th>
                 </tr>
@@ -396,7 +414,12 @@ export default function LibraryPage() {
                   const isOverdue = new Date() > new Date(c.dueDate);
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/50">
-                      <td className="py-4 pl-4 font-bold text-text-primary flex items-center gap-2">
+                      {activeRole === 'PARENT' && (
+                        <td className="py-4 pl-4 font-bold text-text-primary">
+                          {getBorrowerName(c.studentId).replace(' (Student)', '')}
+                        </td>
+                      )}
+                      <td className={`py-4 font-bold text-text-primary flex items-center gap-2 ${activeRole === 'PARENT' ? '' : 'pl-4'}`}>
                         <BookOpen size={14} className="text-accent" />
                         {getBookTitle(c.bookId)}
                       </td>
@@ -416,8 +439,10 @@ export default function LibraryPage() {
                 })}
                 {tenantCirculations.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="text-center py-8 text-xs text-text-secondary italic">
-                      You do not have any active library book checkouts.
+                    <td colSpan={activeRole === 'PARENT' ? 4 : 3} className="text-center py-8 text-xs text-text-secondary italic">
+                      {activeRole === 'STUDENT' 
+                        ? 'You do not have any active library book checkouts.'
+                        : 'No active library book checkouts found for your children.'}
                     </td>
                   </tr>
                 )}

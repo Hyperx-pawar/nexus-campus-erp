@@ -7,7 +7,9 @@ import { compressImage } from '@/lib/storage';
 import { 
   Shield, Sparkles, Building2, ClipboardList, Library, Home, Bus, 
   Briefcase, Wallet, FileBox, Settings, TrendingUp, Award, Zap, Bell, MessageSquare, User, Loader2, Upload,
-  RefreshCw, Database, HardDrive, Terminal, Server, Users, CheckCircle2
+  RefreshCw, Database, HardDrive, Terminal, Server, Users, CheckCircle2,
+  Code, HeartPulse, Scale, GraduationCap, ChevronRight,
+  Ship, Utensils, Coins, Hotel
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -955,7 +957,196 @@ function PlacementPortal({ activeTenant, activeRole }) {
   ]);
   
   const [eligibilityGpa, setEligibilityGpa] = useState(7.5);
+  const [portalTab, setPortalTab] = useState('drives'); // 'drives' | 'career_paths'
+  const [selectedStream, setSelectedStream] = useState('tech'); // 'tech' | 'medical' | 'commerce' | 'humanities'
   
+  const careerPaths = {
+    tech: {
+      title: 'Engineering & Technology (PCM)',
+      icon: Code,
+      badge: 'STEM',
+      color: 'border-blue-500/30 bg-blue-500/5 text-blue-400',
+      description: 'For students strong in Physics, Chemistry, and Mathematics who dream of building software, artificial intelligence, or tech products.',
+      jobs: [
+        { title: 'AI & Machine Learning Engineer', salary: '₹12 - 30 LPA', scope: 'Extremely High' },
+        { title: 'Full-Stack Software Developer', salary: '₹6 - 18 LPA', scope: 'High' },
+        { title: 'Cybersecurity Analyst', salary: '₹5 - 15 LPA', scope: 'Steady Growth' }
+      ],
+      education: [
+        { step: 'B.Tech / B.E. in Computer Science, IT, or AI/ML' },
+        { step: 'Major Entrance Exams: JEE Main, JEE Advanced, BITSAT, VITEEE, State CETs' }
+      ],
+      skills: ['Data Structures & Algorithms', 'Python, Java or C++', 'Web Frameworks (React, Node.js)', 'Cloud Platforms (AWS, GCP)'],
+      steps: [
+        { title: 'Master Core Sciences', desc: 'Secure 75%+ in Junior College (PCM) and prepare for engineering entrance exams.' },
+        { title: 'Excel in Graduation', desc: 'Maintain a 8.0+ CGPA in B.Tech and start coding regularly on LeetCode/GitHub.' },
+        { title: 'Build Projects & Intern', desc: 'Create 2-3 real-world projects and secure a summer internship in web, mobile or AI.' },
+        { title: 'Apply to Drives', desc: 'Participate in campus placement drives or off-campus coding contests (Google Kickstart, CodeChef).' }
+      ]
+    },
+    medical: {
+      title: 'Medical & Life Sciences (PCB)',
+      icon: HeartPulse,
+      badge: 'Healthcare',
+      color: 'border-rose-500/30 bg-rose-500/5 text-rose-400',
+      description: 'For students passionate about biology, medicine, human health, or biotechnology research.',
+      jobs: [
+        { title: 'Specialist Doctor (MD / MS)', salary: '₹15 - 50 LPA', scope: 'Recession Proof' },
+        { title: 'Biotechnologist / Vaccine Researcher', salary: '₹6 - 15 LPA', scope: 'Emerging' },
+        { title: 'Clinical Trial Specialist', salary: '₹4.5 - 10 LPA', scope: 'Steady Growth' }
+      ],
+      education: [
+        { step: 'MBBS, BDS, BAMS, or B.Sc. in Biotechnology / Genetics' },
+        { step: 'Major Entrance Exams: NEET (UG) is mandatory for clinical medical seats' }
+      ],
+      skills: ['Clinical Diagnosis', 'Laboratory Techniques (PCR, Chromatography)', 'Medical Ethics & Patient Care', 'Biostatistics'],
+      steps: [
+        { title: 'Clear NEET exam', desc: 'Score high in NEET (UG) biology, physics, and chemistry to secure a government seat.' },
+        { title: 'Complete MBBS / B.Sc', desc: 'Maintain high academic standing and complete the mandatory 1-year clinical internship.' },
+        { title: 'Specialization (MD/MS/M.Sc)', desc: 'Clear NEET (PG) for medical residency or pursue master\'s/Ph.D. in research fields.' },
+        { title: 'Residency & Practice', desc: 'Join state hospitals, private networks, or set up clinical consultation.' }
+      ]
+    },
+    commerce: {
+      title: 'Finance, Commerce & Management',
+      icon: TrendingUp,
+      badge: 'Business',
+      color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400',
+      description: 'For students interested in business operations, corporate finance, accounting, or managing enterprises.',
+      jobs: [
+        { title: 'Investment Banker', salary: '₹10 - 25 LPA', scope: 'High Demand' },
+        { title: 'Chartered Accountant (CA)', salary: '₹8 - 20 LPA', scope: 'Highly Prestigious' },
+        { title: 'Product / Brand Manager', salary: '₹8 - 18 LPA', scope: 'High Growth' }
+      ],
+      education: [
+        { step: 'B.Com, BBA, BMS, or professional CA program (ICAI)' },
+        { step: 'Major Entrance Exams: CA Foundation, IPMAT (for integrated MBA), CAT/GMAT (for Post-Grad MBA)' }
+      ],
+      skills: ['Financial Modeling & Valuation', 'Advanced Excel & SQL', 'Corporate Law & Auditing', 'Strategic Thinking'],
+      steps: [
+        { title: 'Begin CA Foundation / BBA', desc: 'Enroll in CA Foundation during Junior College or apply for premium BBA/B.Com courses.' },
+        { title: 'Clear CA Inter & Articleship', desc: 'For CA aspirants, clear Inter group exams and complete 2 years of practical articleship.' },
+        { title: 'Pursue MBA (Optional)', desc: 'Prepare for CAT/GMAT to get into top IIMs or international business schools.' },
+        { title: 'Land Corporate Job', desc: 'Apply to Big 4 accounting firms, investment banks, or management trainee programs.' }
+      ]
+    },
+    humanities: {
+      title: 'Creative, Law & Social Sciences',
+      icon: Scale,
+      badge: 'Creative & Law',
+      color: 'border-purple-500/30 bg-purple-500/5 text-purple-400',
+      description: 'For students with strong analytical, creative, design, or writing skills who want to enter legal, design, or public sector fields.',
+      jobs: [
+        { title: 'Corporate Lawyer', salary: '₹8 - 22 LPA', scope: 'High Demand' },
+        { title: 'UI / UX Designer', salary: '₹6 - 15 LPA', scope: 'Fastest Growing' },
+        { title: 'Civil Servant (IAS / IPS)', salary: '₹8 - 12 LPA + Perks', scope: 'Extremely Prestigious' }
+      ],
+      education: [
+        { step: '5-Year Integrated B.A. LL.B., B.Des. (Design), or B.A. in Public Policy' },
+        { step: 'Major Entrance Exams: CLAT, AILET, UCEED, NID DAT, UPSC Civil Services' }
+      ],
+      skills: ['Legal Drafting & Research', 'Design Thinking & Wireframing', 'Public Policy Analysis', 'Critical Reading & Writing'],
+      steps: [
+        { title: 'Target Entrance Exams', desc: 'Prepare for CLAT (Law) or UCEED (Design) or secure admission in top central universities.' },
+        { title: 'Build a Portfolio', desc: 'For design, build a rich case portfolio. For law, participate in moot courts and publish research.' },
+        { title: 'Intern with Agencies', desc: 'Intern under senior advocates, corporate legal firms, or design studios.' },
+        { title: 'Pass Certifications / Exams', desc: 'Pass the Bar Council of India exam to practice law, or appear for Civil Services (UPSC).' }
+      ]
+    },
+    merchant_navy: {
+      title: 'Merchant Navy & Marine Careers',
+      icon: Ship,
+      badge: 'Maritime',
+      color: 'border-sky-500/30 bg-sky-500/5 text-sky-400',
+      description: 'For students interested in navigating commercial ships, managing marine engineering systems, and traveling the world.',
+      jobs: [
+        { title: 'Deck Officer (Navigation)', salary: '₹8 - 25 LPA (Tax-Free)', scope: 'Global Demand' },
+        { title: 'Marine Engineer', salary: '₹10 - 24 LPA (Tax-Free)', scope: 'High Technical' },
+        { title: 'Electro-Technical Officer (ETO)', salary: '₹6 - 15 LPA', scope: 'Steady Growth' }
+      ],
+      education: [
+        { step: 'B.Sc. Nautical Science (3 years) or B.Tech Marine Engineering (4 years) or Diploma in Nautical Science (1 year)' },
+        { step: 'Major Entrance Exam: IMU-CET (Indian Maritime University Common Entrance Test)' }
+      ],
+      skills: ['Celestial Navigation & Meteorology', 'Marine Propulsion Systems', 'Maritime Law & Safety (STCW)', 'Physical Endurance & Swim Certifications'],
+      steps: [
+        { title: 'Step 1: Choose PCM in 10+2', desc: 'Secure 60%+ in Physics, Chemistry, and Mathematics, and pass a Class 1 Merchant Navy physical fitness/vision exam.' },
+        { title: 'Step 2: Clear IMU-CET', desc: 'Prepare for and clear the national IMU-CET entrance exam. Apply to DG Shipping approved academies.' },
+        { title: 'Step 3: Complete Pre-Sea Training & Cadetship', desc: 'Finish your academic training and complete 12 to 18 months of mandatory sea-time training as a deck/engine cadet.' },
+        { title: 'Step 4: Obtain COC (Certificate of Competency)', desc: 'Clear the written and oral MMD examinations to qualify as a licensed 3rd Officer or 4th Engineer.' }
+      ]
+    },
+    hotel_mgmt: {
+      title: 'Hotel & Hostel Management',
+      icon: Hotel,
+      badge: 'Hospitality',
+      color: 'border-amber-500/30 bg-amber-500/5 text-amber-400',
+      description: 'For students who love guest services, accommodation operations, event planning, and managing large hotels, hostels, or resorts.',
+      jobs: [
+        { title: 'Hotel / Resort General Manager', salary: '₹12 - 28 LPA', scope: 'International Scope' },
+        { title: 'Hostel Operations Manager', salary: '₹5 - 12 LPA', scope: 'High Growth (Co-living)' },
+        { title: 'Front Office / Guest Relations Director', salary: '₹6 - 14 LPA', scope: 'Steady Demand' }
+      ],
+      education: [
+        { step: 'Bachelor of Hotel Management (BHM), B.Sc in Hospitality & Hotel Administration, or PG Diploma in Accommodations' },
+        { step: 'Major Entrance Exam: NCHMCT JEE (National Council for Hotel Management Joint Entrance Exam)' }
+      ],
+      skills: ['Guest Relationship Management', 'Revenue & Yield Optimization', 'Event & Banquet Planning', 'Property Management Systems (Opera, PMS)'],
+      steps: [
+        { title: 'Step 1: Junior College (Any Stream)', desc: 'Complete Grade 12 (Science, Commerce, or Arts) with English as a compulsory subject.' },
+        { title: 'Step 2: Clear NCHMCT JEE / College Exams', desc: 'Crack NCHMCT JEE or target premium independent institutes like Oberoi STEP or Welcomgroup (WGSHA).' },
+        { title: 'Step 3: Intern at Premium Properties', desc: 'Complete 22 weeks of industrial training across front office, housekeeping, and food/beverage departments.' },
+        { title: 'Step 4: Secure Management Trainee (MT) post', desc: 'Apply to corporate MT programs of Taj, Oberoi, Marriott, or Oyo Co-living for rapid career acceleration.' }
+      ]
+    },
+    culinary: {
+      title: 'Culinary Arts & Professional Chefs',
+      icon: Utensils,
+      badge: 'Gastronomy',
+      color: 'border-orange-500/30 bg-orange-500/5 text-orange-400',
+      description: 'For students passionate about cooking, menu design, kitchen chemistry, bakery & pastry, and running fine-dining kitchens.',
+      jobs: [
+        { title: 'Executive Chef / Head Chef', salary: '₹15 - 35 LPA', scope: 'Prestigious & Competitive' },
+        { title: 'Pastry Chef / Chocolatier', salary: '₹6 - 16 LPA', scope: 'Emerging Craft' },
+        { title: 'Food Stylist / Culinary Consultant', salary: '₹8 - 20 LPA', scope: 'Niche Careers' }
+      ],
+      education: [
+        { step: 'B.A. / B.Sc. in Culinary Arts, Diploma in Food Production, or Grand Diplôme from Le Cordon Bleu / ICA' },
+        { step: 'Major Entrance Exams: NCHMCT JEE (Culinary specs), WGSHA entrance, or direct portfolios/interviews' }
+      ],
+      skills: ['Advanced Culinary Techniques', 'Food Safety & HACCP Certification', 'Kitchen Inventory & Cost Control', 'Menu Design & Gastronomy'],
+      steps: [
+        { title: 'Step 1: Focus on Food & Languages', desc: 'Complete Grade 12. Develop basic cooking familiarity and strong communication skills.' },
+        { title: 'Step 2: Enroll in Culinary School', desc: 'Join a recognized B.Sc Culinary Arts degree or a specialized diploma program.' },
+        { title: 'Step 3: Work as a Commis Chef', desc: 'Start at the bottom of the kitchen hierarchy (Commis III -> Commis I) to learn section-wise food prep.' },
+        { title: 'Step 4: Rise to Chef de Partie & Sous Chef', desc: 'Take responsibility for specific sections (e.g., Larder, Sauté) and manage shift operations.' }
+      ]
+    },
+    quant_finance: {
+      title: 'Quantitative Finance & Actuary',
+      icon: Coins,
+      badge: 'Quant Finance',
+      color: 'border-indigo-500/30 bg-indigo-500/5 text-indigo-400',
+      description: 'For students with exceptional mathematical skills who want to design trading algorithms, assess risk, and work in investment banking.',
+      jobs: [
+        { title: 'Quantitative Analyst / Trader', salary: '₹18 - 45 LPA', scope: 'Extremely High Paying' },
+        { title: 'Fellow Actuary (Risk Specialist)', salary: '₹15 - 35 LPA', scope: 'Highly Prestigious' },
+        { title: 'Risk Manager / Financial Engineer', salary: '₹12 - 25 LPA', scope: 'Steady Demand' }
+      ],
+      education: [
+        { step: 'B.Sc. Mathematics/Statistics, B.Tech/BS (IITs/ISIs), or professional Actuary Exams (IAI / IFoA)' },
+        { step: 'Major Entrance Exams: JEE Advanced (for IIT Math/CS), ISI Admission Test, ACET (Actuarial Common Entrance Test)' }
+      ],
+      skills: ['Stochastic Calculus & Probability', 'Python / R & SQL', 'Financial Derivatives & Valuation', 'Machine Learning & Time Series'],
+      steps: [
+        { title: 'Step 1: Choose PCM/PCMB in 10+2', desc: 'Ensure a deep foundation in high-level Calculus, Statistics, and Probability in Junior College.' },
+        { title: 'Step 2: Enter Top Math/Tech Program', desc: 'Secure admission at ISI, CMI, IITs, or top statistics programs (e.g., DU) for undergrad.' },
+        { title: 'Step 3: Clear Actuarial / CFA Exams', desc: 'Pass Core Principles exams of Institute of Actuaries of India, or clear CFA Level 1.' },
+        { title: 'Step 4: Enter Quant Trading/Risk', desc: 'Apply to global hedge funds, high-frequency trading firms, or risk consulting desks.' }
+      ]
+    }
+  };
+
   const eligibleStudents = useMemo(() => {
     const tenantStudents = (sharedStudents || []).filter(s => s.tenant_id === activeTenant.id);
     return tenantStudents.map((s, idx) => {
@@ -973,101 +1164,276 @@ function PlacementPortal({ activeTenant, activeRole }) {
 
   return (
     <div className="space-y-6">
-      {/* Top overview metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { label: 'Active Placement Drives', value: '4 Corporate', desc: 'Preloaded major Indian recruiters', icon: Briefcase },
-          { label: 'Eligible Candidates', value: eligibleStudents.length, desc: `Students with GPA >= ${eligibilityGpa}`, icon: Users },
-          { label: 'Average CTC Package', value: '₹4.65 LPA', desc: 'Direct corporate hires average', icon: Wallet }
-        ].map((met, idx) => (
-          <div key={idx} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{met.label}</span>
-              <div className="p-2 bg-accent/10 rounded-xl text-accent"><met.icon size={16} /></div>
-            </div>
-            <p className="text-3xl font-black font-outfit text-text-primary mt-3">{met.value}</p>
-            <p className="text-[10px] text-text-secondary mt-1">{met.desc}</p>
-          </div>
-        ))}
+      {/* Sub-tab Navigation */}
+      <div className="flex gap-2 p-1 bg-slate-100/50 border border-border rounded-2xl w-fit">
+        <button
+          onClick={() => setPortalTab('drives')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wider ${
+            portalTab === 'drives' 
+              ? 'bg-slate-200/60 text-text-primary border border-border shadow-lg' 
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Campus Recruitment
+        </button>
+        <button
+          onClick={() => setPortalTab('career_paths')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-wider ${
+            portalTab === 'career_paths' 
+              ? 'bg-slate-200/60 text-text-primary border border-border shadow-lg' 
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Dream Careers Guide
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Ongoing Corporate recruitment drives */}
-        <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
-          <h4 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary">Corporate Placement Drives</h4>
-          <div className="space-y-3">
-            {drives.map(d => (
-              <div key={d.id} className="p-4 bg-bg-main/40 border border-border hover:border-accent/15 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all">
-                <div>
-                  <p className="text-sm font-bold text-text-primary font-outfit">{d.company}</p>
-                  <p className="text-[10px] text-text-secondary font-bold font-mono">Role: {d.role} • Package: {d.package}</p>
-                  <p className="text-[9px] text-text-secondary mt-1 font-semibold">Drive Date: {d.date}</p>
+      {portalTab === 'drives' ? (
+        <>
+          {/* Top overview metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
+            {[
+              { label: 'Active Placement Drives', value: '4 Corporate', desc: 'Preloaded major Indian recruiters', icon: Briefcase },
+              { label: 'Eligible Candidates', value: eligibleStudents.length, desc: `Students with GPA >= ${eligibilityGpa}`, icon: Users },
+              { label: 'Average CTC Package', value: '₹4.65 LPA', desc: 'Direct corporate hires average', icon: Wallet }
+            ].map((met, idx) => (
+              <div key={idx} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{met.label}</span>
+                  <div className="p-2 bg-accent/10 rounded-xl text-accent"><met.icon size={16} /></div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
-                    d.status === 'ONGOING' 
-                      ? 'bg-success/15 border-success/35 text-success' 
-                      : 'bg-amber-100 border-amber-300 text-amber-800'
-                  }`}>
-                    {d.status}
-                  </span>
-                  {activeRole === 'STUDENT' && (
-                    <button
-                      onClick={() => handleRegisterDrive(d.company)}
-                      className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-lg border border-accent/20 transition-all active:scale-95 cursor-pointer"
-                    >
-                      Apply Now
-                    </button>
-                  )}
-                </div>
+                <p className="text-3xl font-black font-outfit text-text-primary mt-3">{met.value}</p>
+                <p className="text-[10px] text-text-secondary mt-1">{met.desc}</p>
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Eligibility Checker */}
-        <div className="p-6 bg-bg-sidebar border border-border rounded-3xl space-y-4">
-          <h4 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary">GPA Eligibility Filter</h4>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Minimum GPA Threshold</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="5.0"
-                  max="10.0"
-                  step="0.5"
-                  value={eligibilityGpa}
-                  onChange={(e) => setEligibilityGpa(Number(e.target.value))}
-                  className="flex-1 accent-accent"
-                />
-                <span className="font-mono font-black text-xs text-accent bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-lg">
-                  {eligibilityGpa.toFixed(1)}
-                </span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slide-up">
+            {/* Ongoing Corporate recruitment drives */}
+            <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary">Corporate Placement Drives</h4>
+              <div className="space-y-3">
+                {drives.map(d => (
+                  <div key={d.id} className="p-4 bg-bg-main/40 border border-border hover:border-accent/15 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all">
+                    <div>
+                      <p className="text-sm font-bold text-text-primary font-outfit">{d.company}</p>
+                      <p className="text-[10px] text-text-secondary font-bold font-mono">Role: {d.role} • Package: {d.package}</p>
+                      <p className="text-[9px] text-text-secondary mt-1 font-semibold">Drive Date: {d.date}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${
+                        d.status === 'ONGOING' 
+                          ? 'bg-success/15 border-success/35 text-success' 
+                          : 'bg-amber-100 border-amber-300 text-amber-800'
+                      }`}>
+                        {d.status}
+                      </span>
+                      {activeRole === 'STUDENT' && (
+                        <button
+                          onClick={() => handleRegisterDrive(d.company)}
+                          className="px-3.5 py-1.5 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-lg border border-accent/20 transition-all active:scale-95 cursor-pointer"
+                        >
+                          Apply Now
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Eligible Candidates</span>
-              <div className="max-h-48 overflow-y-auto border border-border rounded-xl divide-y divide-border bg-white custom-scrollbar text-[10px]">
-                {eligibleStudents.map((s, idx) => (
-                  <div key={idx} className="p-2.5 flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-text-primary block">{s.first_name} {s.last_name}</span>
-                      <span className="text-text-secondary text-[9px] block">Adm No: {s.admission_no}</span>
-                    </div>
-                    <span className="font-mono font-black text-success">GPA {s.gpa.toFixed(2)}</span>
+            {/* Eligibility Checker */}
+            <div className="p-6 bg-bg-sidebar border border-border rounded-3xl space-y-4">
+              <h4 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary">GPA Eligibility Filter</h4>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Minimum GPA Threshold</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="5.0"
+                      max="10.0"
+                      step="0.5"
+                      value={eligibilityGpa}
+                      onChange={(e) => setEligibilityGpa(Number(e.target.value))}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="font-mono font-black text-xs text-accent bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-lg">
+                      {eligibilityGpa.toFixed(1)}
+                    </span>
                   </div>
-                ))}
-                {eligibleStudents.length === 0 && (
-                  <p className="text-[10px] text-text-secondary italic text-center py-6">No students meet the set GPA threshold.</p>
-                )}
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block ml-1">Eligible Candidates</span>
+                  <div className="max-h-48 overflow-y-auto border border-border rounded-xl divide-y divide-border bg-white custom-scrollbar text-[10px]">
+                    {eligibleStudents.map((s, idx) => (
+                      <div key={idx} className="p-2.5 flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-text-primary block">{s.first_name} {s.last_name}</span>
+                          <span className="text-text-secondary text-[9px] block">Adm No: {s.admission_no}</span>
+                        </div>
+                        <span className="font-mono font-black text-success">GPA {s.gpa.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    {eligibleStudents.length === 0 && (
+                      <p className="text-[10px] text-text-secondary italic text-center py-6">No students meet the set GPA threshold.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </>
+      ) : (
+        /* Dream Careers Guide tab */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slide-up">
+          {/* Left Column: Stream Selection cards */}
+          <div className="space-y-4">
+            <div className="p-6 bg-bg-sidebar border border-border rounded-[2rem] space-y-3">
+              <h4 className="text-sm font-black uppercase tracking-wider font-outfit text-text-primary flex items-center gap-2">
+                <GraduationCap size={18} className="text-accent" />
+                <span>Choose Stream Corridor</span>
+              </h4>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Discover step-by-step roadmaps, entrance exams, core skills, and salaries for major career streams after completing Junior College (Grade 12).
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {Object.entries(careerPaths).map(([key, path]) => {
+                const isSelected = selectedStream === key;
+                const Icon = path.icon;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedStream(key)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
+                      isSelected
+                        ? 'bg-accent/10 border-accent/40 text-text-primary shadow-lg'
+                        : 'bg-bg-sidebar/55 border-border hover:border-border text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2.5 rounded-xl border ${path.color}`}>
+                        <Icon size={18} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-text-primary block">{path.title}</span>
+                        <span className="text-[8px] bg-slate-100 text-text-secondary font-black px-1.5 py-0.5 rounded uppercase mt-1 inline-block border border-border">
+                          {path.badge}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className={`text-text-secondary transition-transform duration-300 ${isSelected ? 'translate-x-1 text-accent' : ''}`} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Column (span-2): Stream Career Roadmap Details */}
+          {(() => {
+            const path = careerPaths[selectedStream];
+            const StreamIcon = path.icon;
+            return (
+              <div className="lg:col-span-2 p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-[2.5rem] space-y-6">
+                
+                {/* Title Card */}
+                <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-black font-outfit text-text-primary tracking-tight flex items-center gap-2">
+                      <StreamIcon className="text-accent" size={20} />
+                      <span>{path.title} Roadmap</span>
+                    </h3>
+                    <p className="text-[11px] text-text-secondary leading-relaxed pr-6">{path.description}</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-accent/15 border border-accent/35 text-accent text-[9px] font-black rounded-lg uppercase tracking-wider">
+                    {path.badge} Corridor
+                  </span>
+                </div>
+
+                {/* Section 1: Popular Dream Jobs */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary font-outfit flex items-center gap-1.5">
+                    <Briefcase size={14} className="text-accent" />
+                    <span>Popular Dream Job Profiles</span>
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    {path.jobs.map((job, idx) => (
+                      <div key={idx} className="p-3.5 bg-bg-main border border-border rounded-xl space-y-1 hover:border-accent/15 transition-all">
+                        <span className="font-bold text-text-primary block">{job.title}</span>
+                        <div className="flex justify-between items-center text-[9px] text-text-secondary mt-1.5">
+                          <span>Est. Salary: <strong className="text-success font-mono font-bold">{job.salary}</strong></span>
+                        </div>
+                        <span className="text-[8px] bg-slate-100 text-text-secondary font-bold px-1.5 py-0.5 rounded uppercase mt-2 inline-block">
+                          Demand: {job.scope}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 2: Education & Entrance Exams */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary font-outfit flex items-center gap-1.5">
+                    <Award size={14} className="text-accent" />
+                    <span>Academic Degrees & Entrance Exams</span>
+                  </h4>
+                  <div className="p-4 bg-bg-sidebar border border-border rounded-2xl space-y-2.5 text-xs text-text-secondary">
+                    {path.education.map((edu, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 bg-accent rounded-full mt-1.5 shrink-0" />
+                        <span className="leading-relaxed font-semibold text-text-primary">{edu.step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 3: Skill Checklist */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary font-outfit flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-accent" />
+                    <span>Industry Skills Checklist</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {path.skills.map((skill, idx) => (
+                      <span key={idx} className="px-3 py-1.5 bg-bg-main border border-border rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 bg-success rounded-full shrink-0" />
+                        <span>{skill}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 4: Step-by-Step Action Plan */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary font-outfit flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-accent" />
+                    <span>Step-by-Step Career Action Plan</span>
+                  </h4>
+                  <div className="relative border-l border-border pl-6 ml-3 space-y-6">
+                    {path.steps.map((step, idx) => (
+                      <div key={idx} className="relative group">
+                        {/* Timeline dot */}
+                        <div className="absolute -left-9 top-0.5 w-6 h-6 rounded-full bg-bg-main border border-border flex items-center justify-center text-[10px] font-black text-text-secondary group-hover:border-accent/40 group-hover:text-accent transition-all shadow-sm">
+                          {idx + 1}
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs font-bold text-text-primary block">{step.title}</span>
+                          <p className="text-[10px] text-text-secondary leading-relaxed">{step.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            );
+          })()}
         </div>
-      </div>
+      )}
     </div>
   );
 }
