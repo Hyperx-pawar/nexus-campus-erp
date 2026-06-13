@@ -291,47 +291,53 @@ export default function HostelManagementPage() {
     setSelectedStudentId(newIssue.studentId); // open student dossier card
   };
 
-  // Record Allocation Payment
+  // Record Allocation Payment — distributes amount across all outstanding items for the student
   const handleRecordPayment = (e) => {
     e.preventDefault();
-    const amount = Number(paymentForm.amount);
-    if (!paymentForm.allocationId || isNaN(amount) || amount <= 0) {
-      toast.error('Please select an item and enter a valid payment amount.');
+    let remaining = Number(paymentForm.amount);
+    if (isNaN(remaining) || remaining <= 0) {
+      toast.error('Please enter a valid payment amount.');
       return;
     }
 
-    const idx = sharedHostelInventoryAllocations.findIndex(a => a.id === paymentForm.allocationId);
-    if (idx === -1) return;
+    // Get all unpaid/partial allocations for this student ordered by date
+    const unpaidAllocs = sharedHostelInventoryAllocations
+      .map((a, idx) => ({ ...a, _idx: idx }))
+      .filter(a => a.studentId === selectedStudentId && a.status !== 'PAID');
 
-    const allocation = sharedHostelInventoryAllocations[idx];
-    const outstanding = allocation.cost - allocation.paid;
+    const totalOutstanding = unpaidAllocs.reduce((sum, a) => sum + (a.cost - a.paid), 0);
 
-    if (amount > outstanding) {
-      toast.error(`Payment amount exceeds outstanding balance of ₹${outstanding}`);
+    if (remaining > totalOutstanding) {
+      toast.error(`Payment amount ₹${remaining} exceeds total outstanding balance of ₹${totalOutstanding}`);
       return;
     }
 
-    const updatedAllocations = [...sharedHostelInventoryAllocations];
-    const newPaid = allocation.paid + amount;
-    const newStatus = newPaid === allocation.cost ? 'PAID' : 'PARTIAL';
     const txId = `tx-h${Math.floor(1000 + Math.random() * 9000)}`;
+    const txDate = new Date().toISOString().split('T')[0];
+    const updatedAllocations = [...sharedHostelInventoryAllocations];
 
-    const newPayment = {
-      id: txId,
-      date: new Date().toISOString().split('T')[0],
-      amount: amount,
-      method: paymentForm.method
-    };
-
-    updatedAllocations[idx] = {
-      ...allocation,
-      paid: newPaid,
-      status: newStatus,
-      payments: [...(allocation.payments || []), newPayment]
-    };
+    for (const alloc of unpaidAllocs) {
+      if (remaining <= 0) break;
+      const outstanding = alloc.cost - alloc.paid;
+      const applyAmt = Math.min(remaining, outstanding);
+      const newPaid = alloc.paid + applyAmt;
+      const newStatus = newPaid >= alloc.cost ? 'PAID' : 'PARTIAL';
+      updatedAllocations[alloc._idx] = {
+        ...updatedAllocations[alloc._idx],
+        paid: newPaid,
+        status: newStatus,
+        payments: [...(updatedAllocations[alloc._idx].payments || []), {
+          id: txId,
+          date: txDate,
+          amount: applyAmt,
+          method: paymentForm.method
+        }]
+      };
+      remaining -= applyAmt;
+    }
 
     setSharedHostelInventoryAllocations(updatedAllocations);
-    toast.success(`Recorded payment of ₹${amount} successfully! Receipt: #${txId}`);
+    toast.success(`Payment of ₹${Number(paymentForm.amount)} recorded! Receipt: #${txId}`);
     setPaymentForm({ allocationId: '', amount: '', method: 'Razorpay UPI' });
   };
 
@@ -1129,67 +1135,88 @@ export default function HostelManagementPage() {
                     </h3>
                     
                     <form onSubmit={handleRecordPayment} className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Choose Outstanding Item *</label>
-                        <select
-                          value={paymentForm.allocationId}
-                          onChange={(e) => {
-                            const alloc = tenantAllocations.find(a => a.id === e.target.value);
-                            setPaymentForm({
-                              ...paymentForm,
-                              allocationId: e.target.value,
-                              amount: alloc ? (alloc.cost - alloc.paid).toString() : ''
-                            });
-                          }}
-                          className="w-full bg-bg-main text-text-primary border border-border rounded-xl py-2.5 px-3 text-xs cursor-pointer"
-                          required
-                        >
-                          <option value="">Select equipment charges...</option>
-                          {tenantAllocations
-                            .filter(a => a.studentId === selectedStudentId && a.status !== 'PAID')
-                            .map(a => (
-                              <option key={a.id} value={a.id}>
-                                {a.item} (₹{a.cost - a.paid} outstanding)
-                              </option>
-                            ))
-                          }
-                        </select>
-                      </div>
+                      {/* Outstanding Summary */}
+                      {(() => {
+                        const unpaidAllocs = tenantAllocations.filter(a => a.studentId === selectedStudentId && a.status !== 'PAID');
+                        const totalCost = tenantAllocations.filter(a => a.studentId === selectedStudentId).reduce((s, a) => s + a.cost, 0);
+                        const totalPaid = tenantAllocations.filter(a => a.studentId === selectedStudentId).reduce((s, a) => s + a.paid, 0);
+                        const totalOutstanding = totalCost - totalPaid;
+                        const payAmt = Number(paymentForm.amount) || 0;
+                        const remaining = totalOutstanding - payAmt;
+                        return (
+                          <>
+                            {/* Summary row */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="bg-bg-main border border-border rounded-xl p-3 text-center">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Total Bill</p>
+                                <p className="text-sm font-black font-mono text-text-primary">₹{totalCost.toLocaleString('en-IN')}</p>
+                              </div>
+                              <div className="bg-bg-main border border-border rounded-xl p-3 text-center">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Paid So Far</p>
+                                <p className="text-sm font-black font-mono text-success">₹{totalPaid.toLocaleString('en-IN')}</p>
+                              </div>
+                              <div className={`border rounded-xl p-3 text-center ${totalOutstanding > 0 ? 'bg-error/8 border-error/30' : 'bg-success/8 border-success/30'}`}>
+                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Outstanding</p>
+                                <p className={`text-sm font-black font-mono ${totalOutstanding > 0 ? 'text-error' : 'text-success'}`}>₹{totalOutstanding.toLocaleString('en-IN')}</p>
+                              </div>
+                            </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Amount (₹) *</label>
-                        <input 
-                          type="number"
-                          placeholder="e.g. 500"
-                          value={paymentForm.amount}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                          className="w-full text-xs font-mono"
-                          required
-                        />
-                      </div>
+                            {totalOutstanding > 0 ? (
+                              <>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Amount (₹) *</label>
+                                  <input
+                                    type="number"
+                                    placeholder={`Max ₹${totalOutstanding}`}
+                                    min="1"
+                                    max={totalOutstanding}
+                                    value={paymentForm.amount}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                    className="w-full text-xs font-mono"
+                                    required
+                                  />
+                                </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Mode *</label>
-                        <select
-                          value={paymentForm.method}
-                          onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-                          className="w-full bg-bg-main text-text-primary border border-border rounded-xl py-2.5 px-3 text-xs"
-                          required
-                        >
-                          <option value="Razorpay UPI">Razorpay UPI</option>
-                          <option value="Cash Counter">Cash Counter</option>
-                          <option value="Net Banking">Net Banking</option>
-                          <option value="Demand Draft">Demand Draft (DD)</option>
-                        </select>
-                      </div>
+                                {/* Remaining after this payment */}
+                                {payAmt > 0 && payAmt <= totalOutstanding && (
+                                  <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-mono font-bold ${remaining === 0 ? 'bg-success/10 border-success/30 text-success' : 'bg-warning/10 border-warning/30 text-warning'}`}>
+                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-70">Remaining after payment</span>
+                                    <span>₹{remaining.toLocaleString('en-IN')}</span>
+                                  </div>
+                                )}
 
-                      <button
-                        type="submit"
-                        className="w-full py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-success/15 active:scale-95 mt-2"
-                      >
-                        <CheckCircle2 size={13} />
-                        <span>Settle Equipment Bill</span>
-                      </button>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-black text-text-secondary uppercase tracking-widest ml-1">Payment Mode *</label>
+                                  <select
+                                    value={paymentForm.method}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                                    className="w-full bg-bg-main text-text-primary border border-border rounded-xl py-2.5 px-3 text-xs"
+                                    required
+                                  >
+                                    <option value="Razorpay UPI">Razorpay UPI</option>
+                                    <option value="Cash Counter">Cash Counter</option>
+                                    <option value="Net Banking">Net Banking</option>
+                                    <option value="Demand Draft">Demand Draft (DD)</option>
+                                  </select>
+                                </div>
+
+                                <button
+                                  type="submit"
+                                  className="w-full py-3 bg-success hover:bg-success-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-success/15 active:scale-95 mt-2"
+                                >
+                                  <CheckCircle2 size={13} />
+                                  <span>Settle Equipment Bill</span>
+                                </button>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-2 p-3 bg-success/10 border border-success/30 rounded-xl">
+                                <CheckCircle2 size={14} className="text-success shrink-0" />
+                                <p className="text-[11px] font-bold text-success">All equipment bills fully settled!</p>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </form>
                   </div>
                 </div>
