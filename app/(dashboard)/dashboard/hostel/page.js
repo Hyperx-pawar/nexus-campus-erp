@@ -1101,15 +1101,15 @@ export default function HostelManagementPage() {
                       .filter(a => a.studentId === selectedStudentId)
                       .flatMap(a => (a.payments || []).map(p => ({ ...p, item: a.item })))
                       .map((pay, i) => (
-                        <div key={i} className="p-3.5 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-xl flex justify-between items-center">
-                          <div>
-                            <p className="text-[11px] font-mono font-bold text-text-primary">Receipt: #{pay.id} • {pay.item}</p>
-                            <span className="text-[9px] text-text-secondary font-semibold">Method: {pay.method} • {pay.date}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs font-black text-success font-mono">₹{pay.amount}</span>
-                            <span className="text-[8px] bg-success/15 text-success font-black px-1.5 rounded uppercase ml-2">Settled</span>
-                          </div>
+                        <div key={i} className="p-3.5 bg-bg-card/85 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-border rounded-xl flex justify-between items-start gap-3 min-w-0">
+                           <div className="min-w-0 flex-1 overflow-hidden">
+                             <p className="text-[11px] font-mono font-bold text-text-primary truncate">#{pay.id} • {pay.item}</p>
+                             <span className="text-[9px] text-text-secondary font-semibold block truncate">Method: {pay.method} • {pay.date}</span>
+                           </div>
+                           <div className="text-right shrink-0">
+                             <span className="text-xs font-black text-success font-mono">₹{pay.amount}</span>
+                             <span className="text-[8px] bg-success/15 text-success font-black px-1.5 rounded uppercase ml-2">Settled</span>
+                           </div>
                         </div>
                       ))
                     }
@@ -1147,17 +1147,17 @@ export default function HostelManagementPage() {
                           <>
                             {/* Summary row */}
                             <div className="grid grid-cols-3 gap-2">
-                              <div className="bg-bg-main border border-border rounded-xl p-3 text-center">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Total Bill</p>
-                                <p className="text-sm font-black font-mono text-text-primary">₹{totalCost.toLocaleString('en-IN')}</p>
+                              <div className="bg-bg-main border border-border rounded-xl p-2.5 text-center overflow-hidden min-w-0">
+                                <p className="text-[7px] font-black uppercase tracking-wider text-text-secondary mb-1 truncate">Total Bill</p>
+                                <p className="text-xs font-black font-mono text-text-primary truncate">₹{totalCost.toLocaleString('en-IN')}</p>
                               </div>
-                              <div className="bg-bg-main border border-border rounded-xl p-3 text-center">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Paid So Far</p>
-                                <p className="text-sm font-black font-mono text-success">₹{totalPaid.toLocaleString('en-IN')}</p>
+                              <div className="bg-bg-main border border-border rounded-xl p-2.5 text-center overflow-hidden min-w-0">
+                                <p className="text-[7px] font-black uppercase tracking-wider text-text-secondary mb-1 truncate">Paid</p>
+                                <p className="text-xs font-black font-mono text-success truncate">₹{totalPaid.toLocaleString('en-IN')}</p>
                               </div>
-                              <div className={`border rounded-xl p-3 text-center ${totalOutstanding > 0 ? 'bg-error/8 border-error/30' : 'bg-success/8 border-success/30'}`}>
-                                <p className="text-[8px] font-black uppercase tracking-widest text-text-secondary mb-1">Outstanding</p>
-                                <p className={`text-sm font-black font-mono ${totalOutstanding > 0 ? 'text-error' : 'text-success'}`}>₹{totalOutstanding.toLocaleString('en-IN')}</p>
+                              <div className={`border rounded-xl p-2.5 text-center overflow-hidden min-w-0 ${totalOutstanding > 0 ? 'bg-error/8 border-error/30' : 'bg-success/8 border-success/30'}`}>
+                                <p className="text-[7px] font-black uppercase tracking-wider text-text-secondary mb-1 truncate">Due</p>
+                                <p className={`text-xs font-black font-mono truncate ${totalOutstanding > 0 ? 'text-error' : 'text-success'}`}>₹{totalOutstanding.toLocaleString('en-IN')}</p>
                               </div>
                             </div>
 
@@ -1179,9 +1179,9 @@ export default function HostelManagementPage() {
 
                                 {/* Remaining after this payment */}
                                 {payAmt > 0 && payAmt <= totalOutstanding && (
-                                  <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-mono font-bold ${remaining === 0 ? 'bg-success/10 border-success/30 text-success' : 'bg-warning/10 border-warning/30 text-warning'}`}>
-                                    <span className="text-[9px] font-black uppercase tracking-widest opacity-70">Remaining after payment</span>
-                                    <span>₹{remaining.toLocaleString('en-IN')}</span>
+                                  <div className={`flex items-center justify-between gap-2 flex-wrap px-3 py-2 rounded-xl border text-xs font-mono font-bold ${remaining === 0 ? 'bg-success/10 border-success/30 text-success' : 'bg-warning/10 border-warning/30 text-warning'}`}>
+                                    <span className="text-[9px] font-black uppercase tracking-wider opacity-70 shrink-0">Remaining</span>
+                                    <span className="font-black">₹{remaining.toLocaleString('en-IN')}</span>
                                   </div>
                                 )}
 
@@ -1250,12 +1250,14 @@ export default function HostelManagementPage() {
                         <tr key={stud.id} className="hover:bg-slate-50/50 transition-colors">
                           <td 
                             onClick={() => setSelectedStudentId(stud.id)}
-                            className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2 cursor-pointer hover:text-accent transition-colors"
+                            className="py-4 pl-2 font-bold text-text-primary cursor-pointer hover:text-accent transition-colors max-w-[160px]"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black">
-                              {stud.first_name[0]}{stud.last_name[0]}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black shrink-0">
+                                {stud.first_name[0]}{stud.last_name[0]}
+                              </div>
+                              <span className="truncate">{stud.first_name} {stud.last_name}</span>
                             </div>
-                            {stud.first_name} {stud.last_name}
                           </td>
                           <td className="py-4 font-mono text-text-secondary">{stud.admission_no}</td>
                           <td className="py-4 text-slate-700 font-semibold">{studentAllos.length} items</td>
