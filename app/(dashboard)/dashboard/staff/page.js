@@ -5,7 +5,8 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
-  Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText, Zap
+  Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText, Zap,
+  Mail, Phone, LayoutGrid, List
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ export default function StaffRegistryPage() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [parsedStaff, setParsedStaff] = useState([]);
+  const [viewMode, setViewMode] = useState('grid');
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -1002,9 +1004,9 @@ export default function StaffRegistryPage() {
       {/* Staff Table */}
       <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
         
-        {/* Search Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="max-w-md w-full relative group/search">
+        {/* Search & Actions Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1 max-w-md relative group/search">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within/search:text-accent transition-colors" size={16} />
             <input 
               type="text" 
@@ -1015,72 +1017,204 @@ export default function StaffRegistryPage() {
             />
           </div>
           
-          <div className="flex items-center gap-2 text-[10px] font-black text-warning bg-warning/5 border border-warning/20 px-3.5 py-2 rounded-xl">
-            <ShieldAlert size={14} />
-            <span>Multi-Tenant Lockdown: Active</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-border">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'grid' 
+                    ? 'bg-white text-accent shadow-sm' 
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid size={14} />
+                <span>Cards</span>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewMode === 'table' 
+                    ? 'bg-white text-accent shadow-sm' 
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title="Table View"
+              >
+                <List size={14} />
+                <span>Table</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[10px] font-black text-warning bg-warning/5 border border-warning/20 px-3.5 py-2.5 rounded-xl">
+              <ShieldAlert size={14} />
+              <span>Multi-Tenant Lockdown: Active</span>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border text-[10px] font-black uppercase text-text-secondary tracking-widest">
-                <th className="pb-3 pl-2">Staff Member</th>
-                <th className="pb-3">Department</th>
-                <th className="pb-3">PAN Code</th>
-                <th className="pb-3">Basic Pay</th>
-                <th className="pb-3 text-right pr-2">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border text-xs">
-              {filteredStaff.map((staff) => {
-                const sal = calculateSalary(staff.basic, staff.allowances, staff.deductions);
-                return (
-                  <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2.5">
+        {viewMode === 'grid' ? (
+          /* Cards Grid View */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStaff.map((staff) => {
+              const docCount = (staff.documents || []).length;
+              return (
+                <div 
+                  key={staff.id} 
+                  className="bg-white hover:bg-slate-50/20 border border-border hover:border-accent/25 rounded-3xl p-6 transition-all hover:shadow-lg hover:shadow-slate-100 flex flex-col justify-between group relative overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {/* Header: Avatar, Name, Role badge */}
+                    <div className="flex items-start gap-4">
                       {staff.profile_picture_url ? (
                         <img 
                           src={staff.profile_picture_url} 
-                          alt="Staff Avatar" 
-                          className="w-8 h-8 rounded-lg object-cover border border-border shrink-0" 
+                          alt={`${staff.first_name} ${staff.last_name}`} 
+                          className="w-14 h-14 rounded-2xl object-cover border border-border shadow-sm shrink-0" 
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black shrink-0">
+                        <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-lg font-black font-outfit shrink-0">
                           {staff.first_name[0]}{staff.last_name[0]}
                         </div>
                       )}
-                      <div>
-                        <p>{staff.first_name} {staff.last_name}</p>
-                        <span className="text-[9px] text-text-secondary uppercase">{staff.employee_id} • {staff.designation}</span>
+                      <div className="space-y-1 min-w-0">
+                        <span className="inline-flex text-[9px] font-black text-accent uppercase tracking-wider bg-accent/5 px-2.5 py-0.5 rounded-lg border border-accent/10">
+                          {staff.role || 'TEACHER'}
+                        </span>
+                        <h4 className="text-sm font-black text-text-primary mt-1 truncate">
+                          {staff.first_name} {staff.last_name}
+                        </h4>
+                        <p className="text-[10px] text-text-secondary font-mono tracking-tight">{staff.employee_id}</p>
                       </div>
-                    </td>
-                    <td className="py-4 font-semibold text-slate-700">{staff.department}</td>
-                    <td className="py-4 font-mono text-text-secondary">{staff.pan_no || 'N/A'}</td>
-                    <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
-                    <td className="py-4 text-right pr-2">
-                      <div className="flex justify-end gap-1">
-                        <button 
-                          onClick={() => simulateStaffSession(staff)}
-                          className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
-                          title="Login as Staff (RBAC Simulator)"
-                        >
-                          <Zap size={14} />
-                        </button>
-                        <button 
-                          onClick={() => setSelectedStaffForDossier(staff)}
-                          className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
-                          title="Staff Documents & Dossier"
-                        >
-                          <FileBox size={14} />
-                        </button>
+                    </div>
+
+                    {/* Metadata details */}
+                    <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 pt-3.5 border-t border-slate-100 text-xs">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Designation</span>
+                        <span className="font-semibold text-text-primary leading-tight block truncate">{staff.designation}</span>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Department</span>
+                        <span className="font-semibold text-text-primary leading-tight block truncate">{staff.department}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Basic Pay</span>
+                        <span className="font-mono font-black text-accent">₹{staff.basic?.toLocaleString('en-IN') || '0'}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">PAN Code</span>
+                        <span className="font-mono text-text-secondary tracking-wider block uppercase truncate">{staff.pan_no || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Contact Details */}
+                    <div className="pt-3.5 border-t border-slate-100 space-y-2 text-[11px]">
+                      <div className="flex items-center gap-2 text-text-secondary min-w-0">
+                        <Mail size={12} className="shrink-0 text-slate-400" />
+                        <span className="truncate select-all" title={staff.email}>{staff.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Phone size={12} className="shrink-0 text-slate-400" />
+                        <span>{staff.phone || '+91 98765 43210'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions & Dossier summary */}
+                  <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 bg-slate-100/60 px-2.5 py-1 rounded-xl border border-border">
+                      <FileText size={10} className="text-slate-500" />
+                      <span className="text-[9px] font-bold text-slate-600">
+                        {docCount === 0 ? 'No Docs' : `${docCount} Doc${docCount > 1 ? 's' : ''}`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => simulateStaffSession(staff)}
+                        className="px-3 py-1.5 bg-success/10 hover:bg-success/20 text-success text-[10px] font-black rounded-xl border border-success/10 transition-all flex items-center gap-1 active:scale-95"
+                        title="Login as Staff (RBAC Simulator)"
+                      >
+                        <Zap size={11} />
+                        <span>Simulate</span>
+                      </button>
+                      <button 
+                        onClick={() => setSelectedStaffForDossier(staff)}
+                        className="px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-[10px] font-black rounded-xl border border-accent/10 transition-all flex items-center gap-1 active:scale-95"
+                        title="Staff Documents & Dossier"
+                      >
+                        <FileBox size={11} />
+                        <span>Dossier</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Table View */
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border text-[10px] font-black uppercase text-text-secondary tracking-widest">
+                  <th className="pb-3 pl-2">Staff Member</th>
+                  <th className="pb-3">Department</th>
+                  <th className="pb-3">PAN Code</th>
+                  <th className="pb-3">Basic Pay</th>
+                  <th className="pb-3 text-right pr-2">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border text-xs">
+                {filteredStaff.map((staff) => {
+                  return (
+                    <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="py-4 pl-2 font-bold text-text-primary flex items-center gap-2.5">
+                        {staff.profile_picture_url ? (
+                          <img 
+                            src={staff.profile_picture_url} 
+                            alt="Staff Avatar" 
+                            className="w-8 h-8 rounded-lg object-cover border border-border shrink-0" 
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-[11px] font-black shrink-0">
+                            {staff.first_name[0]}{staff.last_name[0]}
+                          </div>
+                        )}
+                        <div>
+                          <p>{staff.first_name} {staff.last_name}</p>
+                          <span className="text-[9px] text-text-secondary uppercase">{staff.employee_id} • {staff.designation}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 font-semibold text-slate-700">{staff.department}</td>
+                      <td className="py-4 font-mono text-text-secondary uppercase">{staff.pan_no || 'N/A'}</td>
+                      <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
+                      <td className="py-4 text-right pr-2">
+                        <div className="flex justify-end gap-1">
+                          <button 
+                            onClick={() => simulateStaffSession(staff)}
+                            className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
+                            title="Login as Staff (RBAC Simulator)"
+                          >
+                            <Zap size={14} />
+                          </button>
+                          <button 
+                            onClick={() => setSelectedStaffForDossier(staff)}
+                            className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
+                            title="Staff Documents & Dossier"
+                          >
+                            <FileBox size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {filteredStaff.length === 0 && (
           <p className="text-center py-8 text-xs text-text-secondary">No faculty records found for this campus.</p>
