@@ -28,7 +28,8 @@ import {
   TrendingUp,
   Award,
   CreditCard,
-  FileText
+  FileText,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 
@@ -76,7 +77,7 @@ const sidebarLinks = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { activeRole, activeUser, activeTenant, logout, realRole, sidebarOpen, setSidebarOpen } = useAuth();
+  const { activeRole, activeUser, activeTenant, logout, realRole, sidebarOpen, setSidebarOpen, showInstallBtn, setShowInstallModal } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const filteredLinks = sidebarLinks.map(group => ({
@@ -140,6 +141,24 @@ export default function Sidebar() {
           </div>
         ))}
       </div>
+
+      {/* PWA Install Button in Sidebar */}
+      {showInstallBtn && (
+        <div className="px-4 py-2 shrink-0 border-t border-border bg-slate-50/20">
+          <button
+            onClick={() => {
+              setShowInstallModal(true);
+              setSidebarOpen(false); // Close mobile menu when clicked
+            }}
+            className="w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 bg-gradient-to-br from-accent/5 to-indigo-500/5 hover:from-accent hover:to-indigo-600 border border-accent/20 hover:border-accent hover:text-white rounded-2xl text-accent transition-all duration-300 group/install"
+          >
+            <Smartphone size={18} className="shrink-0 transition-transform duration-300 group-hover/install:scale-110" />
+            {!isCollapsed && (
+              <span className="text-sm font-bold truncate">Install Mobile App</span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Sidebar Footer (User Info & Logout) */}
       <div className="p-4 mt-auto border-t border-border bg-slate-50/50">

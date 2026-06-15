@@ -717,6 +717,52 @@ export default function Providers({ children }) {
   // School-staff real-time payment alert feed (populated when parents pay online)
   const [sharedSchoolAlerts, setSharedSchoolAlerts] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
+  useEffect(() => {
+    const handlePrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    
+    // Check if running in standalone (installed) mode
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallBtn(false);
+    } else {
+      // Also show for mobile clients as a helper
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        setShowInstallBtn(true);
+      }
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setShowInstallBtn(false);
+        setShowInstallModal(false);
+        toast.success("Thank you for installing Campus ERP!");
+      }
+    } else {
+      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isiOS) {
+        toast.info("To install: Tap the Share button in Safari, then select 'Add to Home Screen' 📲");
+      } else {
+        toast.info("To install: Open your browser menu and select 'Install' or 'Add to Home Screen' 📲");
+      }
+    }
+  };
   const [sharedClassTestRecords, setSharedClassTestRecords] = useState({
     'stud-1': [
       { subject: 'Physics Class Test', marks: '22 / 25', grade: 'A1', desc: 'Class Avg: 19' },
@@ -1355,7 +1401,12 @@ export default function Providers({ children }) {
       sharedStudentHistory,
       setSharedStudentHistory,
       sidebarOpen,
-      setSidebarOpen
+      setSidebarOpen,
+      showInstallBtn,
+      setShowInstallBtn,
+      showInstallModal,
+      setShowInstallModal,
+      handleInstallApp
     }}>
       {children}
     </AuthContext.Provider>

@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Header() {
-  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole, sidebarOpen, setSidebarOpen } = useAuth();
+  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole, sidebarOpen, setSidebarOpen, showInstallBtn, setShowInstallModal } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -40,49 +40,7 @@ export default function Header() {
     setSharedSchoolAlerts(prev => prev.filter(a => a.id !== id));
   };
 
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallBtn, setShowInstallBtn] = useState(false);
-
-  useEffect(() => {
-    const handlePrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallBtn(true);
-    };
-    window.addEventListener('beforeinstallprompt', handlePrompt);
-    
-    // Check if running in standalone (installed) mode
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setShowInstallBtn(false);
-    } else {
-      // Also show for mobile clients as a helper
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        setShowInstallBtn(true);
-      }
-    }
-
-    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setShowInstallBtn(false);
-        toast.success("Thank you for installing Campus ERP!");
-      }
-    } else {
-      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      if (isiOS) {
-        toast.info("To install: Tap the Share button in Safari, then select 'Add to Home Screen' 📲");
-      } else {
-        toast.info("To install: Open your browser menu and select 'Install' or 'Add to Home Screen' 📲");
-      }
-    }
-  };
+  // Global install modal handles installation workflow
 
   return (
     <header className="h-20 px-4 md:px-8 border-b border-border bg-bg-main/60 backdrop-blur-3xl flex items-center justify-between sticky top-0 z-[50] font-inter">
@@ -144,7 +102,7 @@ export default function Header() {
         {/* Install Mobile App PWA Button */}
         {showInstallBtn && (
           <button
-            onClick={handleInstallApp}
+            onClick={() => setShowInstallModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 border border-accent/20 hover:bg-accent hover:text-white rounded-xl text-[10px] font-bold text-accent transition-all animate-pulse cursor-pointer"
             title="Download Mobile App"
           >

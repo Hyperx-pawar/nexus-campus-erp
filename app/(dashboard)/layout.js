@@ -2,6 +2,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import Chatbot from '@/components/AI/Chatbot';
 import DevSwitcher from '@/components/AI/DevSwitcher';
+import PWAInstallModal from '@/components/layout/PWAInstallModal';
 
 export default function DashboardLayout({ children }) {
   return (
@@ -17,6 +18,7 @@ export default function DashboardLayout({ children }) {
       </div>
       <Chatbot />
       <DevSwitcher />
+      <PWAInstallModal />
     </div>
   );
 }
