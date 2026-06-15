@@ -76,7 +76,7 @@ const sidebarLinks = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { activeRole, activeUser, activeTenant, logout, realRole } = useAuth();
+  const { activeRole, activeUser, activeTenant, logout, realRole, sidebarOpen, setSidebarOpen } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const filteredLinks = sidebarLinks.map(group => ({
@@ -85,7 +85,18 @@ export default function Sidebar() {
   })).filter(group => group.links.length > 0);
 
   return (
-    <aside className={`relative z-[60] bg-bg-sidebar border-r border-border h-screen flex flex-col transition-all duration-300 ease-in-out font-inter ${isCollapsed ? 'w-[88px]' : 'w-[280px]'}`}>
+    <>
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[55] md:hidden transition-all duration-300"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
+      <aside className={`fixed inset-y-0 left-0 z-[60] md:relative bg-bg-sidebar border-r border-border h-screen flex flex-col transition-all duration-300 ease-in-out font-inter shadow-2xl md:shadow-none ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      } ${isCollapsed ? 'w-[88px] md:w-[88px]' : 'w-[280px] md:w-[280px]'}`}>
       
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto px-4 pt-6 space-y-6 custom-scrollbar">
@@ -105,6 +116,7 @@ export default function Sidebar() {
                   <Link
                     key={link.href}
                     href={link.href}
+                    onClick={() => setSidebarOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 group relative ${
                       isActive 
                         ? 'bg-accent/10 text-accent border border-accent/20' 
@@ -170,6 +182,7 @@ export default function Sidebar() {
           </div>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

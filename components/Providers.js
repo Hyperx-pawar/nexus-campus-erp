@@ -716,6 +716,7 @@ export default function Providers({ children }) {
 
   // School-staff real-time payment alert feed (populated when parents pay online)
   const [sharedSchoolAlerts, setSharedSchoolAlerts] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sharedClassTestRecords, setSharedClassTestRecords] = useState({
     'stud-1': [
       { subject: 'Physics Class Test', marks: '22 / 25', grade: 'A1', desc: 'Class Avg: 19' },
@@ -1352,7 +1353,9 @@ export default function Providers({ children }) {
       sharedSchoolAlerts,
       setSharedSchoolAlerts,
       sharedStudentHistory,
-      setSharedStudentHistory
+      setSharedStudentHistory,
+      sidebarOpen,
+      setSidebarOpen
     }}>
       {children}
     </AuthContext.Provider>

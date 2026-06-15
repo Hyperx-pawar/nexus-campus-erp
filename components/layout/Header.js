@@ -17,14 +17,16 @@ import {
   School,
   Sun,
   Moon,
-  Smartphone
+  Smartphone,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Header() {
-  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole } = useAuth();
+  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole, sidebarOpen, setSidebarOpen } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -83,8 +85,17 @@ export default function Header() {
   };
 
   return (
-    <header className="h-20 px-8 border-b border-border bg-bg-main/60 backdrop-blur-3xl flex items-center justify-between sticky top-0 z-[50] font-inter">
+    <header className="h-20 px-4 md:px-8 border-b border-border bg-bg-main/60 backdrop-blur-3xl flex items-center justify-between sticky top-0 z-[50] font-inter">
       
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="p-2 -ml-2 text-text-secondary hover:text-text-primary hover:bg-slate-100 rounded-xl md:hidden transition-all mr-2 shrink-0 flex items-center justify-center"
+        title="Toggle Menu"
+      >
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
       {/* Active Campus Name Indicator */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-accent shrink-0 overflow-hidden border border-border/10">
