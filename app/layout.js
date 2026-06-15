@@ -22,6 +22,10 @@ const caveat = Caveat({
 export const metadata = {
   title: "Campus ERP | School & College Management Suite",
   description: "Complete modular ERP system for schools and colleges.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }) {

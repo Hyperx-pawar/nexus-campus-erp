@@ -12,7 +12,7 @@ export default async function manifest() {
   let name = "Campus ERP Portal";
   let shortName = "CampusERP";
   let brandColor = "#2563EB";
-  let iconUrl = "/globe.svg";
+  let iconUrl = "/icon.png";
 
   let matchedTenant = null;
 
@@ -67,13 +67,13 @@ export default async function manifest() {
       {
         src: iconUrl,
         sizes: "192x192",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "any"
       },
       {
         src: iconUrl,
         sizes: "512x512",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "any"
       }
     ]
