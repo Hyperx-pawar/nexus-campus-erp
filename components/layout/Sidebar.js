@@ -165,25 +165,37 @@ export default function Sidebar() {
         <div className={`p-1 rounded-[2rem] bg-indigo-500/10 border border-border backdrop-blur-md relative overflow-hidden group/profile ${isCollapsed ? 'flex justify-center' : ''}`}>
           <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/[0.05] to-accent/0 translate-x-[-100%] group-hover/profile:translate-x-[100%] transition-transform duration-1000"></div>
           
-          <div className="flex items-center gap-2.5 p-2.5 relative z-10">
-            <div className="w-9 h-9 rounded-xl bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
-               <span className="font-black text-accent text-xs uppercase">
-                 {activeUser?.name?.[0] || 'U'}
-               </span>
-            </div>
-            {!isCollapsed && (
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[12px] font-bold text-text-primary truncate">{activeUser?.name || 'Academic User'}</span>
-                <div className="flex items-center gap-1 mt-0.5">
-                   <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
-                   <span className="text-[9px] text-text-secondary font-black uppercase tracking-widest">{realRole || activeRole}</span>
-                </div>
+          <div className="flex items-center justify-between gap-2.5 p-2.5 relative z-10 w-full">
+            <Link
+              href="/dashboard/profile"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+              title="My Profile"
+            >
+              <div className="w-9 h-9 rounded-xl bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                 <span className="font-black text-accent text-xs uppercase">
+                   {activeUser?.avatar ? (
+                     <img src={activeUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                   ) : (
+                     activeUser?.name?.[0] || 'U'
+                   )}
+                 </span>
               </div>
-            )}
+              {!isCollapsed && (
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[12px] font-bold text-text-primary truncate">{activeUser?.name || 'Academic User'}</span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                     <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></div>
+                     <span className="text-[9px] text-text-secondary font-black uppercase tracking-widest">{realRole || activeRole}</span>
+                  </div>
+                </div>
+              )}
+            </Link>
             {!isCollapsed && (
                <button 
                  onClick={logout}
-                 className="p-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
+                 className="p-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-all shrink-0"
+                 title="Logout"
                >
                  <LogOut size={14} />
                </button>
