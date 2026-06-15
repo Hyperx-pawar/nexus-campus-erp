@@ -985,15 +985,22 @@ export default function Providers({ children }) {
   const logout = async () => {
     try {
       await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('Supabase signOut error, proceeding with local logout:', err);
+    } finally {
       setSession(null);
+      setActiveUser({
+        name: 'Academic User',
+        email: '',
+        role: 'STUDENT',
+        avatar: ''
+      });
       if (typeof window !== 'undefined') {
-        document.cookie = "sb-demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = "sb-demo-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie = "sb-demo-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0";
+        document.cookie = "sb-demo-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0";
       }
       toast.success('Session terminated successfully');
       router.push('/login');
-    } catch (err) {
-      toast.error('Sign out error');
     }
   };
 
