@@ -294,8 +294,12 @@ function StudentDashboard() {
         let absent = 0;
         let late = 0;
         
-        // Loop over known dates in May 2026 to scan logs
-        const dates = ['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22'];
+        // Scan logs to find all dates dynamically
+        const dates = Array.from(new Set(
+          Object.keys(logs || {})
+            .map(key => key.split('_')[0])
+            .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        )).sort();
         dates.forEach(date => {
           const key = `${date}_${sub.code}_${myStudentProfile.id}`;
           if (logs[key]) {

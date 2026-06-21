@@ -272,10 +272,20 @@ export default function AttendancePage() {
     const logKey = activeTab === 'students'
       ? `${selectedDate}_${selectedSubject}_${id}`
       : `${selectedDate}_${id}`;
-    setAttendanceLogs(prev => ({
-      ...prev,
-      [logKey]: prev[logKey] === newStatus ? undefined : newStatus
-    }));
+      
+    setAttendanceLogs(prev => {
+      const nextVal = prev[logKey] === newStatus ? undefined : newStatus;
+      const updated = {
+        ...prev,
+        [logKey]: nextVal
+      };
+      
+      if (activeTab === 'students') {
+        const allKey = `${selectedDate}_ALL_${id}`;
+        updated[allKey] = nextVal;
+      }
+      return updated;
+    });
     
     const name = activeTab === 'students' 
       ? tenantStudents.find(s => s.id === id)?.first_name 

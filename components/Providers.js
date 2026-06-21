@@ -319,6 +319,43 @@ export default function Providers({ children }) {
     return saved;
   });
 
+  useEffect(() => {
+    const baselines = {
+      'stud-1': { present: 40, absent: 5, late: 1 },
+      'stud-2': { present: 45, absent: 3, late: 2 },
+      'stud-3': { present: 35, absent: 12, late: 1 }
+    };
+
+    const newRecords = {};
+
+    sharedStudents.forEach(student => {
+      const base = baselines[student.id] || { present: 40, absent: 3, late: 1 };
+      let present = base.present;
+      let absent = base.absent;
+      let late = base.late;
+
+      Object.keys(sharedAttendanceLogs || {}).forEach(key => {
+        if (key.endsWith(`_ALL_${student.id}`)) {
+          const status = sharedAttendanceLogs[key];
+          if (status === 'PRESENT') present++;
+          else if (status === 'ABSENT') absent++;
+          else if (status === 'LATE') late++;
+        }
+      });
+
+      const total = present + absent + late;
+      const rate = total > 0 ? ((present + 0.5 * late) / total * 100).toFixed(1) : '100.0';
+      newRecords[student.id] = `${rate}%`;
+    });
+
+    setSharedAttendanceRecords(prev => {
+      const isDifferent = Object.keys(newRecords).some(
+        id => newRecords[id] !== prev[id]
+      );
+      return isDifferent ? newRecords : prev;
+    });
+  }, [sharedAttendanceLogs, sharedStudents]);
+
   const [sharedRemarks, setSharedRemarks] = useState({
     'stud-1': [
       { teacher: 'Prof. Rajesh Iyer (Physics)', remark: 'Excellent understanding of concepts. Active participant in lab sessions.', date: 'May 15, 2026' },
