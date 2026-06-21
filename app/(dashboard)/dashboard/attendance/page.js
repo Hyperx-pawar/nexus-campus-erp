@@ -18,11 +18,36 @@ export default function AttendancePage() {
     activeRole, activeUser, sharedSubjects, sharedNotifications, setSharedNotifications,
     sharedAttendanceLogs, setSharedAttendanceLogs, savedAttendanceRegistries, setSavedAttendanceRegistries
   } = useAuth();
+
+  // Resolve allowed classes for teachers (subject-classes + own-class)
+  const teacherAllowedClasses = React.useMemo(() => {
+    if (activeRole !== 'TEACHER') {
+      return sharedClasses.filter(c => c.tenant_id === activeTenant.id);
+    }
+    const myStaffRecord = sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.includes(s.first_name));
+    const myStaffId = myStaffRecord ? myStaffRecord.id : null;
+    const mySubjectClassIds = sharedSubjects.filter(sub => sub.teacher_id === myStaffId).map(sub => sub.class_id);
+    const myOwnClass = sharedClasses.find(c => c.class_teacher_id === myStaffId);
+    
+    return sharedClasses.filter(c => {
+      if (c.tenant_id !== activeTenant.id) return false;
+      return mySubjectClassIds.includes(c.id) || (myOwnClass && c.id === myOwnClass.id);
+    });
+  }, [activeRole, activeTenant, sharedClasses, sharedStaff, sharedSubjects, activeUser]);
+
+  const teacherAllowedClassIds = React.useMemo(() => teacherAllowedClasses.map(c => c.id), [teacherAllowedClasses]);
   
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'staff' | 'monthly_report'
   const [selectedDate, setSelectedDate] = useState('2026-05-24');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedClass, setSelectedClass] = useState('ALL');
+  
+  // Default to the first allowed class instead of 'ALL' so Save/Edit controls are immediately visible
+  const [selectedClass, setSelectedClass] = useState(() => {
+    return teacherAllowedClasses && teacherAllowedClasses.length > 0 
+      ? teacherAllowedClasses[0].id 
+      : 'ALL';
+  });
+  
   const [selectedSubject, setSelectedSubject] = useState('ALL');
   
   const [loading, setLoading] = useState(true);
@@ -113,23 +138,7 @@ export default function AttendancePage() {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  // Resolve allowed classes for teachers (subject-classes + own-class)
-  const teacherAllowedClasses = React.useMemo(() => {
-    if (activeRole !== 'TEACHER') {
-      return sharedClasses.filter(c => c.tenant_id === activeTenant.id);
-    }
-    const myStaffRecord = sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.includes(s.first_name));
-    const myStaffId = myStaffRecord ? myStaffRecord.id : null;
-    const mySubjectClassIds = sharedSubjects.filter(sub => sub.teacher_id === myStaffId).map(sub => sub.class_id);
-    const myOwnClass = sharedClasses.find(c => c.class_teacher_id === myStaffId);
-    
-    return sharedClasses.filter(c => {
-      if (c.tenant_id !== activeTenant.id) return false;
-      return mySubjectClassIds.includes(c.id) || (myOwnClass && c.id === myOwnClass.id);
-    });
-  }, [activeRole, activeTenant, sharedClasses, sharedStaff, sharedSubjects, activeUser]);
-
-  const teacherAllowedClassIds = React.useMemo(() => teacherAllowedClasses.map(c => c.id), [teacherAllowedClasses]);
+  // teacherAllowedClasses and teacherAllowedClassIds are defined above selectedClass
 
   const classSubjects = React.useMemo(() => {
     return sharedSubjects.filter(sub => {
