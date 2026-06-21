@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, XCircle, Clock, Search, Calendar, ChevronLeft, ChevronRight, 
   QrCode, UserCheck, ShieldAlert, Sparkles, RefreshCw, Eye, Camera, CheckCircle2, Loader2, BellRing,
-  Printer
+  Printer, Lock, Unlock
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ export default function AttendancePage() {
   const {
     activeTenant, sharedStudents, sharedStaff, sharedClasses, sharedParents,
     activeRole, activeUser, sharedSubjects, sharedNotifications, setSharedNotifications,
-    sharedAttendanceLogs, setSharedAttendanceLogs
+    sharedAttendanceLogs, setSharedAttendanceLogs, savedAttendanceRegistries, setSavedAttendanceRegistries
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'staff' | 'monthly_report'
@@ -30,6 +30,9 @@ export default function AttendancePage() {
   const [qrScanning, setQrScanning] = useState(false);
   const [scannedResult, setScannedResult] = useState(null);
 
+  // Edit/Lock states
+  const [isEditing, setIsEditing] = useState(false);
+
   // Monthly report controls
   const [reportType, setReportType] = useState('students'); // 'students' | 'staff'
   const [reportMonth, setReportMonth] = useState('05');
@@ -39,14 +42,48 @@ export default function AttendancePage() {
   const attendanceLogs = sharedAttendanceLogs || {};
   const setAttendanceLogs = setSharedAttendanceLogs;
 
-  // Simulate loading records from database to resolve the "stuck loading" bug
+  // Simulate loading records from database and reset edit states when filters change
   useEffect(() => {
     setLoading(true);
+    setIsEditing(false);
     const timer = setTimeout(() => {
       setLoading(false);
     }, 600); // 600ms load simulation
     return () => clearTimeout(timer);
-  }, [selectedDate, activeTab]);
+  }, [selectedDate, selectedClass, selectedSubject, activeTab]);
+
+  // Get unique key for the current class/subject/date or staff roster
+  const getCurrentRegistryKey = () => {
+    if (activeTab === 'students') {
+      return `student_${selectedDate}_${selectedClass}_${selectedSubject}`;
+    } else {
+      return `staff_${selectedDate}`;
+    }
+  };
+
+  const currentRegistryKey = getCurrentRegistryKey();
+  const isCurrentRegistrySaved = !!savedAttendanceRegistries?.[currentRegistryKey];
+  const canModifyAttendance = !isCurrentRegistrySaved || isEditing;
+
+  const handleSaveAttendance = () => {
+    const key = getCurrentRegistryKey();
+    setSavedAttendanceRegistries(prev => ({
+      ...prev,
+      [key]: true
+    }));
+    setIsEditing(false);
+    
+    const rosterType = activeTab === 'students' 
+      ? `Student Attendance for ${getClassName(selectedClass)} (${selectedSubject === 'ALL' ? 'All Subjects' : selectedSubject})`
+      : 'Staff Daily Attendance';
+      
+    toast.success(`${rosterType} saved and locked successfully!`);
+  };
+
+  const handleEditAttendance = () => {
+    setIsEditing(true);
+    toast.info('Attendance sheet unlocked for editing.');
+  };
 
   // Format date to human-readable string: e.g. "May 24th, 2026"
   const formatHumanDate = (dateStr) => {
@@ -227,6 +264,11 @@ export default function AttendancePage() {
 
   // Toggle status
   const handleToggleStatus = (id, newStatus) => {
+    if (!canModifyAttendance) {
+      toast.error("Roster is locked. Click 'Edit Attendance' at the top to modify.");
+      return;
+    }
+
     const logKey = activeTab === 'students'
       ? `${selectedDate}_${selectedSubject}_${id}`
       : `${selectedDate}_${id}`;
@@ -251,6 +293,11 @@ export default function AttendancePage() {
 
   // Simulated QR Scan Action
   const handleTriggerQRScan = () => {
+    if (!canModifyAttendance) {
+      toast.error("Roster is locked. Click 'Edit Attendance' at the top to modify.");
+      return;
+    }
+
     setQrScanning(true);
     setScannedResult(null);
     
@@ -528,6 +575,109 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {/* Save/Edit Lock Action Banner */}
+      {activeTab !== 'monthly_report' && (
+        <div className="p-5 bg-white dark:bg-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all">
+          <div className="flex items-center gap-3">
+            {activeTab === 'students' && selectedClass === 'ALL' ? (
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-text-secondary shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+            ) : isCurrentRegistrySaved ? (
+              isEditing ? (
+                <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0 animate-pulse">
+                  <Unlock size={20} />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center text-success shrink-0">
+                  <Lock size={20} />
+                </div>
+              )
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                <ShieldAlert size={20} />
+              </div>
+            )}
+            <div>
+              {activeTab === 'students' && selectedClass === 'ALL' ? (
+                <>
+                  <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">Select Class to Save</h4>
+                  <p className="text-[11px] text-text-secondary mt-0.5">Please choose a specific Class and Subject from the filters below to take and save attendance.</p>
+                </>
+              ) : isCurrentRegistrySaved ? (
+                isEditing ? (
+                  <>
+                    <h4 className="text-xs font-black text-accent uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-accent rounded-full animate-ping"></span>
+                      Editing Attendance
+                    </h4>
+                    <p className="text-[11px] text-text-secondary mt-0.5">
+                      Editing saved records for <span className="font-bold text-text-primary">{activeTab === 'students' ? `${getClassName(selectedClass)} (${selectedSubject === 'ALL' ? 'All Subjects' : selectedSubject})` : 'Staff Daily Roster'}</span>.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-xs font-black text-success uppercase tracking-wider">Attendance Saved & Locked</h4>
+                    <p className="text-[11px] text-text-secondary mt-0.5">
+                      Roster finalized for <span className="font-bold text-text-primary">{activeTab === 'students' ? `${getClassName(selectedClass)} (${selectedSubject === 'ALL' ? 'All Subjects' : selectedSubject})` : 'Staff Daily Roster'}</span> on {formatHumanDate(selectedDate)}.
+                    </p>
+                  </>
+                )
+              ) : (
+                <>
+                  <h4 className="text-xs font-black text-amber-600 uppercase tracking-wider">Unsaved Attendance Sheet</h4>
+                  <p className="text-[11px] text-text-secondary mt-0.5">
+                    Roster not finalized yet for <span className="font-bold text-text-primary">{activeTab === 'students' ? `${getClassName(selectedClass)} (${selectedSubject === 'ALL' ? 'All Subjects' : selectedSubject})` : 'Staff Daily Roster'}</span>.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex gap-2 shrink-0 w-full sm:w-auto justify-end">
+            {activeTab === 'students' && selectedClass === 'ALL' ? (
+              <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-border">
+                Filter Required
+              </span>
+            ) : isCurrentRegistrySaved ? (
+              isEditing ? (
+                <>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-text-primary text-xs font-bold rounded-xl transition-all border border-border"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveAttendance}
+                    className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl shadow-md shadow-accent/10 transition-all flex items-center gap-1.5"
+                  >
+                    <CheckCircle size={14} />
+                    <span>Save Changes</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleEditAttendance}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200/60 dark:bg-slate-700 border border-border text-text-primary text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                >
+                  <Unlock size={14} className="text-text-secondary" />
+                  <span>Edit Attendance</span>
+                </button>
+              )
+            ) : (
+              <button
+                onClick={handleSaveAttendance}
+                className="px-5 py-2.5 bg-success hover:bg-success/90 text-white text-xs font-bold rounded-xl shadow-md shadow-success/10 transition-all flex items-center gap-1.5"
+              >
+                <CheckCircle size={14} />
+                <span>Save Attendance</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab !== 'monthly_report' ? (
         /* Filters & Search - Daily Attendance View */
         <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
@@ -631,12 +781,13 @@ export default function AttendancePage() {
                                   return (
                                     <button
                                       key={btn.status}
+                                      disabled={!canModifyAttendance}
                                       onClick={() => handleToggleStatus(stud.id, btn.status)}
                                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
                                         isActive 
                                           ? btn.activeColor 
-                                          : `border-transparent text-text-secondary ${btn.color}`
-                                      }`}
+                                          : `border-transparent text-text-secondary ${canModifyAttendance ? btn.color : 'opacity-40'}`
+                                      } ${!canModifyAttendance ? 'cursor-not-allowed' : ''}`}
                                     >
                                       <btn.icon size={11} />
                                       <span>{btn.label}</span>
@@ -677,12 +828,13 @@ export default function AttendancePage() {
                                   return (
                                     <button
                                       key={btn.status}
+                                      disabled={!canModifyAttendance}
                                       onClick={() => handleToggleStatus(st.id, btn.status)}
                                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
                                         isActive 
                                           ? btn.activeColor 
-                                          : `border-transparent text-text-secondary ${btn.color}`
-                                      }`}
+                                          : `border-transparent text-text-secondary ${canModifyAttendance ? btn.color : 'opacity-40'}`
+                                      } ${!canModifyAttendance ? 'cursor-not-allowed' : ''}`}
                                     >
                                       <btn.icon size={11} />
                                       <span>{btn.label}</span>
@@ -716,8 +868,14 @@ export default function AttendancePage() {
               </div>
               {filteredStudents.filter(s => getStatus(s.id) === 'ABSENT').length > 0 && (
                 <button
+                  disabled={!isCurrentRegistrySaved}
                   onClick={handleBulkAbsenteeReminders}
-                  className="px-4 py-2 bg-danger hover:bg-danger/80 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                  className={`px-4 py-2 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                    isCurrentRegistrySaved 
+                      ? 'bg-danger hover:bg-danger/80' 
+                      : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-text-secondary opacity-50'
+                  }`}
+                  title={!isCurrentRegistrySaved ? "Save/finalize attendance first before notifying parents" : ""}
                 >
                   <BellRing size={12} />
                   <span>Notify All Absentee Parents ({filteredStudents.filter(s => getStatus(s.id) === 'ABSENT').length})</span>
@@ -950,11 +1108,15 @@ export default function AttendancePage() {
           <div className="flex gap-3">
             <button
               onClick={handleTriggerQRScan}
-              disabled={qrScanning}
-              className="flex-1 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              disabled={qrScanning || !canModifyAttendance}
+              className={`flex-1 py-3 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                canModifyAttendance 
+                  ? 'bg-accent hover:bg-accent-hover' 
+                  : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed opacity-50'
+              }`}
             >
               <Camera size={14} />
-              <span>{qrScanning ? 'Scanning...' : 'Simulate Card Detect'}</span>
+              <span>{qrScanning ? 'Scanning...' : !canModifyAttendance ? 'Roster Locked' : 'Simulate Card Detect'}</span>
             </button>
             
             {scannedResult && (

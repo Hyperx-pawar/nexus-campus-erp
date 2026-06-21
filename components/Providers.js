@@ -297,6 +297,28 @@ export default function Providers({ children }) {
     return logs;
   });
 
+  const [savedAttendanceRegistries, setSavedAttendanceRegistries] = useState(() => {
+    const saved = {};
+    const dates = ['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22'];
+    
+    dates.forEach(date => {
+      // student class-1 saved
+      saved[`student_${date}_class-1_PH-121`] = true;
+      saved[`student_${date}_class-1_MA-122`] = true;
+      saved[`student_${date}_class-1_CY-123`] = true;
+      saved[`student_${date}_class-1_ALL`] = true;
+      
+      // student class-2 saved
+      saved[`student_${date}_class-2_AC-121`] = true;
+      saved[`student_${date}_class-2_BS-122`] = true;
+      saved[`student_${date}_class-2_ALL`] = true;
+
+      // staff saved
+      saved[`staff_${date}`] = true;
+    });
+    return saved;
+  });
+
   const [sharedRemarks, setSharedRemarks] = useState({
     'stud-1': [
       { teacher: 'Prof. Rajesh Iyer (Physics)', remark: 'Excellent understanding of concepts. Active participant in lab sessions.', date: 'May 15, 2026' },
@@ -1363,6 +1385,8 @@ export default function Providers({ children }) {
       setSharedAttendanceRecords,
       sharedAttendanceLogs,
       setSharedAttendanceLogs,
+      savedAttendanceRegistries,
+      setSavedAttendanceRegistries,
       sharedRemarks,
       setSharedRemarks,
       activeParentId,
