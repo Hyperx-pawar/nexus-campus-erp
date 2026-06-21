@@ -19,36 +19,56 @@ export default function AttendancePage() {
     sharedAttendanceLogs, setSharedAttendanceLogs, savedAttendanceRegistries, setSavedAttendanceRegistries
   } = useAuth();
 
+  // Resolve current staff record for logged-in teacher
+  const myStaffRecord = React.useMemo(() => {
+    return sharedStaff.find(
+      s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.includes(s.first_name)
+    );
+  }, [sharedStaff, activeTenant.id, activeUser]);
+
+  const myStaffId = myStaffRecord ? myStaffRecord.id : null;
+
+  // Resolve the class where the teacher is the class teacher
+  const myOwnClass = React.useMemo(() => {
+    return sharedClasses.find(c => c.class_teacher_id === myStaffId && c.tenant_id === activeTenant.id);
+  }, [sharedClasses, myStaffId, activeTenant.id]);
+
   // Resolve allowed classes for teachers (subject-classes + own-class)
   const teacherAllowedClasses = React.useMemo(() => {
     if (activeRole !== 'TEACHER') {
       return sharedClasses.filter(c => c.tenant_id === activeTenant.id);
     }
-    const myStaffRecord = sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.includes(s.first_name));
-    const myStaffId = myStaffRecord ? myStaffRecord.id : null;
-    const mySubjectClassIds = sharedSubjects.filter(sub => sub.teacher_id === myStaffId).map(sub => sub.class_id);
-    const myOwnClass = sharedClasses.find(c => c.class_teacher_id === myStaffId);
+    const mySubjectClassIds = sharedSubjects
+      .filter(sub => sub.teacher_id === myStaffId)
+      .map(sub => sub.class_id);
     
     return sharedClasses.filter(c => {
       if (c.tenant_id !== activeTenant.id) return false;
       return mySubjectClassIds.includes(c.id) || (myOwnClass && c.id === myOwnClass.id);
     });
-  }, [activeRole, activeTenant, sharedClasses, sharedStaff, sharedSubjects, activeUser]);
+  }, [activeRole, activeTenant, sharedClasses, sharedSubjects, myStaffId, myOwnClass]);
 
   const teacherAllowedClassIds = React.useMemo(() => teacherAllowedClasses.map(c => c.id), [teacherAllowedClasses]);
   
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'staff' | 'monthly_report'
   const [selectedDate, setSelectedDate] = useState('2026-05-24');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Default to the first allowed class instead of 'ALL' so Save/Edit controls are immediately visible
-  const [selectedClass, setSelectedClass] = useState(() => {
-    return teacherAllowedClasses && teacherAllowedClasses.length > 0 
-      ? teacherAllowedClasses[0].id 
-      : 'ALL';
-  });
-  
+  const [selectedClass, setSelectedClass] = useState('ALL');
   const [selectedSubject, setSelectedSubject] = useState('ALL');
+
+  const classSubjects = React.useMemo(() => {
+    return sharedSubjects.filter(sub => {
+      if (sub.tenant_id !== activeTenant.id) return false;
+      if (activeRole === 'TEACHER') {
+        // Teacher can only see and access subjects they are assigned to
+        if (sub.teacher_id !== myStaffId) return false;
+      }
+      if (selectedClass !== 'ALL' && sub.class_id !== selectedClass) return false;
+      return true;
+    });
+  }, [sharedSubjects, activeTenant.id, selectedClass, activeRole, myStaffId]);
+
+  const isInitialClassLoad = React.useRef(true);
   
   const [loading, setLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -76,6 +96,27 @@ export default function AttendancePage() {
     }, 600); // 600ms load simulation
     return () => clearTimeout(timer);
   }, [selectedDate, selectedClass, selectedSubject, activeTab]);
+
+  // Default to the first allowed class instead of 'ALL' on initial mount so controls are immediately visible
+  useEffect(() => {
+    if (isInitialClassLoad.current && teacherAllowedClasses && teacherAllowedClasses.length > 0) {
+      setSelectedClass(teacherAllowedClasses[0].id);
+      isInitialClassLoad.current = false;
+    }
+  }, [teacherAllowedClasses]);
+
+  // Security state synchronization: if not a class teacher, auto-select their first assigned subject
+  useEffect(() => {
+    if (activeRole === 'TEACHER' && selectedClass !== 'ALL') {
+      const isClassTeacher = myOwnClass && selectedClass === myOwnClass.id;
+      if (!isClassTeacher) {
+        const isValidSubject = classSubjects.some(sub => sub.code === selectedSubject);
+        if (!isValidSubject && classSubjects.length > 0) {
+          setSelectedSubject(classSubjects[0].code);
+        }
+      }
+    }
+  }, [selectedClass, activeRole, myOwnClass, classSubjects, selectedSubject]);
 
   // Get unique key for the current class/subject/date or staff roster
   const getCurrentRegistryKey = () => {
@@ -138,18 +179,7 @@ export default function AttendancePage() {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  // teacherAllowedClasses and teacherAllowedClassIds are defined above selectedClass
-
-  const classSubjects = React.useMemo(() => {
-    return sharedSubjects.filter(sub => {
-      if (sub.tenant_id !== activeTenant.id) return false;
-      if (activeRole === 'TEACHER') {
-        if (!teacherAllowedClassIds.includes(sub.class_id)) return false;
-      }
-      if (selectedClass !== 'ALL' && sub.class_id !== selectedClass) return false;
-      return true;
-    });
-  }, [sharedSubjects, activeTenant.id, selectedClass, activeRole, teacherAllowedClassIds]);
+  // teacherAllowedClasses, teacherAllowedClassIds, and classSubjects are defined above selectedClass
 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'];
   if (!allowedRoles.includes(activeRole)) {
@@ -278,6 +308,27 @@ export default function AttendancePage() {
       return;
     }
 
+    // Security Gate: Verify teacher is allowed to edit this class and subject
+    if (activeRole === 'TEACHER' && activeTab === 'students') {
+      if (!teacherAllowedClassIds.includes(selectedClass)) {
+        toast.error("Unauthorized: You do not have permission for this class.");
+        return;
+      }
+      if (selectedSubject !== 'ALL') {
+        const hasSubject = classSubjects.some(sub => sub.code === selectedSubject);
+        if (!hasSubject) {
+          toast.error("Unauthorized: You do not have permission for this subject.");
+          return;
+        }
+      } else {
+        const isClassTeacher = myOwnClass && selectedClass === myOwnClass.id;
+        if (!isClassTeacher) {
+          toast.error("Unauthorized: Only the class teacher can edit daily attendance.");
+          return;
+        }
+      }
+    }
+
     const logKey = activeTab === 'students'
       ? `${selectedDate}_${selectedSubject}_${id}`
       : `${selectedDate}_${id}`;
@@ -315,6 +366,27 @@ export default function AttendancePage() {
     if (!canModifyAttendance) {
       toast.error("Roster is locked. Click 'Edit Attendance' at the top to modify.");
       return;
+    }
+
+    // Security Gate: Verify teacher is allowed to edit this class and subject
+    if (activeRole === 'TEACHER' && activeTab === 'students') {
+      if (!teacherAllowedClassIds.includes(selectedClass)) {
+        toast.error("Unauthorized: You do not have permission for this class.");
+        return;
+      }
+      if (selectedSubject !== 'ALL') {
+        const hasSubject = classSubjects.some(sub => sub.code === selectedSubject);
+        if (!hasSubject) {
+          toast.error("Unauthorized: You do not have permission for this subject.");
+          return;
+        }
+      } else {
+        const isClassTeacher = myOwnClass && selectedClass === myOwnClass.id;
+        if (!isClassTeacher) {
+          toast.error("Unauthorized: Only the class teacher can manage daily attendance.");
+          return;
+        }
+      }
     }
 
     setQrScanning(true);
@@ -733,7 +805,9 @@ export default function AttendancePage() {
                     onChange={(e) => setSelectedSubject(e.target.value)}
                     className="w-full bg-bg-main border border-border rounded-2xl py-3.5 px-4 text-xs text-text-primary outline-none cursor-pointer"
                   >
-                    <option value="ALL">All Subjects</option>
+                    {(activeRole !== 'TEACHER' || (myOwnClass && selectedClass === myOwnClass.id)) && (
+                      <option value="ALL">All Subjects</option>
+                    )}
                     {classSubjects.map(sub => (
                       <option key={sub.id} value={sub.code}>{sub.name}</option>
                     ))}
