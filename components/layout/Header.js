@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, 
   Bell, 
@@ -47,12 +48,38 @@ export default function Header() {
     sharedStudents,
     sharedParents,
     sharedNotifications,
-    setSharedNotifications
+    setSharedNotifications,
+    pushSubscribed,
+    pushPermissionStatus,
+    subscribeToPush
   } = useAuth();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  const notificationsRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+
+    function handleClickOutside(event) {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener("click", handleClickOutside, true);
+    document.addEventListener("touchstart", handleClickOutside, true);
+    return () => {
+      document.removeEventListener("click", handleClickOutside, true);
+      document.removeEventListener("touchstart", handleClickOutside, true);
+    };
+  }, []);
 
   const handleAlertClick = (alert) => {
     // Mark as read
@@ -211,7 +238,7 @@ export default function Header() {
         </button>
 
         {/* Notifications and Alerts */}
-        <div className="relative">
+        <div className="relative" ref={notificationsRef}>
            <button 
              onClick={() => setShowNotifications(!showNotifications)}
              className="p-2.5 text-text-secondary hover:text-text-primary hover:bg-slate-100 rounded-xl transition-all relative"
@@ -227,8 +254,6 @@ export default function Header() {
            </button>
 
            {showNotifications && (
-             <>
-               <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)}></div>
                 <div className="absolute right-0 top-full mt-3 w-96 glass p-4 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl max-h-[80vh] overflow-hidden flex flex-col">
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-border shrink-0">
                     <div>
@@ -281,7 +306,7 @@ export default function Header() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-1">
-                                <p className="text-[11px] font-black text-text-primary leading-tight group-hover:text-accent transition-colors">{alert.title}</p>
+                                <p className="text-[11px] font-black text-text-primary leading-tight group-hover:text-accent transition-colors">{alert.title}{alert.subject ? ` (${alert.subject})` : ''}</p>
                                 {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
                               </div>
                               <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed truncate">{alert.body}</p>
@@ -316,7 +341,6 @@ export default function Header() {
                     </div>
                   )}
                 </div>
-             </>
            )}
         </div>
 
@@ -324,7 +348,7 @@ export default function Header() {
         <div className="h-8 w-[1px] bg-slate-100"></div>
 
         {/* User Dropdown */}
-        <div className="relative">
+        <div className="relative" ref={profileRef}>
            <button 
              onClick={() => setIsProfileOpen(!isProfileOpen)}
              className={`flex items-center gap-3 p-1.5 pr-3 rounded-2xl transition-all border ${
@@ -350,9 +374,7 @@ export default function Header() {
 
            {/* Executive Context Menu */}
            {isProfileOpen && (
-             <>
-               <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)}></div>
-               <div className="absolute right-0 top-full mt-3 w-64 glass p-3 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl">
+                <div className="absolute right-0 top-full mt-3 w-64 glass p-3 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl">
                   <div className="p-3 mb-2 bg-slate-100/50 border border-border rounded-xl">
                      <p className="text-[9px] font-black text-text-secondary uppercase tracking-widest mb-1">Corporate Account</p>
                      <p className="text-xs font-bold text-text-primary truncate">{activeUser?.email || (activeRole === 'SUPER_ADMIN' ? 'admin@campuserp.in' : `admin@${activeTenant?.subdomain || 'school'}.edu.in`)}</p>
@@ -375,6 +397,23 @@ export default function Header() {
                      ))}
                   </div>
 
+                  <button 
+                    onClick={async () => {
+                      const success = await subscribeToPush();
+                      if (success) {
+                        setIsProfileOpen(false);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                      pushSubscribed 
+                        ? 'text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10' 
+                        : 'text-accent hover:bg-accent/10'
+                    }`}
+                  >
+                    <Smartphone size={14} />
+                    <span>{pushSubscribed ? 'Mobile Alerts Active' : 'Enable Mobile Alerts'}</span>
+                  </button>
+
                   <div className="h-px bg-slate-100 my-2 mx-1"></div>
                   
                   <button 
@@ -385,13 +424,15 @@ export default function Header() {
                     <span>Terminate Session</span>
                   </button>
                </div>
-             </>
            )}
         </div>
       </div>
       {/* Alert Details Modal */}
-      {selectedAlert && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      {selectedAlert && mounted && createPortal(
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedAlert(null)}
+        >
           <div 
             className="w-full max-w-md bg-white border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -427,7 +468,7 @@ export default function Header() {
             {/* Modal Body */}
             <div className="p-6 space-y-4">
               <h4 className="text-sm font-black text-text-primary leading-snug">
-                {selectedAlert.title}
+                {selectedAlert.title}{selectedAlert.subject ? ` (${selectedAlert.subject})` : ''}
               </h4>
               <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line bg-slate-50 p-4 border border-border/80 rounded-2xl">
                 {selectedAlert.body}
@@ -488,7 +529,8 @@ export default function Header() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

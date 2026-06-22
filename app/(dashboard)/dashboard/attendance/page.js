@@ -441,6 +441,7 @@ export default function AttendancePage() {
           title: `🚨 Absence Alert: ${student.first_name} ${student.last_name}`,
           body: `${student.first_name} was marked ABSENT on ${formatHumanDate(selectedDate)} for ${selectedSubject !== 'ALL' ? selectedSubject : 'daily schedule'}.`,
           type: 'ABSENCE',
+          subject: selectedSubject !== 'ALL' ? selectedSubject : null,
           date: selectedDate,
           read: false
         },

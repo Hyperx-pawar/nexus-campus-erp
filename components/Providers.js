@@ -894,6 +894,108 @@ export default function Providers({ children }) {
   const [showInstallBtn, setShowInstallBtn] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushPermissionStatus, setPushPermissionStatus] = useState('default');
+
+  // Register service worker on client mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          console.log('Service Worker registered successfully:', reg);
+          if ('pushManager' in reg) {
+            reg.pushManager.getSubscription().then(sub => {
+              setPushSubscribed(!!sub);
+            });
+          }
+        })
+        .catch(err => console.error('Service Worker registration failed:', err));
+
+      if ('Notification' in window) {
+        setPushPermissionStatus(Notification.permission);
+      }
+    }
+  }, []);
+
+  const subscribeToPush = async () => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('Notification' in window)) {
+      toast.error('Push notifications are not supported on this browser.');
+      return false;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermissionStatus(permission);
+      if (permission !== 'granted') {
+        toast.error('Permission not granted for notifications.');
+        return false;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      if (!('pushManager' in reg)) {
+        toast.error('Push notifications are not supported by this browser/OS.');
+        return false;
+      }
+
+      const urlBase64ToUint8Array = (base64String) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+          .replace(/\-/g, '+')
+          .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicKey) {
+        console.error('VAPID public key is missing.');
+        toast.error('Unable to subscribe: VAPID public key missing.');
+        return false;
+      }
+
+      let subscription = await reg.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+      }
+
+      const userEmail = activeUser?.email;
+      if (!userEmail) {
+        toast.error('Please log in first before enabling notifications.');
+        return false;
+      }
+
+      const res = await fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription,
+          email: userEmail,
+          tenant_id: activeTenant.id
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save subscription on server');
+      }
+
+      setPushSubscribed(true);
+      toast.success('🎉 Lock screen alerts successfully enabled!');
+      return true;
+    } catch (err) {
+      console.error('Push subscription failed:', err);
+      toast.error(`Web Push Error: ${err.message}`);
+      return false;
+    }
+  };
+
   // Real-time toast alerts observer
   const prevNotificationsLength = React.useRef(sharedNotifications?.length || 0);
   const prevSchoolAlertsLength = React.useRef(sharedSchoolAlerts?.length || 0);
@@ -904,7 +1006,7 @@ export default function Providers({ children }) {
       for (let i = 0; i < diff; i++) {
         const newNotif = sharedNotifications[i];
         if (newNotif) {
-          toast(`🔔 Notification: ${newNotif.title}`, {
+          toast(`🔔 Notification: ${newNotif.title}${newNotif.subject ? ` (${newNotif.subject})` : ''}`, {
             description: newNotif.body,
             duration: 8000,
             action: {
@@ -912,6 +1014,31 @@ export default function Providers({ children }) {
               onClick: () => {}
             }
           });
+
+          // Dispatch background web push message to user
+          let recipientEmail = null;
+          const parentRecipient = (sharedParents || []).find(p => p.id === newNotif.recipient_id);
+          if (parentRecipient) {
+            recipientEmail = parentRecipient.email;
+          } else {
+            const studentRecipient = (sharedStudents || []).find(s => s.id === newNotif.recipient_id);
+            if (studentRecipient) {
+              recipientEmail = studentRecipient.email;
+            }
+          }
+
+          if (recipientEmail) {
+            fetch('/api/send-push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: recipientEmail,
+                title: newNotif.title + (newNotif.subject ? ` (${newNotif.subject})` : ''),
+                body: newNotif.body,
+                url: '/dashboard'
+              })
+            }).catch(err => console.error('Failed to trigger background push notification:', err));
+          }
         }
       }
     }
@@ -1637,7 +1764,10 @@ export default function Providers({ children }) {
       setShowInstallBtn,
       showInstallModal,
       setShowInstallModal,
-      handleInstallApp
+      handleInstallApp,
+      pushSubscribed,
+      pushPermissionStatus,
+      subscribeToPush
     }}>
       {children}
     </AuthContext.Provider>
