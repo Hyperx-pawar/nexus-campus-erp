@@ -233,6 +233,9 @@ function StudentDashboard() {
     sharedAttendanceLogs
   } = useAuth();
   const [selectedTrackRoute, setSelectedTrackRoute] = useState(null);
+  const [showAttendanceLogsModal, setShowAttendanceLogsModal] = useState(false);
+  const [logsFilter, setLogsFilter] = useState('ALL');
+
   const activeTrackedRoute = useMemo(() => {
     if (!selectedTrackRoute) return null;
     return (sharedTransportRoutes || []).find(r => r.id === selectedTrackRoute.id);
@@ -242,6 +245,62 @@ function StudentDashboard() {
   const myStudentProfile = useMemo(() => {
     return sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
   }, [sharedStudents, activeTenant.id, activeUser]);
+
+  // Get detailed attendance logs for student
+  const detailedLogs = useMemo(() => {
+    if (!myStudentProfile) return [];
+    
+    const list = [];
+    const logs = sharedAttendanceLogs || {};
+    
+    Object.keys(logs).forEach(key => {
+      const parts = key.split('_');
+      if (parts.length === 3 && parts[2] === myStudentProfile.id && parts[1] !== 'ALL') {
+        const date = parts[0];
+        const subjectCode = parts[1];
+        const status = logs[key];
+        
+        const subject = (sharedSubjects || []).find(s => s.code === subjectCode && s.tenant_id === activeTenant.id);
+        
+        list.push({
+          key,
+          date,
+          subjectCode,
+          subjectName: subject ? subject.name : 'Lecture Session',
+          status
+        });
+      }
+    });
+    
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [myStudentProfile, sharedAttendanceLogs, sharedSubjects, activeTenant.id]);
+
+  // Aggregate stats from detailed logs
+  const attendanceStats = useMemo(() => {
+    const total = detailedLogs.length;
+    const present = detailedLogs.filter(l => l.status === 'PRESENT').length;
+    const absent = detailedLogs.filter(l => l.status === 'ABSENT').length;
+    const late = detailedLogs.filter(l => l.status === 'LATE').length;
+    
+    const initialPercent = myStudentProfile ? parseFloat(myStudentProfile.initialAttendance || '85') : 85;
+    const percentage = total > 0 
+      ? ((present / total) * 100).toFixed(1) 
+      : initialPercent.toFixed(1);
+
+    return {
+      total,
+      present,
+      absent,
+      late,
+      percentage: `${percentage}%`
+    };
+  }, [detailedLogs, myStudentProfile]);
+
+  // Filter logs for displaying in modal
+  const filteredLogs = useMemo(() => {
+    if (logsFilter === 'ALL') return detailedLogs;
+    return detailedLogs.filter(l => l.status === logsFilter);
+  }, [detailedLogs, logsFilter]);
 
   const myHostelItems = useMemo(() => {
     if (!myStudentProfile) return [];
@@ -378,18 +437,32 @@ function StudentDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: 'Attendance Average', value: attendanceAvg, desc: 'Threshold limit 75%', icon: UserCheck, color: 'text-success' },
+          { label: 'Attendance Average', value: attendanceAvg, desc: 'Threshold limit 75%', icon: UserCheck, color: 'text-success', action: () => setShowAttendanceLogsModal(true) },
           { label: 'Current GPA Score', value: '8.4 / 10.0', desc: 'Top 15% of class', icon: Star, color: 'text-warning' },
           { label: 'Library Borrows', value: libraryBorrows, desc: 'Active issued items', icon: Library, color: 'text-accent' },
           { label: 'Outstanding Dues', value: outstandingDues, desc: 'Remaining unpaid term fees', icon: Wallet, color: 'text-success' }
         ].map((k, i) => (
-          <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
+          <div 
+            key={i} 
+            onClick={k.action ? k.action : undefined}
+            className={`p-6 bg-bg-sidebar border border-border rounded-3xl ${
+              k.action ? 'cursor-pointer hover:border-accent/40 hover:shadow-md transition-all active:scale-[0.98] group' : ''
+            }`}
+          >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{k.label}</span>
+              <span className={`text-[10px] font-black text-text-secondary uppercase tracking-widest ${k.action ? 'group-hover:text-accent transition-colors' : ''}`}>{k.label}</span>
               <div className={`p-2 bg-accent/10 rounded-xl ${k.color}`}><k.icon size={16} /></div>
             </div>
             <p className="text-3xl font-black font-outfit text-text-primary mt-3">{k.value}</p>
-            <p className="text-[10px] text-text-secondary mt-1">{k.desc}</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-[10px] text-text-secondary">{k.desc}</p>
+              {k.action && (
+                <span className="text-[9px] text-accent font-black uppercase tracking-wider group-hover:underline flex items-center gap-0.5">
+                  <span>Details</span>
+                  <ChevronRight size={10} />
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -878,6 +951,114 @@ function StudentDashboard() {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Attendance History Logs Modal */}
+      <Modal
+        open={showAttendanceLogsModal}
+        onClose={() => setShowAttendanceLogsModal(false)}
+        title="My Daily Attendance Register"
+        icon={<UserCheck size={16} />}
+        size="lg"
+      >
+        <div className="space-y-6">
+          <p className="text-[10px] text-text-secondary leading-relaxed">
+            Review your historical subject-wise daily attendance records. Keep a minimum of <b>75% attendance</b> to qualify for the final semester examinations.
+          </p>
+
+          {/* Modal Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: 'Classes Logged', value: attendanceStats.total, color: 'text-text-primary' },
+              { label: 'Days Present', value: attendanceStats.present, color: 'text-success' },
+              { label: 'Days Absent', value: attendanceStats.absent, color: 'text-danger' },
+              { label: 'Days Late', value: attendanceStats.late, color: 'text-warning' }
+            ].map((stat, i) => (
+              <div key={i} className="p-4 bg-slate-50 border border-border rounded-2xl text-center">
+                <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">{stat.label}</span>
+                <p className={`text-xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex flex-wrap gap-1 p-1 bg-slate-100/80 border border-border/80 rounded-2xl w-fit">
+            {[
+              { value: 'ALL', label: 'All Logs' },
+              { value: 'PRESENT', label: 'Present' },
+              { value: 'ABSENT', label: 'Absent' },
+              { value: 'LATE', label: 'Late' }
+            ].map(tab => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setLogsFilter(tab.value)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all active:scale-[0.97] ${
+                  logsFilter === tab.value 
+                    ? 'bg-white text-text-primary shadow-sm font-black' 
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table List of Logs */}
+          <div className="border border-border rounded-2xl overflow-hidden max-h-[300px] overflow-y-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-border">
+                  <th className="px-4 py-3 text-[9px] font-black text-text-secondary uppercase tracking-widest">Date</th>
+                  <th className="px-4 py-3 text-[9px] font-black text-text-secondary uppercase tracking-widest">Subject Name</th>
+                  <th className="px-4 py-3 text-[9px] font-black text-text-secondary uppercase tracking-widest">Subject Code</th>
+                  <th className="px-4 py-3 text-[9px] font-black text-text-secondary uppercase tracking-widest">Marked Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {filteredLogs.map(log => (
+                  <tr key={log.key} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 text-xs font-bold text-text-primary">
+                      {new Date(log.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-text-primary">
+                      {log.subjectName}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono text-text-secondary font-bold">
+                      {log.subjectCode}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                        log.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-700' :
+                        log.status === 'ABSENT' ? 'bg-red-100 text-red-700 animate-pulse' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {filteredLogs.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="px-4 py-8 text-center text-xs text-text-secondary italic">
+                      No attendance checks match the selected filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-border no-print">
+            <button
+              type="button"
+              onClick={() => setShowAttendanceLogsModal(false)}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 border border-border text-text-primary text-xs font-bold rounded-xl transition-all"
+            >
+              Close Register
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
