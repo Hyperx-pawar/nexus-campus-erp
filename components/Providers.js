@@ -813,6 +813,48 @@ export default function Providers({ children }) {
     }
   ]);
 
+  const [sharedVirtualClasses, setSharedVirtualClasses] = useState([
+    {
+      id: 'meet-1',
+      subjectId: 'subj-1', // Physics Core theory
+      classId: 'class-1',
+      teacherId: 'staff-1',
+      topic: 'Kinematics & Vector Resolution',
+      date: '2026-06-22',
+      startTime: '10:00',
+      endTime: '11:00',
+      meetingRoom: 'nexus-meet-phy121-demo',
+      status: 'LIVE',
+      tenantId: 'demo-tenant-1'
+    },
+    {
+      id: 'meet-2',
+      subjectId: 'subj-2', // Advanced Calculus math
+      classId: 'class-1',
+      teacherId: 'staff-2',
+      topic: 'Definite Integrals & Area Under Curves',
+      date: '2026-06-22',
+      startTime: '12:00',
+      endTime: '13:00',
+      meetingRoom: 'nexus-meet-ma122-demo',
+      status: 'SCHEDULED',
+      tenantId: 'demo-tenant-1'
+    },
+    {
+      id: 'meet-3',
+      subjectId: 'subj-4', // Accountancy Core
+      classId: 'class-2',
+      teacherId: 'staff-3',
+      topic: 'Double Entry Balance Sheets',
+      date: '2026-06-21',
+      startTime: '14:00',
+      endTime: '15:00',
+      meetingRoom: 'nexus-meet-ac121-demo',
+      status: 'COMPLETED',
+      tenantId: 'demo-tenant-1'
+    }
+  ]);
+
   const [sharedPayrollTransactions, setSharedPayrollTransactions] = useState([
     // Jan 2026
     { id: 'txn-jan-1', staffId: 'staff-1', month: 'January 2026', basic: 75000, netPay: 75000, status: 'PAID', paidAt: '2026-01-20', bankName: 'State Bank of India', accountNo: '998877665544', ifscCode: 'SBIN0000214', utr: 'UTR-JAN00184920', tenantId: 'demo-tenant-1' },
@@ -1577,6 +1619,8 @@ export default function Providers({ children }) {
       setSharedExamPapers,
       sharedSubmissions,
       setSharedSubmissions,
+      sharedVirtualClasses,
+      setSharedVirtualClasses,
       sharedPayrollTransactions,
       setSharedPayrollTransactions,
       sharedFinalExamsPublished,

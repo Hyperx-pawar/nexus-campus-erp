@@ -29,7 +29,8 @@ import {
   Award,
   CreditCard,
   FileText,
-  Smartphone
+  Smartphone,
+  Video
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 
@@ -48,6 +49,7 @@ const sidebarLinks = [
       { name: 'Staff Directory', icon: UserSquare2, href: '/dashboard/staff', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'Daily Attendance', icon: CheckCircle, href: '/dashboard/attendance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
       { name: 'Syllabus & LMS', icon: BookOpen, href: '/dashboard/courses', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
+      { name: 'Virtual Class', icon: Video, href: '/dashboard/virtual-class', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
       { name: 'Exams & Marksheets', icon: ClipboardList, href: '/dashboard/exams', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
       { name: 'Timetable', icon: Calendar, href: '/dashboard/timetable', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
     ]
