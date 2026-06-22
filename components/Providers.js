@@ -823,7 +823,7 @@ export default function Providers({ children }) {
       date: '2026-06-22',
       startTime: '10:00',
       endTime: '11:00',
-      meetingRoom: 'nexus-meet-phy121-demo',
+      meetingRoom: 'nexus-meet-demo-tenant-1-phy121-demo',
       status: 'LIVE',
       tenantId: 'demo-tenant-1'
     },
@@ -836,7 +836,7 @@ export default function Providers({ children }) {
       date: '2026-06-22',
       startTime: '12:00',
       endTime: '13:00',
-      meetingRoom: 'nexus-meet-ma122-demo',
+      meetingRoom: 'nexus-meet-demo-tenant-1-ma122-demo',
       status: 'SCHEDULED',
       tenantId: 'demo-tenant-1'
     },
@@ -849,7 +849,7 @@ export default function Providers({ children }) {
       date: '2026-06-21',
       startTime: '14:00',
       endTime: '15:00',
-      meetingRoom: 'nexus-meet-ac121-demo',
+      meetingRoom: 'nexus-meet-demo-tenant-1-ac121-demo',
       status: 'COMPLETED',
       tenantId: 'demo-tenant-1'
     }

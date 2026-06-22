@@ -137,8 +137,8 @@ export default function VirtualClassroomPage() {
     const endMinutes = endMins % 60;
     const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
 
-    // Unique Jitsi meeting room name
-    const meetingRoom = `nexus-meet-${formData.subjectId}-${formData.classId}-${Date.now()}`;
+    // Unique Jitsi meeting room name with strict Tenant isolation prefix
+    const meetingRoom = `nexus-meet-${activeTenant.id}-${formData.subjectId}-${formData.classId}-${Date.now()}`;
 
     const newClass = {
       id: `meet-${Date.now()}`,
