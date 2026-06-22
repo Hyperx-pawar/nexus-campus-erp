@@ -66,18 +66,27 @@ export default function Header() {
     setMounted(true);
 
     function handleClickOutside(event) {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+      if (!event || !event.target) return;
+      
+      const isNotificationsClick = notificationsRef.current && notificationsRef.current.contains(event.target);
+      const isProfileClick = profileRef.current && profileRef.current.contains(event.target);
+
+      if (!isNotificationsClick) {
         setShowNotifications(false);
       }
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
+      if (!isProfileClick) {
         setIsProfileOpen(false);
       }
     }
-    document.addEventListener("mouseup", handleClickOutside, true);
-    document.addEventListener("touchend", handleClickOutside, true);
+    window.addEventListener("click", handleClickOutside, true);
+    window.addEventListener("mouseup", handleClickOutside, true);
+    window.addEventListener("touchstart", handleClickOutside, true);
+    window.addEventListener("touchend", handleClickOutside, true);
     return () => {
-      document.removeEventListener("mouseup", handleClickOutside, true);
-      document.removeEventListener("touchend", handleClickOutside, true);
+      window.removeEventListener("click", handleClickOutside, true);
+      window.removeEventListener("mouseup", handleClickOutside, true);
+      window.removeEventListener("touchstart", handleClickOutside, true);
+      window.removeEventListener("touchend", handleClickOutside, true);
     };
   }, []);
 
