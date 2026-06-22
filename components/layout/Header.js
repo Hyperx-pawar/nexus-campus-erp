@@ -73,11 +73,11 @@ export default function Header() {
         setIsProfileOpen(false);
       }
     }
-    document.addEventListener("click", handleClickOutside, true);
-    document.addEventListener("touchstart", handleClickOutside, true);
+    document.addEventListener("mouseup", handleClickOutside, true);
+    document.addEventListener("touchend", handleClickOutside, true);
     return () => {
-      document.removeEventListener("click", handleClickOutside, true);
-      document.removeEventListener("touchstart", handleClickOutside, true);
+      document.removeEventListener("mouseup", handleClickOutside, true);
+      document.removeEventListener("touchend", handleClickOutside, true);
     };
   }, []);
 
