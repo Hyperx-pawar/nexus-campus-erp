@@ -852,6 +852,50 @@ export default function Providers({ children }) {
   const [showInstallBtn, setShowInstallBtn] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
+  // Real-time toast alerts observer
+  const prevNotificationsLength = React.useRef(sharedNotifications?.length || 0);
+  const prevSchoolAlertsLength = React.useRef(sharedSchoolAlerts?.length || 0);
+
+  useEffect(() => {
+    if (sharedNotifications && sharedNotifications.length > prevNotificationsLength.current) {
+      const diff = sharedNotifications.length - prevNotificationsLength.current;
+      for (let i = 0; i < diff; i++) {
+        const newNotif = sharedNotifications[i];
+        if (newNotif) {
+          toast(`🔔 Notification: ${newNotif.title}`, {
+            description: newNotif.body,
+            duration: 8000,
+            action: {
+              label: "Dismiss",
+              onClick: () => {}
+            }
+          });
+        }
+      }
+    }
+    prevNotificationsLength.current = sharedNotifications?.length || 0;
+  }, [sharedNotifications]);
+
+  useEffect(() => {
+    if (sharedSchoolAlerts && sharedSchoolAlerts.length > prevSchoolAlertsLength.current) {
+      const diff = sharedSchoolAlerts.length - prevSchoolAlertsLength.current;
+      for (let i = 0; i < diff; i++) {
+        const newAlert = sharedSchoolAlerts[i];
+        if (newAlert) {
+          toast(`🚨 Staff Alert: ${newAlert.title}`, {
+            description: newAlert.body,
+            duration: 10000,
+            action: {
+              label: "Dismiss",
+              onClick: () => {}
+            }
+          });
+        }
+      }
+    }
+    prevSchoolAlertsLength.current = sharedSchoolAlerts?.length || 0;
+  }, [sharedSchoolAlerts]);
+
   useEffect(() => {
     const handlePrompt = (e) => {
       e.preventDefault();

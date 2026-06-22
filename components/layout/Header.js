@@ -26,18 +26,88 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Header() {
-  const { activeUser, activeRole, activeTenant, availableTenants, switchTenant, logout, theme, toggleTheme, sharedSchoolAlerts, setSharedSchoolAlerts, realRole, sidebarOpen, setSidebarOpen, showInstallBtn, setShowInstallModal } = useAuth();
+  const { 
+    activeUser, 
+    activeRole, 
+    activeTenant, 
+    availableTenants, 
+    switchTenant, 
+    logout, 
+    theme, 
+    toggleTheme, 
+    sharedSchoolAlerts, 
+    setSharedSchoolAlerts, 
+    realRole, 
+    sidebarOpen, 
+    setSidebarOpen, 
+    showInstallBtn, 
+    setShowInstallModal,
+    sharedStudents,
+    sharedParents,
+    sharedNotifications,
+    setSharedNotifications
+  } = useAuth();
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const unreadCount = (sharedSchoolAlerts || []).filter(a => !a.read).length;
+  // Resolve profiles
+  const myParentProfile = React.useMemo(() => {
+    return (sharedParents || []).find(p => p.tenant_id === activeTenant?.id && p.email === activeUser?.email) || 
+      (sharedParents || []).find(p => p.tenant_id === activeTenant?.id);
+  }, [sharedParents, activeTenant, activeUser]);
+
+  const myStudentProfile = React.useMemo(() => {
+    return (sharedStudents || []).find(s => s.tenant_id === activeTenant?.id && s.email === activeUser?.email) ||
+      (sharedStudents || []).find(s => s.tenant_id === activeTenant?.id);
+  }, [sharedStudents, activeTenant, activeUser]);
+
+  // Dynamic role-aware alert feed
+  const currentAlerts = React.useMemo(() => {
+    if (!activeTenant) return [];
+    if (activeRole === 'PARENT') {
+      return (sharedNotifications || []).filter(
+        n => n.tenant_id === activeTenant.id && n.recipient_id === (myParentProfile?.id || '')
+      );
+    }
+    if (activeRole === 'STUDENT') {
+      return (sharedNotifications || []).filter(
+        n => n.tenant_id === activeTenant.id && 
+          (n.recipient_id === myStudentProfile?.id || n.recipient_id === 'parent-1' || n.title.includes(myStudentProfile?.first_name || ''))
+      );
+    }
+    // Default: Staff alerts
+    return (sharedSchoolAlerts || []).filter(a => a.tenant_id === activeTenant.id);
+  }, [activeRole, activeTenant, myParentProfile, myStudentProfile, sharedNotifications, sharedSchoolAlerts]);
+
+  const unreadCount = React.useMemo(() => {
+    return (currentAlerts || []).filter(a => !a.read).length;
+  }, [currentAlerts]);
 
   const markAllRead = () => {
-    setSharedSchoolAlerts(prev => prev.map(a => ({ ...a, read: true })));
+    if (activeRole === 'PARENT' || activeRole === 'STUDENT') {
+      const visibleIds = new Set(currentAlerts.map(a => a.id));
+      setSharedNotifications(prev => (prev || []).map(a => visibleIds.has(a.id) ? { ...a, read: true } : a));
+    } else {
+      setSharedSchoolAlerts(prev => (prev || []).map(a => ({ ...a, read: true })));
+    }
   };
 
   const dismissAlert = (id) => {
-    setSharedSchoolAlerts(prev => prev.filter(a => a.id !== id));
+    if (activeRole === 'PARENT' || activeRole === 'STUDENT') {
+      setSharedNotifications(prev => (prev || []).filter(a => a.id !== id));
+    } else {
+      setSharedSchoolAlerts(prev => (prev || []).filter(a => a.id !== id));
+    }
+  };
+
+  const clearAllAlerts = () => {
+    if (activeRole === 'PARENT' || activeRole === 'STUDENT') {
+      const visibleIds = new Set(currentAlerts.map(a => a.id));
+      setSharedNotifications(prev => (prev || []).filter(a => !visibleIds.has(a.id)));
+    } else {
+      setSharedSchoolAlerts([]);
+    }
   };
 
   // Global install modal handles installation workflow
@@ -140,88 +210,97 @@ export default function Header() {
            {showNotifications && (
              <>
                <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)}></div>
-               <div className="absolute right-0 top-full mt-3 w-96 glass p-4 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl max-h-[80vh] overflow-hidden flex flex-col">
-                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-border shrink-0">
-                   <div>
-                     <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">School Alerts</h4>
-                     <p className="text-[9px] text-text-secondary mt-0.5">{unreadCount} unread • Online payment notifications</p>
-                   </div>
-                   {unreadCount > 0 && (
-                     <button onClick={markAllRead} className="text-[9px] font-black text-accent hover:text-accent/80 transition-colors px-2 py-1 bg-accent/10 rounded-lg">
-                       Mark all read
-                     </button>
-                   )}
-                 </div>
+                <div className="absolute right-0 top-full mt-3 w-96 glass p-4 z-20 animate-in fade-in duration-200 shadow-2xl rounded-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-border shrink-0">
+                    <div>
+                      <h4 className="text-xs font-black text-text-primary uppercase tracking-wider animate-pulse-subtle">
+                        {activeRole === 'PARENT' ? 'Parent Alerts' : activeRole === 'STUDENT' ? 'Student Alerts' : 'School Alerts'}
+                      </h4>
+                      <p className="text-[9px] text-text-secondary mt-0.5">{unreadCount} unread • Notification Center</p>
+                    </div>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-[9px] font-black text-accent hover:text-accent/80 transition-colors px-2 py-1 bg-accent/10 rounded-lg">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
 
-                 <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
-                   {(sharedSchoolAlerts || []).length === 0 ? (
-                     <div className="py-8 text-center">
-                       <Bell size={24} className="text-text-secondary mx-auto mb-2 opacity-30" />
-                       <p className="text-xs font-bold text-text-secondary">No alerts yet</p>
-                       <p className="text-[10px] text-text-secondary opacity-60 mt-1">Online payments from parents will appear here.</p>
-                     </div>
-                   ) : (
-                     (sharedSchoolAlerts || []).map(alert => (
-                       <div key={alert.id} className={`p-3 rounded-xl border transition-all group relative ${
-                         !alert.read
-                           ? alert.type === 'ONLINE_PAYMENT'
-                             ? 'bg-accent/8 border-accent/25 hover:border-accent/40'
-                             : 'bg-slate-50/80 border-border'
-                           : 'bg-bg-main border-border/50 opacity-60'
-                       }`}>
-                         <div className="flex items-start gap-2.5">
-                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                             alert.type === 'ONLINE_PAYMENT' ? 'bg-accent/15 text-accent' :
-                             alert.type === 'HOSTEL_PAYMENT' ? 'bg-purple-500/15 text-purple-500' :
-                             'bg-slate-100 text-text-secondary'
-                           }`}>
-                             <span className="text-sm">{alert.icon || '🔔'}</span>
-                           </div>
-                           <div className="flex-1 min-w-0">
-                             <div className="flex items-start justify-between gap-1">
-                               <p className="text-[11px] font-black text-text-primary leading-tight">{alert.title}</p>
-                               {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
-                             </div>
-                             <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">{alert.body}</p>
-                             {alert.type === 'ONLINE_PAYMENT' && (activeRole === 'ACCOUNTANT' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ADMINISTRATOR') && (
-                                <div className="mt-1.5 mb-1">
-                                  <Link
-                                    href="/dashboard/finance?tab=online"
-                                    onClick={() => setShowNotifications(false)}
-                                    className="inline-flex items-center gap-1 text-[9px] bg-accent hover:bg-accent-hover text-white font-bold px-2 py-0.5 rounded-md transition-all shadow-sm"
-                                  >
-                                    <span>Verify Payment</span>
-                                    <ChevronRight size={8} />
-                                  </Link>
-                                </div>
-                              )}
-                             <div className="flex items-center justify-between mt-1.5">
-                               <span className="text-[9px] text-text-secondary opacity-50 font-mono">{alert.time}</span>
-                               <button
-                                 onClick={() => dismissAlert(alert.id)}
-                                 className="text-[8px] text-text-secondary opacity-0 group-hover:opacity-100 hover:text-danger transition-all font-bold px-1.5 py-0.5 rounded hover:bg-danger/10"
-                               >
-                                 Dismiss
-                               </button>
-                             </div>
-                           </div>
-                         </div>
-                       </div>
-                     ))
-                   )}
-                 </div>
+                  <div className="space-y-2 overflow-y-auto flex-1 custom-scrollbar pr-1">
+                    {(currentAlerts || []).length === 0 ? (
+                      <div className="py-8 text-center">
+                        <Bell size={24} className="text-text-secondary mx-auto mb-2 opacity-30 animate-pulse" />
+                        <p className="text-xs font-bold text-text-secondary">No alerts yet</p>
+                        <p className="text-[10px] text-text-secondary opacity-60 mt-1">
+                          {activeRole === 'PARENT' ? 'Real-time student attendance and fee updates appear here.' :
+                           activeRole === 'STUDENT' ? 'Your grading and academic progress alerts appear here.' :
+                           'Online payments and portal warnings appear here.'}
+                        </p>
+                      </div>
+                    ) : (
+                      (currentAlerts || []).map(alert => (
+                        <div key={alert.id} className={`p-3 rounded-xl border transition-all group relative ${
+                          !alert.read
+                            ? 'bg-accent/8 border-accent/25 hover:border-accent/40'
+                            : 'bg-bg-main border-border/50 opacity-60'
+                        }`}>
+                          <div className="flex items-start gap-2.5">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                              alert.type === 'ONLINE_PAYMENT' || alert.type === 'FEE_PAYMENT' ? 'bg-emerald-500/15 text-emerald-500' :
+                              alert.type === 'ABSENCE' ? 'bg-red-500/15 text-red-500' :
+                              alert.type === 'HOSTEL_PAYMENT' ? 'bg-purple-500/15 text-purple-500' :
+                              'bg-accent/15 text-accent'
+                            }`}>
+                              <span className="text-sm">
+                                {alert.icon ? alert.icon :
+                                 alert.type === 'ABSENCE' ? '🚨' :
+                                 alert.type === 'ONLINE_PAYMENT' || alert.type === 'FEE_PAYMENT' ? '✅' : '🔔'}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-1">
+                                <p className="text-[11px] font-black text-text-primary leading-tight">{alert.title}</p>
+                                {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
+                              </div>
+                              <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">{alert.body}</p>
+                              {alert.type === 'ONLINE_PAYMENT' && (activeRole === 'ACCOUNTANT' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ADMINISTRATOR') && (
+                                 <div className="mt-1.5 mb-1">
+                                   <Link
+                                     href="/dashboard/finance?tab=online"
+                                     onClick={() => setShowNotifications(false)}
+                                     className="inline-flex items-center gap-1 text-[9px] bg-accent hover:bg-accent-hover text-white font-bold px-2 py-0.5 rounded-md transition-all shadow-sm"
+                                   >
+                                     <span>Verify Payment</span>
+                                     <ChevronRight size={8} />
+                                   </Link>
+                                 </div>
+                               )}
+                              <div className="flex items-center justify-between mt-1.5">
+                                <span className="text-[9px] text-text-secondary opacity-50 font-mono">{alert.time || alert.date}</span>
+                                <button
+                                  onClick={() => dismissAlert(alert.id)}
+                                  className="text-[8px] text-text-secondary opacity-0 group-hover:opacity-100 hover:text-danger transition-all font-bold px-1.5 py-0.5 rounded hover:bg-danger/10"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
 
-                 {(sharedSchoolAlerts || []).length > 0 && (
-                   <div className="pt-3 mt-2 border-t border-border shrink-0">
-                     <button
-                       onClick={() => setSharedSchoolAlerts([])}
-                       className="w-full py-2 text-[10px] font-bold text-text-secondary hover:text-danger hover:bg-danger/5 rounded-xl transition-all"
-                     >
-                       Clear all alerts
-                     </button>
-                   </div>
-                 )}
-               </div>
+                  {(currentAlerts || []).length > 0 && (
+                    <div className="pt-3 mt-2 border-t border-border shrink-0">
+                      <button
+                        onClick={clearAllAlerts}
+                        className="w-full py-2 text-[10px] font-bold text-text-secondary hover:text-danger hover:bg-danger/5 rounded-xl transition-all"
+                      >
+                        Clear all alerts
+                      </button>
+                    </div>
+                  )}
+                </div>
              </>
            )}
         </div>
