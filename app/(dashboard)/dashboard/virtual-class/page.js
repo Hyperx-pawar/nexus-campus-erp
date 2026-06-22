@@ -275,7 +275,7 @@ export default function VirtualClassroomPage() {
           {/* Embedded WebRTC IFrame */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
             <iframe
-              src={`https://meet.jit.si/${activeMeeting.meetingRoom}#config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(activeUser?.name || 'Nexus User')}`}
+              src={`https://meet.ffmuc.net/${activeMeeting.meetingRoom}#config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(activeUser?.name || 'Nexus User')}`}
               allow="camera; microphone; fullscreen; display-capture; autoplay"
               className="w-full h-full min-h-[500px]"
               frameBorder="0"
