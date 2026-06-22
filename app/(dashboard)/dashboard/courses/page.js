@@ -7,7 +7,8 @@ import {
   BookOpen, FileText, CheckCircle2, Upload, Sparkles, 
   ChevronRight, Download, Plus, Users, 
   UserSquare2, Save, GraduationCap, ShieldAlert,
-  Link2, ExternalLink, X, FilePlus, Video, Eye
+  Link2, ExternalLink, X, FilePlus, Video, Eye,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -26,7 +27,9 @@ export default function CoursesLMSPage() {
     sharedStaff,
     sharedStudents,
     sharedParents,
-    activeUser
+    activeUser,
+    sharedSubmissions,
+    setSharedSubmissions
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState('lms'); // 'lms' | 'classes' | 'subjects'
@@ -49,6 +52,10 @@ export default function CoursesLMSPage() {
 
   // Custom lesson overrides per subject (teachers can add)
   const [lessonOverrides, setLessonOverrides] = useState({});
+
+  // Teacher: Grading panel state
+  const [gradingSubmissionId, setGradingSubmissionId] = useState(null);
+  const [gradeForm, setGradeForm] = useState({ grade: '', feedback: '' });
 
   // Read tab parameter on mount
   useEffect(() => {
@@ -77,6 +84,39 @@ export default function CoursesLMSPage() {
     units: '4'
   });
 
+  // Active LMS Subject State
+  const [activeLmsSubjectId, setActiveLmsSubjectId] = useState(null);
+
+  // Filter staff by current tenant/school
+  const tenantStaff = sharedStaff.filter(s => s.tenant_id === activeTenant.id);
+  const tenantSubjects = sharedSubjects.filter(s => s.tenant_id === activeTenant.id);
+  const currentLmsSubjects = tenantSubjects.filter(sub => sub.class_id === selectedClassId);
+
+  // Resolve current logged-in student profile or staff record
+  const myStudentProfile = useMemo(() => {
+    return sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase())) 
+      || sharedStudents.find(s => s.tenant_id === activeTenant.id);
+  }, [sharedStudents, activeTenant.id, activeUser]);
+
+  const myStaffRecord = useMemo(() => {
+    return sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()))
+      || sharedStaff.find(s => s.tenant_id === activeTenant.id);
+  }, [sharedStaff, activeTenant.id, activeUser]);
+
+  const activeStudentSubmission = useMemo(() => {
+    if (!activeLmsSubjectId || !myStudentProfile) return null;
+    return (sharedSubmissions || []).find(
+      sub => sub.studentId === myStudentProfile.id && sub.subjectId === activeLmsSubjectId && sub.tenantId === activeTenant.id
+    );
+  }, [sharedSubmissions, myStudentProfile, activeLmsSubjectId, activeTenant.id]);
+
+  const activeSubjectSubmissions = useMemo(() => {
+    if (!activeLmsSubjectId) return [];
+    return (sharedSubmissions || []).filter(
+      sub => sub.subjectId === activeLmsSubjectId && sub.tenantId === activeTenant.id
+    );
+  }, [sharedSubmissions, activeLmsSubjectId, activeTenant.id]);
+
   // Resolve allowed classes based on role
   const allowedClasses = useMemo(() => {
     if (activeRole === 'SUPER_ADMIN' || activeRole === 'SCHOOL_ADMIN') {
@@ -84,7 +124,6 @@ export default function CoursesLMSPage() {
     }
     
     if (activeRole === 'TEACHER') {
-      const myStaffRecord = sharedStaff.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
       const myStaffId = myStaffRecord ? myStaffRecord.id : null;
       const mySubjectClassIds = sharedSubjects.filter(sub => sub.teacher_id === myStaffId && sub.tenant_id === activeTenant.id).map(sub => sub.class_id);
       const myOwnClass = sharedClasses.find(c => c.class_teacher_id === myStaffId && c.tenant_id === activeTenant.id);
@@ -96,7 +135,6 @@ export default function CoursesLMSPage() {
     }
     
     if (activeRole === 'STUDENT') {
-      const myStudentProfile = sharedStudents.find(s => s.tenant_id === activeTenant.id && s.first_name && activeUser?.name?.toLowerCase().includes(s.first_name.toLowerCase()));
       if (myStudentProfile) {
         return sharedClasses.filter(c => c.id === myStudentProfile.class_id && c.tenant_id === activeTenant.id);
       }
@@ -114,11 +152,7 @@ export default function CoursesLMSPage() {
     }
     
     return [];
-  }, [activeRole, activeTenant.id, sharedClasses, sharedStaff, sharedSubjects, sharedStudents, sharedParents, activeUser]);
-
-  // Filter staff by current tenant/school
-  const tenantStaff = sharedStaff.filter(s => s.tenant_id === activeTenant.id);
-  const tenantSubjects = sharedSubjects.filter(s => s.tenant_id === activeTenant.id);
+  }, [activeRole, activeTenant.id, sharedClasses, myStaffRecord, sharedSubjects, myStudentProfile, sharedParents, activeUser]);
 
   // Validate active selectedClassId matches allowed classes context
   useEffect(() => {
@@ -131,6 +165,15 @@ export default function CoursesLMSPage() {
       setSelectedClassId('');
     }
   }, [allowedClasses, selectedClassId]);
+
+  // Initialize active LMS subject
+  useEffect(() => {
+    if (currentLmsSubjects.length > 0) {
+      setActiveLmsSubjectId(currentLmsSubjects[0].id);
+    } else {
+      setActiveLmsSubjectId(null);
+    }
+  }, [selectedClassId, currentLmsSubjects]);
 
   // Get staff name by ID
   const getStaffName = (staffId) => {
@@ -191,18 +234,7 @@ export default function CoursesLMSPage() {
     setShowAddSubjectModal(false);
   };
 
-  // Dynamic LMS Subjects filter
-  const currentLmsSubjects = tenantSubjects.filter(sub => sub.class_id === selectedClassId);
-  const [activeLmsSubjectId, setActiveLmsSubjectId] = useState(null);
 
-  // Initialize active LMS subject
-  useEffect(() => {
-    if (currentLmsSubjects.length > 0) {
-      setActiveLmsSubjectId(currentLmsSubjects[0].id);
-    } else {
-      setActiveLmsSubjectId(null);
-    }
-  }, [selectedClassId, currentLmsSubjects]);
 
   // Handle Upload Assignment (notes only)
   const handleUploadAssignment = async (e) => {
@@ -228,6 +260,20 @@ export default function CoursesLMSPage() {
       toast.dismiss();
 
       if (publicUrl) {
+        const newSubmission = {
+          id: `subm-${Date.now()}`,
+          subjectId: activeLmsSubjectId,
+          studentId: myStudentProfile?.id || 'stud-1',
+          fileName: selectedFile.name,
+          fileUrl: publicUrl,
+          submittedAt: new Date().toLocaleString('en-US', { hour12: true, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          grade: null,
+          feedback: null,
+          gradedAt: null,
+          tenantId: activeTenant.id,
+          status: 'SUBMITTED'
+        };
+        setSharedSubmissions(prev => [...(prev || []), newSubmission]);
         setSubmitted(true);
         toast.success(`Notes "${selectedFile.name}" submitted successfully!`);
       } else {
@@ -239,6 +285,32 @@ export default function CoursesLMSPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle Teacher Assignment Grading
+  const handleSaveGrade = (e, submissionId) => {
+    e.preventDefault();
+    if (!gradeForm.grade.trim()) {
+      toast.error('Please enter a grade or score.');
+      return;
+    }
+    setSharedSubmissions(prev => 
+      (prev || []).map(sub => {
+        if (sub.id === submissionId) {
+          return {
+            ...sub,
+            grade: gradeForm.grade.trim(),
+            feedback: gradeForm.feedback.trim() || null,
+            gradedAt: new Date().toLocaleString('en-US', { hour12: true, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            status: 'GRADED'
+          };
+        }
+        return sub;
+      })
+    );
+    toast.success('Assignment graded and feedback sent to student!');
+    setGradingSubmissionId(null);
+    setGradeForm({ grade: '', feedback: '' });
   };
 
   // Validate video link helper
@@ -694,103 +766,285 @@ export default function CoursesLMSPage() {
             )}
           </div>
 
-          {/* Right Panel: Assignment / Notes submission */}
+          {/* Right Panel: Assignment/Submission Hub */}
           <div className="space-y-6">
-            <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-5">
-              <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <Upload size={14} className="text-accent" />
-                <span>Assignment Desk</span>
-              </h3>
-
-              <div className="p-4 bg-bg-main border border-border rounded-2xl space-y-2">
-                <span className="text-[9px] font-black text-danger uppercase tracking-widest">Active Task</span>
-                <p className="text-xs font-bold text-text-primary">Assignment 1: Syllabus Core Review</p>
-                <p className="text-[9px] text-text-secondary font-bold">Submit notes/answers as PDF or DOC. Max 10MB.</p>
-              </div>
-
-              {/* Notes-only policy notice */}
-              <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <FileText size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-black text-blue-700 uppercase tracking-wide">Notes Only</p>
-                  <p className="text-[9px] text-blue-500 mt-0.5 leading-relaxed">
-                    Only documents (PDF, DOC, PPT) can be uploaded here. For videos, use the "Add Note / Video Link" option in the lesson panel.
-                  </p>
+            {canManageMaterials ? (
+              /* Teacher / Admin View: Review Submissions */
+              <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardList size={14} className="text-accent" />
+                    <span>Submission Manager</span>
+                  </h3>
+                  <span className="text-[10px] font-bold text-text-secondary bg-slate-100 px-2 py-0.5 rounded-lg">
+                    {activeSubjectSubmissions.length} submitted
+                  </span>
                 </div>
-              </div>
 
-              {submitted ? (
-                <div className="p-4 bg-success/10 border border-success/25 rounded-2xl text-center space-y-2">
-                  <CheckCircle2 size={24} className="text-success mx-auto" />
-                  <h4 className="text-xs font-bold text-text-primary">Submission Successful</h4>
-                  <p className="text-[9px] text-text-secondary font-mono truncate max-w-full">File: {selectedFile ? selectedFile.name : 'study_notes_verified.pdf'}</p>
+                <div className="p-4 bg-bg-main border border-border rounded-2xl space-y-1">
+                  <span className="text-[9px] font-black text-accent uppercase tracking-widest">Active Assignment</span>
+                  <p className="text-xs font-bold text-text-primary">Assignment 1: Syllabus Core Review</p>
+                  <p className="text-[9px] text-text-secondary">Grade and review notes submitted by students of this subject.</p>
                 </div>
-              ) : (
-                <form onSubmit={handleUploadAssignment} className="space-y-3">
-                  <input
-                    type="file"
-                    id="assignment-file-input"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        if (fileSizeMB > 10) {
-                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
-                          return;
-                        }
-                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
-                        setSelectedFile(file);
-                      }
-                    }}
-                  />
-                  <div 
-                    onClick={() => document.getElementById('assignment-file-input')?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDragging(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) {
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        if (fileSizeMB > 10) {
-                          toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
-                          return;
-                        }
-                        toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
-                        setSelectedFile(file);
-                      }
-                    }}
-                    className={`border border-dashed rounded-2xl p-6 text-center hover:border-accent/30 transition-all cursor-pointer bg-slate-50/50 ${
-                      isDragging ? 'border-accent bg-accent/5' : 'border-border'
-                    }`}
-                  >
-                    <FileText size={24} className={`mx-auto mb-2 transition-colors ${isDragging ? 'text-accent animate-bounce' : 'text-text-secondary'}`} />
-                    {selectedFile ? (
-                      <div className="space-y-1">
-                        <span className="text-[11px] text-text-primary font-bold block truncate max-w-full">{selectedFile.name}</span>
-                        <span className="text-[9px] text-text-secondary block">{(selectedFile.size / 1024).toFixed(1)} KB • Click or drop to change</span>
+
+                <div className="space-y-3">
+                  {activeSubjectSubmissions.map((sub) => {
+                    const student = sharedStudents.find(s => s.id === sub.studentId);
+                    const studentName = student ? `${student.first_name} ${student.last_name}` : 'Unknown Student';
+                    const rollNo = student ? student.roll_no : 'N/A';
+                    const isGraded = sub.status === 'GRADED';
+                    const isEditingThis = gradingSubmissionId === sub.id;
+
+                    return (
+                      <div 
+                        key={sub.id} 
+                        className={`p-4 border rounded-2xl transition-all duration-200 ${
+                          isGraded 
+                            ? 'bg-success/5 border-success/15 hover:border-success/30' 
+                            : 'bg-warning/5 border-warning/15 hover:border-warning/30'
+                        }`}
+                      >
+                        {/* Student Info & Badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-bold text-text-primary">{studentName}</p>
+                            <p className="text-[9px] text-text-secondary font-bold">Roll No: {rollNo} • {sub.submittedAt}</p>
+                          </div>
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                            isGraded 
+                              ? 'bg-success/10 text-success' 
+                              : 'bg-warning/10 text-warning animate-pulse'
+                          }`}>
+                            {isGraded ? `Graded: ${sub.grade}` : 'Pending'}
+                          </span>
+                        </div>
+
+                        {/* File Link */}
+                        <div className="mt-3 p-2.5 bg-bg-main/50 border border-border/80 rounded-xl flex items-center justify-between gap-3 text-[10px]">
+                          <span className="text-text-secondary font-mono truncate max-w-[150px]">{sub.fileName}</span>
+                          <a 
+                            href={sub.fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-accent hover:text-accent-hover font-bold flex items-center gap-1 shrink-0"
+                          >
+                            <Download size={11} />
+                            <span>Download</span>
+                          </a>
+                        </div>
+
+                        {/* Graded Details */}
+                        {isGraded && !isEditingThis && (
+                          <div className="mt-3 pt-3 border-t border-dashed border-border space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-black text-text-secondary uppercase">Feedback:</span>
+                              <span className="text-[9px] text-text-secondary">{sub.gradedAt}</span>
+                            </div>
+                            <p className="text-[10px] text-text-secondary italic bg-slate-100/50 p-2 rounded-lg border border-border/40">
+                              "{sub.feedback || 'No comments left.'}"
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Inline Grading Form */}
+                        {isEditingThis ? (
+                          <form onSubmit={(e) => handleSaveGrade(e, sub.id)} className="mt-4 pt-4 border-t border-border space-y-3">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest">Assign Grade / Score *</label>
+                              <input 
+                                type="text"
+                                placeholder="e.g. A+, 95/100, Excellent"
+                                value={gradeForm.grade}
+                                onChange={(e) => setGradeForm({ ...gradeForm, grade: e.target.value })}
+                                className="w-full text-xs py-2 px-3 rounded-lg border border-border"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest">Feedback / Remarks</label>
+                              <textarea
+                                placeholder="Write constructive feedback..."
+                                value={gradeForm.feedback}
+                                onChange={(e) => setGradeForm({ ...gradeForm, feedback: e.target.value })}
+                                className="w-full text-xs py-2 px-3 rounded-lg border border-border min-h-[60px]"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                type="submit"
+                                className="px-3.5 py-2 bg-accent hover:bg-accent-hover text-white text-[10px] font-bold rounded-lg transition-all"
+                              >
+                                Submit
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setGradingSubmissionId(null);
+                                  setGradeForm({ grade: '', feedback: '' });
+                                }}
+                                className="px-3.5 py-2 bg-slate-100 border border-border hover:bg-slate-200 text-text-secondary text-[10px] font-bold rounded-lg transition-all"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              onClick={() => {
+                                setGradingSubmissionId(sub.id);
+                                setGradeForm({ grade: sub.grade || '', feedback: sub.feedback || '' });
+                              }}
+                              className="px-3 py-1.5 bg-accent/10 border border-accent/20 hover:bg-accent text-accent hover:text-white text-[9px] font-black uppercase tracking-wider rounded-lg transition-all"
+                            >
+                              {isGraded ? 'Edit Grade' : 'Grade Submission'}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-text-secondary block font-bold">Select or drop notes file</span>
-                        <span className="text-[9px] text-text-secondary opacity-60">PDF, DOC, PPT accepted</span>
+                    );
+                  })}
+
+                  {activeSubjectSubmissions.length === 0 && (
+                    <div className="text-center py-8 space-y-2 border border-dashed border-border rounded-2xl bg-slate-50/50">
+                      <Users size={24} className="text-text-secondary/30 mx-auto" />
+                      <p className="text-xs text-text-secondary font-bold">No Submissions Yet</p>
+                      <p className="text-[9px] text-text-secondary px-4">Students enrolled in this course have not shared their assignment notes yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Student / Parent View: Assignment Submission Desk */
+              <div className="p-6 bg-bg-card/60 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-5">
+                <h3 className="text-sm font-black font-outfit text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <Upload size={14} className="text-accent" />
+                  <span>Assignment Desk</span>
+                </h3>
+
+                <div className="p-4 bg-bg-main border border-border rounded-2xl space-y-2">
+                  <span className="text-[9px] font-black text-danger uppercase tracking-widest">Active Task</span>
+                  <p className="text-xs font-bold text-text-primary">Assignment 1: Syllabus Core Review</p>
+                  <p className="text-[9px] text-text-secondary font-bold">Submit notes/answers as PDF or DOC. Max 10MB.</p>
+                </div>
+
+                {/* Notes-only policy notice */}
+                <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <FileText size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-black text-blue-700 uppercase tracking-wide">Notes Only</p>
+                    <p className="text-[9px] text-blue-500 mt-0.5 leading-relaxed">
+                      Only documents (PDF, DOC, PPT) can be uploaded here. For videos, use the "Add Note / Video Link" option in the lesson panel.
+                    </p>
+                  </div>
+                </div>
+
+                {activeStudentSubmission || submitted ? (
+                  /* Submitted Screen */
+                  <div className="space-y-4">
+                    <div className="p-5 bg-success/5 border border-success/15 rounded-2xl text-center space-y-3">
+                      <CheckCircle2 size={28} className="text-success mx-auto animate-bounce" />
+                      <div>
+                        <h4 className="text-xs font-black text-text-primary uppercase tracking-wide">Submission Status: Submitted</h4>
+                        <p className="text-[9px] text-text-secondary mt-1">
+                          File: <span className="font-mono">{activeStudentSubmission ? activeStudentSubmission.fileName : (selectedFile ? selectedFile.name : 'study_notes_verified.pdf')}</span>
+                        </p>
+                        <p className="text-[9px] text-text-secondary mt-0.5">
+                          Uploaded: {activeStudentSubmission ? activeStudentSubmission.submittedAt : 'Just now'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Graded Details Card */}
+                    {activeStudentSubmission?.status === 'GRADED' && (
+                      <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-accent uppercase tracking-wider flex items-center gap-1">
+                            <Sparkles size={12} />
+                            Evaluated
+                          </span>
+                          <span className="text-xs font-black bg-accent text-white px-2.5 py-1 rounded-xl shadow-sm">
+                            Grade: {activeStudentSubmission.grade}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-text-secondary uppercase">Instructor Feedback</p>
+                          <p className="text-xs text-text-primary italic leading-relaxed bg-white border border-border/60 p-3 rounded-xl">
+                            "{activeStudentSubmission.feedback || 'No comments left.'}"
+                          </p>
+                        </div>
+                        <p className="text-[9px] text-text-secondary text-right">Graded on {activeStudentSubmission.gradedAt}</p>
                       </div>
                     )}
                   </div>
-                  <button 
-                    type="submit" 
-                    disabled={loading || !activeLmsSubjectId || !selectedFile}
-                    className="w-full py-3 bg-accent hover:bg-accent-hover text-text-primary text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-55"
-                  >
-                    <Upload size={14} />
-                    <span>Submit Assignment</span>
-                  </button>
-                </form>
-              )}
-            </div>
+                ) : (
+                  /* Form Upload Screen */
+                  <form onSubmit={handleUploadAssignment} className="space-y-3">
+                    <input
+                      type="file"
+                      id="assignment-file-input"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const fileSizeMB = file.size / (1024 * 1024);
+                          if (fileSizeMB > 10) {
+                            toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
+                            return;
+                          }
+                          toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
+                          setSelectedFile(file);
+                        }
+                      }}
+                    />
+                    <div 
+                      onClick={() => document.getElementById('assignment-file-input')?.click()}
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          const fileSizeMB = file.size / (1024 * 1024);
+                          if (fileSizeMB > 10) {
+                            toast.error(`File size (${fileSizeMB.toFixed(2)} MB) exceeds 10MB limit. Please upload a smaller file.`);
+                            return;
+                          }
+                          toast.success(`File selected: ${file.name} (${fileSizeMB.toFixed(2)} MB / 10MB limit)`);
+                          setSelectedFile(file);
+                        }
+                      }}
+                      className={`border border-dashed rounded-2xl p-6 text-center hover:border-accent/30 transition-all cursor-pointer bg-slate-50/50 ${
+                        isDragging ? 'border-accent bg-accent/5' : 'border-border'
+                      }`}
+                    >
+                      <FileText size={24} className={`mx-auto mb-2 transition-colors ${isDragging ? 'text-accent animate-bounce' : 'text-text-secondary'}`} />
+                      {selectedFile ? (
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-text-primary font-bold block truncate max-w-full">{selectedFile.name}</span>
+                          <span className="text-[9px] text-text-secondary block">{(selectedFile.size / 1024).toFixed(1)} KB • Click or drop to change</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-text-secondary block font-bold">Select or drop notes file</span>
+                          <span className="text-[9px] text-text-secondary opacity-60">PDF, DOC, PPT accepted</span>
+                        </div>
+                      )}
+                    </div>
+                    <button 
+                      type="submit" 
+                      disabled={loading || !activeLmsSubjectId || !selectedFile}
+                      className="w-full py-3 bg-accent hover:bg-accent-hover text-text-primary text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-55"
+                    >
+                      <Upload size={14} />
+                      <span>Submit Assignment</span>
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

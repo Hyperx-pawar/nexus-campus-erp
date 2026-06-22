@@ -18,10 +18,15 @@ export default function HRPayrollPage() {
     sharedStaff, 
     setSharedStaff,
     activeRole,
-    activeUser
+    activeUser,
+    sharedPayrollTransactions,
+    setSharedPayrollTransactions
   } = useAuth();
 
   const [viewingSlipEmployee, setViewingSlipEmployee] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState('May 2026');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'PAID' | 'UNPAID'
+  const [viewingTransaction, setViewingTransaction] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,19 +77,29 @@ export default function HRPayrollPage() {
     return true;
   });
 
-  const employees = tenantStaff.map(s => ({
-    id: s.id,
-    name: `${s.first_name} ${s.last_name}`,
-    employee_id: s.employee_id,
-    designation: s.designation,
-    basic: s.basic || 50000,
-    allowances: s.allowances || 0,
-    deductions: s.deductions || 0,
-    pan: s.pan_no || 'N/A',
-    status: s.status || 'UNPAID',
-    paid_at: s.paid_at || null,
-    profile_picture_url: s.profile_picture_url
-  }));
+  const employees = tenantStaff.map(s => {
+    // Find matching transaction for this staff in selectedMonth
+    const tx = (sharedPayrollTransactions || []).find(
+      t => t.staffId === s.id && t.month === selectedMonth && t.tenantId === activeTenant.id
+    );
+    return {
+      id: s.id,
+      name: `${s.first_name} ${s.last_name}`,
+      employee_id: s.employee_id,
+      designation: s.designation,
+      basic: s.basic || 50000,
+      allowances: s.allowances || 0,
+      deductions: s.deductions || 0,
+      pan: s.pan_no || 'N/A',
+      status: tx ? tx.status : 'UNPAID',
+      paid_at: tx ? tx.paidAt : null,
+      bank_name: tx ? tx.bankName : (s.bank_name || 'State Bank of India'),
+      account_no: tx ? tx.accountNo : (s.account_no || ''),
+      ifsc_code: tx ? tx.ifscCode : (s.ifsc_code || ''),
+      utr: tx ? tx.utr : null,
+      profile_picture_url: s.profile_picture_url
+    };
+  });
 
   const handleConfirmDisbursement = (e) => {
     e.preventDefault();
@@ -94,19 +109,22 @@ export default function HRPayrollPage() {
       return;
     }
 
-    const updatedStaff = sharedStaff.map(emp => 
-      emp.id === pendingPayoutEmployee.id 
-        ? { 
-            ...emp, 
-            status: 'PAID', 
-            paid_at: new Date().toISOString().split('T')[0],
-            bank_name: payoutForm.bankName,
-            account_no: payoutForm.accountNo,
-            ifsc_code: payoutForm.ifscCode
-          } 
-        : emp
-    );
-    setSharedStaff(updatedStaff);
+    const newTx = {
+      id: `txn-${Date.now()}`,
+      staffId: pendingPayoutEmployee.id,
+      month: selectedMonth,
+      basic: Number(pendingPayoutEmployee.basic),
+      netPay: Number(pendingPayoutEmployee.basic),
+      status: 'PAID',
+      paidAt: new Date().toISOString().split('T')[0],
+      bankName: payoutForm.bankName,
+      accountNo: payoutForm.accountNo,
+      ifscCode: payoutForm.ifscCode,
+      utr: `UTR-${Math.floor(100000000000 + Math.random() * 900000000000)}`,
+      tenantId: activeTenant.id
+    };
+
+    setSharedPayrollTransactions(prev => [...(prev || []), newTx]);
     toast.success(`Salary processed & credited to ${pendingPayoutEmployee.name}'s bank account (${payoutForm.bankName}). SMS slip dispatched.`);
     setPendingPayoutEmployee(null);
   };
@@ -217,17 +235,17 @@ export default function HRPayrollPage() {
 
   const filteredEmployees = employees.filter(e => {
     const term = searchQuery.toLowerCase();
-    return (
-      e.name.toLowerCase().includes(term) ||
+    const matchesSearch = e.name.toLowerCase().includes(term) ||
       e.employee_id.toLowerCase().includes(term) ||
-      (e.pan && e.pan.toLowerCase().includes(term))
-    );
+      (e.pan && e.pan.toLowerCase().includes(term));
+    const matchesStatus = statusFilter === 'ALL' || e.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   // Calculate aggregate payroll metrics dynamically
   const totalEmployeesCount = employees.length;
-  const totalBasicSalaries = employees.reduce((sum, emp) => sum + Number(emp.basic), 0);
-  const avgSalary = totalEmployeesCount > 0 ? Math.round(totalBasicSalaries / totalEmployeesCount) : 0;
+  const totalDisbursedMonth = employees.filter(emp => emp.status === 'PAID').reduce((sum, emp) => sum + Number(emp.basic), 0);
+  const totalPendingMonth = employees.filter(emp => emp.status === 'UNPAID').reduce((sum, emp) => sum + Number(emp.basic), 0);
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -252,8 +270,8 @@ export default function HRPayrollPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { label: 'Staff Count', value: totalEmployeesCount, desc: 'Active staff members', icon: Users },
-          { label: 'Total Payroll (Month)', value: `₹${(totalBasicSalaries / 100000).toFixed(2)} Lakh`, desc: 'Total monthly base pay', icon: Wallet },
-          { label: 'Average Monthly Salary', value: `₹${avgSalary.toLocaleString('en-IN')}`, desc: 'Average pay per employee', icon: CreditCard }
+          { label: 'Disbursed (Month)', value: `₹${(totalDisbursedMonth / 100000).toFixed(2)} Lakh`, desc: 'Settled salary payments', icon: Wallet },
+          { label: 'Awaiting Pay (Month)', value: `₹${(totalPendingMonth / 100000).toFixed(2)} Lakh`, desc: 'Pending payouts', icon: CreditCard }
         ].map((k, i) => (
           <div key={i} className="p-6 bg-bg-sidebar border border-border rounded-3xl">
             <div className="flex items-center justify-between">
@@ -268,7 +286,8 @@ export default function HRPayrollPage() {
 
       {/* Payroll Table */}
       <div className="p-6 bg-bg-sidebar/55 shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-border rounded-3xl space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-4">
+          {/* Row 1: Search Bar */}
           <div className="max-w-md w-full relative group/search">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within/search:text-accent transition-colors" size={16} />
             <input 
@@ -279,9 +298,62 @@ export default function HRPayrollPage() {
               className="w-full bg-slate-100/50 border border-border rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-all text-xs text-text-primary placeholder:text-text-secondary"
             />
           </div>
-          <span className="text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-full uppercase tracking-wider">
-            Current Cycle: May 2026
-          </span>
+
+          {/* Row 2: Selectors/Filters (Tabs) */}
+          <div className="flex flex-wrap items-center gap-4 pt-1">
+            {/* Month Cycle Selector (Tabs) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Payroll Cycle</span>
+              <div className="flex flex-wrap gap-1 p-1 bg-slate-100/80 border border-border rounded-2xl">
+                {[
+                  { value: 'January 2026', label: 'Jan 26' },
+                  { value: 'February 2026', label: 'Feb 26' },
+                  { value: 'March 2026', label: 'Mar 26' },
+                  { value: 'April 2026', label: 'Apr 26' },
+                  { value: 'May 2026', label: 'May 26' },
+                  { value: 'June 2026', label: 'Jun 26' }
+                ].map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setSelectedMonth(m.value)}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-[0.97] ${
+                      selectedMonth === m.value 
+                        ? 'bg-accent text-white shadow-sm font-black' 
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Filter (Tabs) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Disbursement Status</span>
+              <div className="flex flex-wrap gap-1 p-1 bg-slate-100/80 border border-border rounded-2xl">
+                {[
+                  { value: 'ALL', label: 'All Staff' },
+                  { value: 'PAID', label: 'Settled' },
+                  { value: 'UNPAID', label: 'Unpaid' }
+                ].map(s => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setStatusFilter(s.value)}
+                    className={`px-3.5 py-1.5 rounded-xl text-[10px] font-bold transition-all active:scale-[0.97] ${
+                      statusFilter === s.value 
+                        ? 'bg-white text-text-primary shadow-sm font-black' 
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
@@ -326,11 +398,30 @@ export default function HRPayrollPage() {
                             <span className="text-[8px] text-text-secondary mt-0.5 opacity-55 font-mono">Paid on: {emp.paid_at || 'May 20, 2026'}</span>
                           </div>
                           <button
-                            onClick={() => setViewingSlipEmployee(emp)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 border border-border text-text-secondary rounded-lg transition-all"
-                            title="Print Pay Slip"
+                            onClick={() => {
+                              const tx = (sharedPayrollTransactions || []).find(
+                                t => t.staffId === emp.id && t.month === selectedMonth && t.tenantId === activeTenant.id
+                              ) || {
+                                id: `txn-mock-${emp.id}`,
+                                staffId: emp.id,
+                                month: selectedMonth,
+                                basic: emp.basic,
+                                netPay: emp.basic,
+                                status: 'PAID',
+                                paidAt: emp.paid_at || '2026-05-20',
+                                bankName: emp.bank_name,
+                                accountNo: emp.account_no,
+                                ifscCode: emp.ifsc_code,
+                                utr: emp.utr || 'UTR-MOCK8849201',
+                                tenantId: activeTenant.id
+                              };
+                              setViewingTransaction(tx);
+                            }}
+                            className="px-2.5 py-1.5 bg-accent/10 hover:bg-accent border border-accent/20 hover:border-accent text-accent hover:text-white rounded-lg transition-all flex items-center gap-1 text-[10px] font-bold"
+                            title="View Transaction Details"
                           >
-                            <Receipt size={14} />
+                            <Receipt size={12} />
+                            <span>Details</span>
                           </button>
                         </div>
                       ) : activeRole === 'TEACHER' ? (
@@ -813,6 +904,100 @@ export default function HRPayrollPage() {
                   className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Monthly Payout Transaction Receipt Modal */}
+      <Modal
+        open={!!viewingTransaction}
+        onClose={() => setViewingTransaction(null)}
+        title="Disbursement Transaction Receipt"
+        icon={<Receipt size={16} />}
+        size="md"
+      >
+        {viewingTransaction && (() => {
+          const emp = sharedStaff.find(s => s.id === viewingTransaction.staffId) || {};
+          const studentName = `${emp.first_name || ''} ${emp.last_name || 'Staff'}`;
+
+          return (
+            <div className="space-y-6">
+              {/* Receipt status header */}
+              <div className="p-6 bg-success/5 border border-success/20 rounded-2xl text-center space-y-2">
+                <CheckCircle2 size={36} className="text-success mx-auto animate-bounce" />
+                <h4 className="text-sm font-black text-text-primary uppercase tracking-wide">Transaction Successful</h4>
+                <p className="text-2xl font-black font-mono text-accent">₹{viewingTransaction.basic.toLocaleString('en-IN')}</p>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-success/15 rounded-full text-[9px] font-black uppercase text-success tracking-wide">
+                  <span>Net Salary Disbursed</span>
+                </div>
+              </div>
+
+              {/* Transaction details block */}
+              <div className="p-5 bg-slate-50 border border-border/80 rounded-2xl space-y-4 text-xs">
+                <h5 className="text-[10px] font-black text-text-secondary uppercase tracking-widest border-b border-border pb-1">Receipt Particulars</h5>
+                
+                <div className="grid grid-cols-2 gap-y-3.5 gap-x-4">
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Staff Member</span>
+                    <span className="font-bold text-text-primary">{studentName}</span>
+                    <span className="text-[9px] text-text-secondary block font-mono">ID: {emp.employee_id}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Designation</span>
+                    <span className="font-bold text-text-primary">{emp.designation || 'Lecturer'}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Monthly Payout Cycle</span>
+                    <span className="font-bold text-accent font-outfit uppercase">{viewingTransaction.month}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Disbursement Date</span>
+                    <span className="font-bold text-text-primary font-mono">{viewingTransaction.paidAt}</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Beneficiary Bank</span>
+                    <span className="font-bold text-text-primary">{viewingTransaction.bankName}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">IFSC Code</span>
+                    <span className="font-bold text-text-primary font-mono">{viewingTransaction.ifscCode}</span>
+                  </div>
+
+                  <div className="col-span-2">
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Account Number</span>
+                    <span className="font-bold text-text-primary font-mono">
+                      {viewingTransaction.accountNo ? viewingTransaction.accountNo.replace(/\d(?=\d{4})/g, "•") : 'N/A'}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 p-3 bg-white border border-border/80 rounded-xl space-y-1">
+                    <span className="text-[9px] text-text-secondary font-black uppercase tracking-wider block">Bank UTR Transaction ID</span>
+                    <span className="font-mono font-bold text-text-primary text-[11px] select-all tracking-wider block">
+                      {viewingTransaction.utr || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t border-border no-print">
+                <button
+                  onClick={() => window.print()}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 border border-border text-text-primary text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <Printer size={12} className="text-text-secondary" />
+                  <span>Print Receipt</span>
+                </button>
+                <button
+                  onClick={() => setViewingTransaction(null)}
+                  className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+                >
+                  Close Receipt
                 </button>
               </div>
             </div>

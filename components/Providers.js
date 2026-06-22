@@ -771,6 +771,77 @@ export default function Providers({ children }) {
     { id: 'all-inv-3', studentId: 'stud-2', item: 'Study Desk Lamp', cost: 450, paid: 0, status: 'UNPAID', date: '2026-05-18', tenant_id: 'demo-tenant-1', payments: [] }
   ]);
 
+  const [sharedSubmissions, setSharedSubmissions] = useState([
+    {
+      id: 'subm-1',
+      subjectId: 'subj-1', // Physics
+      studentId: 'stud-1', // Aarav Patel
+      fileName: 'aarav_physics_kinematics.pdf',
+      fileUrl: 'https://placeholder.supabase.co/storage/v1/object/public/campus-bucket/demo-tenant-1/assignments/aarav_physics_kinematics.pdf',
+      submittedAt: 'Jun 18, 2026, 10:15 AM',
+      grade: 'A+',
+      feedback: 'Excellent work on vectors and trajectory equations! All steps are shown clearly.',
+      gradedAt: 'Jun 19, 2026, 2:30 PM',
+      tenantId: 'demo-tenant-1',
+      status: 'GRADED'
+    },
+    {
+      id: 'subm-2',
+      subjectId: 'subj-1', // Physics
+      studentId: 'stud-2', // Diya Sharma
+      fileName: 'diya_physics_unit1.pdf',
+      fileUrl: 'https://placeholder.supabase.co/storage/v1/object/public/campus-bucket/demo-tenant-1/assignments/diya_physics_unit1.pdf',
+      submittedAt: 'Jun 20, 2026, 09:45 AM',
+      grade: null,
+      feedback: null,
+      gradedAt: null,
+      tenantId: 'demo-tenant-1',
+      status: 'SUBMITTED'
+    },
+    {
+      id: 'subm-3',
+      subjectId: 'subj-2', // Calculus
+      studentId: 'stud-1', // Aarav Patel
+      fileName: 'aarav_calculus_limits.pdf',
+      fileUrl: 'https://placeholder.supabase.co/storage/v1/object/public/campus-bucket/demo-tenant-1/assignments/aarav_calculus_limits.pdf',
+      submittedAt: 'Jun 19, 2026, 04:20 PM',
+      grade: 'A',
+      feedback: 'Good understanding of Continuity and Mean Value Theorems. Minor calculation error in Q3.',
+      gradedAt: 'Jun 20, 2026, 11:15 AM',
+      tenantId: 'demo-tenant-1',
+      status: 'GRADED'
+    }
+  ]);
+
+  const [sharedPayrollTransactions, setSharedPayrollTransactions] = useState([
+    // Jan 2026
+    { id: 'txn-jan-1', staffId: 'staff-1', month: 'January 2026', basic: 75000, netPay: 75000, status: 'PAID', paidAt: '2026-01-20', bankName: 'State Bank of India', accountNo: '998877665544', ifscCode: 'SBIN0000214', utr: 'UTR-JAN00184920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-jan-2', staffId: 'staff-2', month: 'January 2026', basic: 90000, netPay: 90000, status: 'PAID', paidAt: '2026-01-20', bankName: 'HDFC Bank', accountNo: '112233445566', ifscCode: 'HDFC0000104', utr: 'UTR-JAN00883920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-jan-3', staffId: 'staff-4', month: 'January 2026', basic: 65000, netPay: 65000, status: 'PAID', paidAt: '2026-01-20', bankName: 'Axis Bank', accountNo: '887766554433', ifscCode: 'UTIB0000082', utr: 'UTR-JAN00938482', tenantId: 'demo-tenant-1' },
+    { id: 'txn-jan-4', staffId: 'staff-5', month: 'January 2026', basic: 68000, netPay: 68000, status: 'PAID', paidAt: '2026-01-20', bankName: 'State Bank of India', accountNo: '223344556677', ifscCode: 'SBIN0000214', utr: 'UTR-JAN00773010', tenantId: 'demo-tenant-1' },
+
+    // Feb 2026
+    { id: 'txn-feb-1', staffId: 'staff-1', month: 'February 2026', basic: 75000, netPay: 75000, status: 'PAID', paidAt: '2026-02-20', bankName: 'State Bank of India', accountNo: '998877665544', ifscCode: 'SBIN0000214', utr: 'UTR-FEB00184920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-feb-2', staffId: 'staff-2', month: 'February 2026', basic: 90000, netPay: 90000, status: 'PAID', paidAt: '2026-02-20', bankName: 'HDFC Bank', accountNo: '112233445566', ifscCode: 'HDFC0000104', utr: 'UTR-FEB00883920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-feb-3', staffId: 'staff-4', month: 'February 2026', basic: 65000, netPay: 65000, status: 'PAID', paidAt: '2026-02-20', bankName: 'Axis Bank', accountNo: '887766554433', ifscCode: 'UTIB0000082', utr: 'UTR-FEB00938482', tenantId: 'demo-tenant-1' },
+    { id: 'txn-feb-4', staffId: 'staff-5', month: 'February 2026', basic: 68000, netPay: 68000, status: 'PAID', paidAt: '2026-02-20', bankName: 'State Bank of India', accountNo: '223344556677', ifscCode: 'SBIN0000214', utr: 'UTR-FEB00773010', tenantId: 'demo-tenant-1' },
+
+    // Mar 2026
+    { id: 'txn-mar-1', staffId: 'staff-1', month: 'March 2026', basic: 75000, netPay: 75000, status: 'PAID', paidAt: '2026-03-20', bankName: 'State Bank of India', accountNo: '998877665544', ifscCode: 'SBIN0000214', utr: 'UTR-MAR00184920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-mar-2', staffId: 'staff-2', month: 'March 2026', basic: 90000, netPay: 90000, status: 'PAID', paidAt: '2026-03-20', bankName: 'HDFC Bank', accountNo: '112233445566', ifscCode: 'HDFC0000104', utr: 'UTR-MAR00883920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-mar-3', staffId: 'staff-4', month: 'March 2026', basic: 65000, netPay: 65000, status: 'PAID', paidAt: '2026-03-20', bankName: 'Axis Bank', accountNo: '887766554433', ifscCode: 'UTIB0000082', utr: 'UTR-MAR00938482', tenantId: 'demo-tenant-1' },
+    { id: 'txn-mar-4', staffId: 'staff-5', month: 'March 2026', basic: 68000, netPay: 68000, status: 'PAID', paidAt: '2026-03-20', bankName: 'State Bank of India', accountNo: '223344556677', ifscCode: 'SBIN0000214', utr: 'UTR-MAR00773010', tenantId: 'demo-tenant-1' },
+
+    // Apr 2026 (Vinod Mehta is unpaid)
+    { id: 'txn-apr-1', staffId: 'staff-1', month: 'April 2026', basic: 75000, netPay: 75000, status: 'PAID', paidAt: '2026-04-20', bankName: 'State Bank of India', accountNo: '998877665544', ifscCode: 'SBIN0000214', utr: 'UTR-APR00184920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-apr-2', staffId: 'staff-2', month: 'April 2026', basic: 90000, netPay: 90000, status: 'PAID', paidAt: '2026-04-20', bankName: 'HDFC Bank', accountNo: '112233445566', ifscCode: 'HDFC0000104', utr: 'UTR-APR00883920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-apr-3', staffId: 'staff-4', month: 'April 2026', basic: 65000, netPay: 65000, status: 'PAID', paidAt: '2026-04-20', bankName: 'Axis Bank', accountNo: '887766554433', ifscCode: 'UTIB0000082', utr: 'UTR-APR00938482', tenantId: 'demo-tenant-1' },
+
+    // May 2026 (Rajesh and Vinod are unpaid)
+    { id: 'txn-may-2', staffId: 'staff-2', month: 'May 2026', basic: 90000, netPay: 90000, status: 'PAID', paidAt: '2026-05-20', bankName: 'HDFC Bank', accountNo: '112233445566', ifscCode: 'HDFC0000104', utr: 'UTR-MAY00883920', tenantId: 'demo-tenant-1' },
+    { id: 'txn-may-3', staffId: 'staff-4', month: 'May 2026', basic: 65000, netPay: 65000, status: 'PAID', paidAt: '2026-05-20', bankName: 'Axis Bank', accountNo: '887766554433', ifscCode: 'UTIB0000082', utr: 'UTR-MAY00938482', tenantId: 'demo-tenant-1' }
+  ]);
+
   const [sharedFinalExamsPublished, setSharedFinalExamsPublished] = useState(true);
 
   // School-staff real-time payment alert feed (populated when parents pay online)
@@ -1460,6 +1531,10 @@ export default function Providers({ children }) {
       setSharedQuestions,
       sharedExamPapers,
       setSharedExamPapers,
+      sharedSubmissions,
+      setSharedSubmissions,
+      sharedPayrollTransactions,
+      setSharedPayrollTransactions,
       sharedFinalExamsPublished,
       setSharedFinalExamsPublished,
       sharedClassTestRecords,
