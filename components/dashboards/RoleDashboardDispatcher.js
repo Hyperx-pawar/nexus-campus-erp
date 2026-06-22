@@ -981,6 +981,66 @@ function StudentDashboard() {
             ))}
           </div>
 
+          {/* Subject-Wise Summary Table */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider block">Subject-wise Breakdown</span>
+            <div className="border border-border rounded-2xl overflow-hidden bg-slate-50/50">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-border">
+                    <th className="px-4 py-2 text-[9px] font-black text-text-secondary uppercase tracking-widest">Subject</th>
+                    <th className="px-4 py-2 text-[9px] font-black text-text-secondary uppercase tracking-widest text-center">Conducted</th>
+                    <th className="px-4 py-2 text-[9px] font-black text-text-secondary uppercase tracking-widest text-center">Present</th>
+                    <th className="px-4 py-2 text-[9px] font-black text-text-secondary uppercase tracking-widest text-center">Absent / Late</th>
+                    <th className="px-4 py-2 text-[9px] font-black text-text-secondary uppercase tracking-widest text-right">Percentage</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {studentCourses.map(c => {
+                    const subLogs = detailedLogs.filter(l => l.subjectCode === c.code);
+                    const subConducted = subLogs.length;
+                    const subPresent = subLogs.filter(l => l.status === 'PRESENT').length;
+                    const subAbsent = subLogs.filter(l => l.status === 'ABSENT').length;
+                    const subLate = subLogs.filter(l => l.status === 'LATE').length;
+                    
+                    let conducted = subConducted;
+                    let present = subPresent;
+                    let absent = subAbsent + subLate;
+                    let pct = '0.0%';
+                    
+                    if (conducted > 0) {
+                      pct = `${((present / conducted) * 100).toFixed(1)}%`;
+                    } else if (c.attendance) {
+                      const match = c.attendance.match(/(\d+)\/(\d+)\s+days\s+\(([\d.]+%)\)/);
+                      if (match) {
+                        present = parseInt(match[1], 10);
+                        conducted = parseInt(match[2], 10);
+                        absent = conducted - present;
+                        pct = match[3];
+                      }
+                    }
+                    
+                    const isLow = parseFloat(pct) < 75;
+
+                    return (
+                      <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs font-bold text-text-primary">
+                          {c.name} <span className="text-[10px] text-text-secondary font-mono">({c.code})</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-center text-text-primary">{conducted}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-center text-success">{present}</td>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-center text-text-secondary">{absent}</td>
+                        <td className={`px-4 py-2.5 text-xs font-black text-right ${isLow ? 'text-danger' : 'text-success'}`}>
+                          {pct}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Filter tabs */}
           <div className="flex flex-wrap gap-1 p-1 bg-slate-100/80 border border-border/80 rounded-2xl w-fit">
             {[
