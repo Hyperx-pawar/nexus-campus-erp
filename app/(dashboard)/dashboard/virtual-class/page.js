@@ -275,10 +275,11 @@ export default function VirtualClassroomPage() {
           {/* Embedded WebRTC IFrame */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
             <iframe
-              src={`https://meet.ffmuc.net/${activeMeeting.meetingRoom}#config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(activeUser?.name || 'Nexus User')}`}
-              allow="camera; microphone; fullscreen; display-capture; autoplay"
-              className="w-full h-full min-h-[500px]"
+              src={`https://p2p.mirotalk.com/join?room=${activeMeeting.meetingRoom}&name=${encodeURIComponent(activeUser?.name || 'Nexus User')}`}
+              allow="camera; microphone; fullscreen; display-capture; autoplay; clipboard-read; clipboard-write; web-share"
+              className="w-full h-full min-h-[600px]"
               frameBorder="0"
+              allowFullScreen
             />
           </div>
 
