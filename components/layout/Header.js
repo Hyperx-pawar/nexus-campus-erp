@@ -24,8 +24,10 @@ import {
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
+  const router = useRouter();
   const { 
     activeUser, 
     activeRole, 
@@ -50,6 +52,23 @@ export default function Header() {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+
+  const handleAlertClick = (alert) => {
+    // Mark as read
+    if (!alert.read) {
+      if (activeRole === 'PARENT' || activeRole === 'STUDENT') {
+        setSharedNotifications(prev => (prev || []).map(a => a.id === alert.id ? { ...a, read: true } : a));
+      } else {
+        setSharedSchoolAlerts(prev => (prev || []).map(a => a.id === alert.id ? { ...a, read: true } : a));
+      }
+    }
+
+    setShowNotifications(false);
+
+    // Open detailed dialog modal first so user can view it clearly, then they can navigate if they want
+    setSelectedAlert(alert);
+  };
 
   // Resolve profiles
   const myParentProfile = React.useMemo(() => {
@@ -238,11 +257,15 @@ export default function Header() {
                       </div>
                     ) : (
                       (currentAlerts || []).map(alert => (
-                        <div key={alert.id} className={`p-3 rounded-xl border transition-all group relative ${
-                          !alert.read
-                            ? 'bg-accent/8 border-accent/25 hover:border-accent/40'
-                            : 'bg-bg-main border-border/50 opacity-60'
-                        }`}>
+                        <div 
+                          key={alert.id} 
+                          onClick={() => handleAlertClick(alert)}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer active:scale-[0.99] group relative ${
+                            !alert.read
+                              ? 'bg-accent/8 border-accent/25 hover:border-accent/40 hover:bg-accent/10 shadow-sm'
+                              : 'bg-bg-main border-border/50 hover:border-accent/20 opacity-60'
+                          }`}
+                        >
                           <div className="flex items-start gap-2.5">
                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
                               alert.type === 'ONLINE_PAYMENT' || alert.type === 'FEE_PAYMENT' ? 'bg-emerald-500/15 text-emerald-500' :
@@ -258,26 +281,18 @@ export default function Header() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-1">
-                                <p className="text-[11px] font-black text-text-primary leading-tight">{alert.title}</p>
+                                <p className="text-[11px] font-black text-text-primary leading-tight group-hover:text-accent transition-colors">{alert.title}</p>
                                 {!alert.read && <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-1"></span>}
                               </div>
-                              <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed">{alert.body}</p>
-                              {alert.type === 'ONLINE_PAYMENT' && (activeRole === 'ACCOUNTANT' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ADMINISTRATOR') && (
-                                 <div className="mt-1.5 mb-1">
-                                   <Link
-                                     href="/dashboard/finance?tab=online"
-                                     onClick={() => setShowNotifications(false)}
-                                     className="inline-flex items-center gap-1 text-[9px] bg-accent hover:bg-accent-hover text-white font-bold px-2 py-0.5 rounded-md transition-all shadow-sm"
-                                   >
-                                     <span>Verify Payment</span>
-                                     <ChevronRight size={8} />
-                                   </Link>
-                                 </div>
-                               )}
+                              <p className="text-[10px] text-text-secondary mt-0.5 leading-relaxed truncate">{alert.body}</p>
+                              
                               <div className="flex items-center justify-between mt-1.5">
                                 <span className="text-[9px] text-text-secondary opacity-50 font-mono">{alert.time || alert.date}</span>
                                 <button
-                                  onClick={() => dismissAlert(alert.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    dismissAlert(alert.id);
+                                  }}
                                   className="text-[8px] text-text-secondary opacity-0 group-hover:opacity-100 hover:text-danger transition-all font-bold px-1.5 py-0.5 rounded hover:bg-danger/10"
                                 >
                                   Dismiss
@@ -374,6 +389,107 @@ export default function Header() {
            )}
         </div>
       </div>
+      {/* Alert Details Modal */}
+      {selectedAlert && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div 
+            className="w-full max-w-md bg-white border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                  selectedAlert.type === 'ONLINE_PAYMENT' || selectedAlert.type === 'FEE_PAYMENT' ? 'bg-emerald-500/15 text-emerald-500' :
+                  selectedAlert.type === 'ABSENCE' ? 'bg-red-500/15 text-red-500' :
+                  selectedAlert.type === 'HOSTEL_PAYMENT' ? 'bg-purple-500/15 text-purple-500' :
+                  'bg-accent/15 text-accent'
+                }`}>
+                  <span className="text-base font-bold">
+                    {selectedAlert.icon ? selectedAlert.icon :
+                     selectedAlert.type === 'ABSENCE' ? '🚨' :
+                     selectedAlert.type === 'ONLINE_PAYMENT' || selectedAlert.type === 'FEE_PAYMENT' ? '✅' : '🔔'}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-text-primary uppercase tracking-widest">Alert Details</h3>
+                  <p className="text-[9px] text-text-secondary font-mono">{selectedAlert.time || selectedAlert.date || 'Just now'}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedAlert(null)}
+                className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-slate-100 rounded-xl transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <h4 className="text-sm font-black text-text-primary leading-snug">
+                {selectedAlert.title}
+              </h4>
+              <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line bg-slate-50 p-4 border border-border/80 rounded-2xl">
+                {selectedAlert.body}
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-border bg-slate-50 flex flex-col sm:flex-row gap-2 justify-end">
+              {/* Context-aware Actions */}
+              {(selectedAlert.type === 'ONLINE_PAYMENT' || selectedAlert.type === 'FEE_PAYMENT') && (
+                <button
+                  onClick={() => {
+                    setSelectedAlert(null);
+                    if (activeRole === 'ACCOUNTANT' || activeRole === 'SCHOOL_ADMIN' || activeRole === 'ADMINISTRATOR') {
+                      router.push('/dashboard/finance?tab=online');
+                    } else {
+                      router.push('/dashboard/finance');
+                    }
+                  }}
+                  className="px-4 py-2 bg-accent text-white hover:bg-accent-hover text-xs font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1"
+                >
+                  <span>Go to Finance</span>
+                  <ChevronRight size={12} />
+                </button>
+              )}
+
+              {(selectedAlert.type === 'ABSENCE' || selectedAlert.type === 'ATTENDANCE') && (
+                <button
+                  onClick={() => {
+                    setSelectedAlert(null);
+                    router.push('/dashboard/attendance');
+                  }}
+                  className="px-4 py-2 bg-accent text-white hover:bg-accent-hover text-xs font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1"
+                >
+                  <span>Go to Attendance</span>
+                  <ChevronRight size={12} />
+                </button>
+              )}
+
+              {(selectedAlert.type === 'ASSIGNMENT' || selectedAlert.type === 'GRADING' || selectedAlert.type === 'COURSE') && (
+                <button
+                  onClick={() => {
+                    setSelectedAlert(null);
+                    router.push('/dashboard/courses');
+                  }}
+                  className="px-4 py-2 bg-accent text-white hover:bg-accent-hover text-xs font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1"
+                >
+                  <span>Go to Courses</span>
+                  <ChevronRight size={12} />
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedAlert(null)}
+                className="px-4 py-2 bg-white border border-border hover:bg-slate-100 text-xs font-bold text-text-primary rounded-xl transition-all"
+              >
+                Dismiss Detail
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
