@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
   Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText, Zap,
-  Mail, Phone, LayoutGrid, List
+  Mail, Phone, LayoutGrid, List, UserMinus
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -61,6 +61,45 @@ export default function StaffRegistryPage() {
       }
     } else {
       toast.success(`Staff account login ${newStatus ? 'activated' : 'blocked'} successfully!`);
+    }
+  };
+  const handleToggleStaffLeftStatus = async (staff) => {
+    const isLeftVal = !staff.is_left;
+    const confirmMsg = isLeftVal
+      ? `Are you sure you want to mark "${staff.first_name} ${staff.last_name}" as Left/Inactive? This will automatically deactivate their portal account.`
+      : `Are you sure you want to restore "${staff.first_name} ${staff.last_name}" to Active Staff status?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const updatedStaff = sharedStaff.map(s => 
+      s.id === staff.id ? { 
+        ...s, 
+        is_left: isLeftVal,
+        is_active: isLeftVal ? false : s.is_active 
+      } : s
+    );
+    setSharedStaff(updatedStaff);
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('staff')
+          .update({ is_left: isLeftVal })
+          .eq('id', staff.id);
+
+        if (isLeftVal) {
+          await supabase
+            .from('profiles')
+            .update({ is_active: false })
+            .eq('id', staff.id);
+        }
+        toast.success(`Staff marked as ${isLeftVal ? 'Left/Inactive' : 'Active'} successfully!`);
+      } catch (err) {
+        console.error('Failed to sync staff left status to Supabase:', err);
+        toast.error('Local change saved, but failed to sync to database.');
+      }
+    } else {
+      toast.success(`Staff marked as ${isLeftVal ? 'Left/Inactive' : 'Active'} successfully!`);
     }
   };
   
@@ -1114,6 +1153,11 @@ export default function StaffRegistryPage() {
                         </span>
                         <h4 className="text-sm font-black text-text-primary mt-1 truncate flex items-center gap-1.5">
                           <span>{staff.first_name} {staff.last_name}</span>
+                          {staff.is_left && (
+                            <span className="text-[7px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                              Left
+                            </span>
+                          )}
                           {staff.is_active === false && (
                             <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
                               Blocked
@@ -1167,6 +1211,18 @@ export default function StaffRegistryPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => handleToggleStaffLeftStatus(staff)}
+                        className={`px-2.5 py-1.5 text-[9px] font-black rounded-xl transition-all flex items-center gap-1 active:scale-95 border ${
+                          staff.is_left 
+                            ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 border-indigo-500/10' 
+                            : 'bg-slate-100 hover:bg-indigo-50 text-slate-600 border-slate-200'
+                        }`}
+                        title={staff.is_left ? "Restore to Active Staff" : "Mark as Left/Resigned"}
+                      >
+                        <UserMinus size={10} />
+                        <span>{staff.is_left ? 'Re-admit' : 'Left'}</span>
+                      </button>
                       <button 
                         onClick={() => handleToggleStaffStatus(staff)}
                         className={`px-2.5 py-1.5 text-[9px] font-black rounded-xl transition-all flex items-center gap-1 active:scale-95 border ${
@@ -1233,6 +1289,11 @@ export default function StaffRegistryPage() {
                         <div>
                           <p className="flex items-center gap-1.5">
                             <span>{staff.first_name} {staff.last_name}</span>
+                            {staff.is_left && (
+                              <span className="text-[7px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                                Left
+                              </span>
+                            )}
                             {staff.is_active === false && (
                               <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
                                 Blocked
@@ -1247,6 +1308,15 @@ export default function StaffRegistryPage() {
                       <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
                       <td className="py-4 text-right pr-2">
                         <div className="flex justify-end gap-1">
+                          <button 
+                            onClick={() => handleToggleStaffLeftStatus(staff)}
+                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
+                              staff.is_left ? 'text-indigo-600 hover:text-indigo-700 bg-indigo-50/50' : 'text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={staff.is_left ? "Restore to Active Staff" : "Mark as Left/Resigned"}
+                          >
+                            <UserMinus size={14} />
+                          </button>
                           <button 
                             onClick={() => handleToggleStaffStatus(staff)}
                             className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
