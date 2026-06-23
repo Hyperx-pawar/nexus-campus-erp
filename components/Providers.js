@@ -187,9 +187,9 @@ export default function Providers({ children }) {
 
   // Shared state for multi-role dynamic simulation
   const [sharedStudents, setSharedStudents] = useState([
-    { id: 'stud-1', first_name: 'Aarav', last_name: 'Patel', admission_no: 'ADM2026/049', roll_no: 'A-01', date_of_birth: '2010-04-12', gender: 'MALE', category: 'GENERAL', aadhaar_no: '4839 2840 9283', address: 'Saket, New Delhi', parent_id: 'parent-1', class_id: 'class-1', tenant_id: 'demo-tenant-1' },
-    { id: 'stud-2', first_name: 'Diya', last_name: 'Sharma', admission_no: 'ADM2026/102', roll_no: 'D-01', date_of_birth: '2011-08-19', gender: 'FEMALE', category: 'OBC', aadhaar_no: '9283 4839 1049', address: 'Indiranagar, Bangalore', parent_id: 'parent-2', class_id: 'class-2', tenant_id: 'demo-tenant-1' },
-    { id: 'stud-3', first_name: 'Kabir', last_name: 'Verma', admission_no: 'ADM2026/182', roll_no: 'K-01', date_of_birth: '2010-12-05', gender: 'MALE', category: 'SC', aadhaar_no: '8839 2039 1204', address: 'Salt Lake, Kolkata', parent_id: 'parent-3', class_id: 'class-3', tenant_id: 'demo-tenant-1' }
+    { id: 'stud-1', first_name: 'Aarav', last_name: 'Patel', admission_no: 'ADM2026/049', roll_no: 'A-01', date_of_birth: '2010-04-12', gender: 'MALE', category: 'GENERAL', aadhaar_no: '4839 2840 9283', address: 'Saket, New Delhi', parent_id: 'parent-1', class_id: 'class-1', tenant_id: 'demo-tenant-1', is_alumni: false, is_active: true },
+    { id: 'stud-2', first_name: 'Diya', last_name: 'Sharma', admission_no: 'ADM2026/102', roll_no: 'D-01', date_of_birth: '2011-08-19', gender: 'FEMALE', category: 'OBC', aadhaar_no: '9283 4839 1049', address: 'Indiranagar, Bangalore', parent_id: 'parent-2', class_id: 'class-2', tenant_id: 'demo-tenant-1', is_alumni: false, is_active: true },
+    { id: 'stud-3', first_name: 'Kabir', last_name: 'Verma', admission_no: 'ADM2026/182', roll_no: 'K-01', date_of_birth: '2010-12-05', gender: 'MALE', category: 'SC', aadhaar_no: '8839 2039 1204', address: 'Salt Lake, Kolkata', parent_id: 'parent-3', class_id: 'class-3', tenant_id: 'demo-tenant-1', is_alumni: false, is_active: true }
   ]);
 
   const [sharedParents, setSharedParents] = useState([
@@ -548,11 +548,11 @@ export default function Providers({ children }) {
 
   // Shared Roster for employees
   const [sharedStaff, setSharedStaff] = useState([
-    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', role: 'TEACHER', basic: 75000, allowances: 0, deductions: 0, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '998877665544', ifsc_code: 'SBIN0000214' },
-    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', role: 'SCHOOL_ADMIN', basic: 90000, allowances: 0, deductions: 0, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'HDFC Bank', account_no: '112233445566', ifsc_code: 'HDFC0000104' },
-    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', role: 'LIBRARIAN', basic: 50000, allowances: 0, deductions: 0, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2', bank_name: 'ICICI Bank', account_no: '556677889900', ifsc_code: 'ICIC0000011' },
-    { id: 'staff-4', first_name: 'Karan', last_name: 'Johar', employee_id: 'EMP-ADM-03', designation: 'Bursar', role: 'ACCOUNTANT', basic: 65000, allowances: 0, deductions: 0, pan_no: 'KJHOP1234E', phone: '+91 91234 56780', email: 'karan.johar@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'Axis Bank', account_no: '887766554433', ifsc_code: 'UTIB0000082' },
-    { id: 'staff-5', first_name: 'Vinod', last_name: 'Mehta', employee_id: 'EMP-ADM-04', designation: 'Office Administrator', role: 'ADMINISTRATOR', basic: 68000, allowances: 0, deductions: 0, pan_no: 'VNMTH5678D', phone: '+91 98765 12345', email: 'vinod.mehta@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '223344556677', ifsc_code: 'SBIN0000214' }
+    { id: 'staff-1', first_name: 'Rajesh', last_name: 'Iyer', employee_id: 'EMP-PHY-01', designation: 'HOD Physics', role: 'TEACHER', basic: 75000, allowances: 0, deductions: 0, pan_no: 'ABCPI1234F', phone: '+91 98765 43210', email: 'rajesh.iyer@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '998877665544', ifsc_code: 'SBIN0000214', is_active: true },
+    { id: 'staff-2', first_name: 'Anjali', last_name: 'Sharma', employee_id: 'EMP-ADM-02', designation: 'Dean Academics', role: 'SCHOOL_ADMIN', basic: 90000, allowances: 0, deductions: 0, pan_no: 'KLMPR9876Q', phone: '+91 87654 32109', email: 'anjali.sharma@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'HDFC Bank', account_no: '112233445566', ifsc_code: 'HDFC0000104', is_active: true },
+    { id: 'staff-3', first_name: 'Deepa', last_name: 'Roy', employee_id: 'EMP-LIB-05', designation: 'Chief Librarian', role: 'LIBRARIAN', basic: 50000, allowances: 0, deductions: 0, pan_no: 'BGHPR5432J', phone: '+91 76543 21098', email: 'deepa.roy@dpsrkp.edu.in', tenant_id: 'demo-tenant-2', bank_name: 'ICICI Bank', account_no: '556677889900', ifsc_code: 'ICIC0000011', is_active: true },
+    { id: 'staff-4', first_name: 'Karan', last_name: 'Johar', employee_id: 'EMP-ADM-03', designation: 'Bursar', role: 'ACCOUNTANT', basic: 65000, allowances: 0, deductions: 0, pan_no: 'KJHOP1234E', phone: '+91 91234 56780', email: 'karan.johar@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'Axis Bank', account_no: '887766554433', ifsc_code: 'UTIB0000082', is_active: true },
+    { id: 'staff-5', first_name: 'Vinod', last_name: 'Mehta', employee_id: 'EMP-ADM-04', designation: 'Office Administrator', role: 'ADMINISTRATOR', basic: 68000, allowances: 0, deductions: 0, pan_no: 'VNMTH5678D', phone: '+91 98765 12345', email: 'vinod.mehta@iitd.edu.in', tenant_id: 'demo-tenant-1', bank_name: 'State Bank of India', account_no: '223344556677', ifsc_code: 'SBIN0000214', is_active: true }
   ]);
 
   // Shared fleet maintenance logs
@@ -1204,6 +1204,20 @@ export default function Providers({ children }) {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_active')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile && profile.is_active === false) {
+            await supabase.auth.signOut();
+            setSession(null);
+            toast.error('This account has been deactivated/blocked. Please contact the administrator.');
+            router.push('/login');
+            return;
+          }
+
           const role = session.user.app_metadata?.role || 'STUDENT';
           const tenantId = session.user.app_metadata?.tenant_id;
           setActiveRole(role);
@@ -1305,6 +1319,9 @@ export default function Providers({ children }) {
       // Allow demo login bypass for any onboarded staff member by email
       const foundStaff = (sharedStaff || []).find(s => s.email?.toLowerCase() === email?.toLowerCase());
       if (foundStaff) {
+        if (foundStaff.is_active === false) {
+          throw new Error('This account has been deactivated/blocked. Please contact the administrator.');
+        }
         simulateStaffSession(foundStaff);
         return { success: true };
       }
@@ -1315,6 +1332,18 @@ export default function Providers({ children }) {
       }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profile && profile.is_active === false) {
+        await supabase.auth.signOut();
+        throw new Error('This account has been deactivated/blocked. Please contact the administrator.');
+      }
+
       toast.success('Access session authenticated successfully');
       router.push('/dashboard');
       return { success: true };
@@ -1423,6 +1452,10 @@ export default function Providers({ children }) {
   };
 
   const simulateStaffSession = (staff) => {
+    if (staff.is_active === false) {
+      toast.error('This account has been deactivated/blocked. Please contact the administrator.');
+      return;
+    }
     // Determine active role from staff.role, fallback to matching designation
     let role = staff.role;
     if (!role) {

@@ -32,6 +32,37 @@ export default function StaffRegistryPage() {
   const [bulkText, setBulkText] = useState('');
   const [parsedStaff, setParsedStaff] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
+
+  const handleToggleStaffStatus = async (staff) => {
+    const newStatus = staff.is_active === false;
+    const confirmMsg = newStatus 
+      ? `Are you sure you want to reactivate the portal login for "${staff.first_name} ${staff.last_name}"?`
+      : `Are you sure you want to block/deactivate the portal login for "${staff.first_name} ${staff.last_name}"?`;
+      
+    if (!confirm(confirmMsg)) return;
+
+    const updatedStaff = sharedStaff.map(s => 
+      s.id === staff.id ? { ...s, is_active: newStatus } : s
+    );
+    setSharedStaff(updatedStaff);
+
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ is_active: newStatus })
+          .eq('id', staff.id);
+          
+        if (error) throw error;
+        toast.success(`Staff account login ${newStatus ? 'activated' : 'blocked'} successfully!`);
+      } catch (err) {
+        console.error('Failed to sync staff block status to Supabase:', err);
+        toast.error('Local change saved, but failed to sync to database.');
+      }
+    } else {
+      toast.success(`Staff account login ${newStatus ? 'activated' : 'blocked'} successfully!`);
+    }
+  };
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -1081,8 +1112,13 @@ export default function StaffRegistryPage() {
                         <span className="inline-flex text-[9px] font-black text-accent uppercase tracking-wider bg-accent/5 px-2.5 py-0.5 rounded-lg border border-accent/10">
                           {staff.role || 'TEACHER'}
                         </span>
-                        <h4 className="text-sm font-black text-text-primary mt-1 truncate">
-                          {staff.first_name} {staff.last_name}
+                        <h4 className="text-sm font-black text-text-primary mt-1 truncate flex items-center gap-1.5">
+                          <span>{staff.first_name} {staff.last_name}</span>
+                          {staff.is_active === false && (
+                            <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
+                              Blocked
+                            </span>
+                          )}
                         </h4>
                         <p className="text-[10px] text-text-secondary font-mono tracking-tight">{staff.employee_id}</p>
                       </div>
@@ -1132,19 +1168,31 @@ export default function StaffRegistryPage() {
 
                     <div className="flex items-center gap-1.5">
                       <button 
+                        onClick={() => handleToggleStaffStatus(staff)}
+                        className={`px-2.5 py-1.5 text-[9px] font-black rounded-xl transition-all flex items-center gap-1 active:scale-95 border ${
+                          staff.is_active === false 
+                            ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/10' 
+                            : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 border-red-500/10'
+                        }`}
+                        title={staff.is_active === false ? "Activate Portal" : "Deactivate Portal"}
+                      >
+                        <ShieldAlert size={10} />
+                        <span>{staff.is_active === false ? 'Unblock' : 'Block'}</span>
+                      </button>
+                      <button 
                         onClick={() => simulateStaffSession(staff)}
-                        className="px-3 py-1.5 bg-success/10 hover:bg-success/20 text-success text-[10px] font-black rounded-xl border border-success/10 transition-all flex items-center gap-1 active:scale-95"
+                        className="px-2.5 py-1.5 bg-success/10 hover:bg-success/20 text-success text-[9px] font-black rounded-xl border border-success/10 transition-all flex items-center gap-0.5 active:scale-95"
                         title="Login as Staff (RBAC Simulator)"
                       >
-                        <Zap size={11} />
+                        <Zap size={10} />
                         <span>Simulate</span>
                       </button>
                       <button 
                         onClick={() => setSelectedStaffForDossier(staff)}
-                        className="px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-[10px] font-black rounded-xl border border-accent/10 transition-all flex items-center gap-1 active:scale-95"
+                        className="px-2.5 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-[9px] font-black rounded-xl border border-accent/10 transition-all flex items-center gap-0.5 active:scale-95"
                         title="Staff Documents & Dossier"
                       >
-                        <FileBox size={11} />
+                        <FileBox size={10} />
                         <span>Dossier</span>
                       </button>
                     </div>
@@ -1183,7 +1231,14 @@ export default function StaffRegistryPage() {
                           </div>
                         )}
                         <div>
-                          <p>{staff.first_name} {staff.last_name}</p>
+                          <p className="flex items-center gap-1.5">
+                            <span>{staff.first_name} {staff.last_name}</span>
+                            {staff.is_active === false && (
+                              <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
+                                Blocked
+                              </span>
+                            )}
+                          </p>
                           <span className="text-[9px] text-text-secondary uppercase">{staff.employee_id} • {staff.designation}</span>
                         </div>
                       </td>
@@ -1192,6 +1247,15 @@ export default function StaffRegistryPage() {
                       <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
                       <td className="py-4 text-right pr-2">
                         <div className="flex justify-end gap-1">
+                          <button 
+                            onClick={() => handleToggleStaffStatus(staff)}
+                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
+                              staff.is_active === false ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-500 hover:text-red-600'
+                            }`}
+                            title={staff.is_active === false ? "Activate Portal" : "Deactivate Portal"}
+                          >
+                            <ShieldAlert size={14} />
+                          </button>
                           <button 
                             onClick={() => simulateStaffSession(staff)}
                             className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"

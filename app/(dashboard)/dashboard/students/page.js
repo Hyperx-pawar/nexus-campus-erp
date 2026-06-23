@@ -404,7 +404,9 @@ export default function StudentRegistryPage() {
       discount: sharedFeeRecords[student.id]?.discount || 0,
       initialAttendance: student.initialAttendance || '85.0%',
       avatar: student.profile_picture_url || '',
-      avatarFile: null
+      avatarFile: null,
+      isAlumni: student.is_alumni || false,
+      isActive: student.is_active !== false
     });
     setShowAddForm(true);
   };
@@ -441,7 +443,9 @@ export default function StudentRegistryPage() {
     discount: '',
     initialAttendance: '85.0%',
     avatar: '',
-    avatarFile: null
+    avatarFile: null,
+    isAlumni: false,
+    isActive: true
   });
 
   const handleUploadDocument = async (file, docType) => {
@@ -632,8 +636,25 @@ export default function StudentRegistryPage() {
           enableHostel: formData.enableHostel,
           hostelBlockId: formData.hostelBlockId,
           hostelFee: hostelFeeValue,
-          profile_picture_url: profilePicUrl
+          profile_picture_url: profilePicUrl,
+          is_alumni: formData.isAlumni,
+          is_active: formData.isActive
         };
+
+        if (supabase) {
+          try {
+            await supabase
+              .from('profiles')
+              .update({ is_active: formData.isActive })
+              .eq('id', editingStudentId);
+            await supabase
+              .from('students')
+              .update({ is_alumni: formData.isAlumni })
+              .eq('id', editingStudentId);
+          } catch (dbErr) {
+            console.error('Failed to sync status to Supabase:', dbErr);
+          }
+        }
 
         const updatedParents = sharedParents.map(p => {
           if (p.id === existingStudent.parent_id) {
@@ -752,7 +773,8 @@ export default function StudentRegistryPage() {
         enableHostel: false, hostelBlockId: '', customHostelFee: '',
         parentFirstName: '', parentLastName: '', parentEmail: '', parentPhone: '', parentOccupation: 'Business Owner',
         totalFee: 0, paidFee: 0, discount: '', initialAttendance: '85.0%',
-        avatar: '', avatarFile: null
+        avatar: '', avatarFile: null,
+        isAlumni: false, isActive: true
       });
       setEditingStudentId(null);
       setShowAddForm(false);
@@ -1993,6 +2015,44 @@ export default function StudentRegistryPage() {
               </div>
             </div>
 
+            {/* Part 4: Account & Enrolment Status (Only shown when editing) */}
+            {editingStudentId && (
+              <div className="space-y-4 pt-4 border-t border-border animate-in fade-in duration-200">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-wider">4. Account & Enrolment Status</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Academic Status</label>
+                    <select 
+                      value={formData.isAlumni ? 'PASS_OUT' : 'ACTIVE'}
+                      onChange={(e) => {
+                        const isAlumniVal = e.target.value === 'PASS_OUT';
+                        setFormData({
+                          ...formData, 
+                          isAlumni: isAlumniVal,
+                          isActive: isAlumniVal ? false : formData.isActive
+                        });
+                      }}
+                      className="w-full text-xs bg-bg-sidebar text-text-primary py-2 px-3 rounded-xl border border-border"
+                    >
+                      <option value="ACTIVE">Active Student</option>
+                      <option value="PASS_OUT">Pass Out / Alumni (Deactivates Portal)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Portal Account Login</label>
+                    <select 
+                      value={formData.isActive ? 'ACTIVE' : 'BLOCKED'}
+                      onChange={(e) => setFormData({...formData, isActive: e.target.value === 'ACTIVE'})}
+                      className="w-full text-xs bg-bg-sidebar text-text-primary py-2 px-3 rounded-xl border border-border"
+                    >
+                      <option value="ACTIVE">Active (Allowed to Log In)</option>
+                      <option value="BLOCKED">Blocked / Deactivated</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button 
               type="submit" 
               disabled={loading}
@@ -2031,7 +2091,19 @@ export default function StudentRegistryPage() {
                   </div>
                 )}
                 <div>
-                  <h4 className="text-sm font-bold text-text-primary">{selectedStudentForDossier.first_name} {selectedStudentForDossier.last_name}</h4>
+                  <h4 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                    {selectedStudentForDossier.first_name} {selectedStudentForDossier.last_name}
+                    {selectedStudentForDossier.is_alumni && (
+                      <span className="text-[7px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                        Pass Out
+                      </span>
+                    )}
+                    {selectedStudentForDossier.is_active === false && (
+                      <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
+                        Blocked
+                      </span>
+                    )}
+                  </h4>
                   <p className="text-[10px] text-text-secondary uppercase">Admission No: {selectedStudentForDossier.admission_no} • Class: {getClassName(selectedStudentForDossier.class_id)}</p>
                 </div>
               </div>
@@ -2559,7 +2631,19 @@ export default function StudentRegistryPage() {
                       </div>
                     )}
                     <div>
-                      <span className="block">{student.first_name} {student.last_name}</span>
+                      <span className="block flex items-center gap-1.5">
+                        <span>{student.first_name} {student.last_name}</span>
+                        {student.is_alumni && (
+                          <span className="text-[7px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                            Pass Out
+                          </span>
+                        )}
+                        {student.is_active === false && (
+                          <span className="text-[7px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
+                            Blocked
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[9px] text-text-secondary block font-semibold font-mono select-all mt-0.5" title="Student Login ID">
                         {(() => {
                           const initial = student.first_name.trim().toLowerCase().replace(/\s+/g, '');
