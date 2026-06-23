@@ -5,7 +5,8 @@ import RoleGate from '@/components/RoleGate';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
-  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus, Edit, ArrowUpCircle
+  Trash2, ChevronRight, FileText, ArrowLeft, Loader2, Link as LinkIcon, Bus, Home as HomeIcon, X, Plus, Edit, ArrowUpCircle,
+  GraduationCap, ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -782,6 +783,76 @@ export default function StudentRegistryPage() {
     } catch (err) {
       setLoading(false);
       toast.error('Failed to submit student record.');
+    }
+  };
+
+  const handleToggleStudentActiveStatus = async (student) => {
+    const newStatus = student.is_active === false;
+    const confirmMsg = newStatus
+      ? `Are you sure you want to reactivate the portal login access for "${student.first_name} ${student.last_name}"?`
+      : `Are you sure you want to block/deactivate the portal login access for "${student.first_name} ${student.last_name}"?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const updatedStudents = sharedStudents.map(s => 
+      s.id === student.id ? { ...s, is_active: newStatus } : s
+    );
+    setSharedStudents(updatedStudents);
+
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ is_active: newStatus })
+          .eq('id', student.id);
+        if (error) throw error;
+        toast.success(`Student portal access ${newStatus ? 'activated' : 'blocked'} successfully!`);
+      } catch (err) {
+        console.error('Failed to sync student block status:', err);
+        toast.error('Local change saved, but failed to sync to database.');
+      }
+    } else {
+      toast.success(`Student portal access ${newStatus ? 'activated' : 'blocked'} successfully!`);
+    }
+  };
+
+  const handleToggleStudentAlumniStatus = async (student) => {
+    const isAlumniVal = !student.is_alumni;
+    const confirmMsg = isAlumniVal
+      ? `Are you sure you want to mark "${student.first_name} ${student.last_name}" as Pass Out / Alumni? This will automatically deactivate their portal account.`
+      : `Are you sure you want to re-admit "${student.first_name} ${student.last_name}" as an Active Student?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const updatedStudents = sharedStudents.map(s => 
+      s.id === student.id ? { 
+        ...s, 
+        is_alumni: isAlumniVal,
+        is_active: isAlumniVal ? false : s.is_active 
+      } : s
+    );
+    setSharedStudents(updatedStudents);
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('students')
+          .update({ is_alumni: isAlumniVal })
+          .eq('id', student.id);
+
+        if (isAlumniVal) {
+          await supabase
+            .from('profiles')
+            .update({ is_active: false })
+            .eq('id', student.id);
+        }
+        toast.success(`Student marked as ${isAlumniVal ? 'Pass Out' : 'Active'} successfully!`);
+      } catch (err) {
+        console.error('Failed to sync student alumni status:', err);
+        toast.error('Local change saved, but failed to sync to database.');
+      }
+    } else {
+      toast.success(`Student marked as ${isAlumniVal ? 'Pass Out' : 'Active'} successfully!`);
     }
   };
 
@@ -2684,6 +2755,31 @@ export default function StudentRegistryPage() {
                           >
                             <Edit size={14} />
                           </button>
+                          
+                          <button
+                            onClick={() => handleToggleStudentAlumniStatus(student)}
+                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
+                              student.is_alumni 
+                                ? 'text-indigo-600 hover:text-indigo-700 bg-indigo-500/5' 
+                                : 'text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={student.is_alumni ? "Mark as Active Student" : "Mark as Pass Out (Graduate)"}
+                          >
+                            <GraduationCap size={15} />
+                          </button>
+
+                          <button
+                            onClick={() => handleToggleStudentActiveStatus(student)}
+                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
+                              student.is_active === false 
+                                ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-500/5' 
+                                : 'text-red-500 hover:text-red-600'
+                            }`}
+                            title={student.is_active === false ? "Unblock Portal Login" : "Block Portal Login"}
+                          >
+                            <ShieldAlert size={14} />
+                          </button>
+
                           <button 
                             onClick={() => {
                               setSelectedStudentForPromotion(student);
