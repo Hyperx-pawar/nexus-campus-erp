@@ -28,7 +28,9 @@ import {
   TrendingUp,
   Award,
   CreditCard,
-  FileText
+  FileText,
+  Database,
+  UserX
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 
@@ -44,6 +46,7 @@ const sidebarLinks = [
     group: 'Academics',
     links: [
       { name: 'Student Directory', icon: Users, href: '/dashboard/students', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'PARENT'] },
+      { name: 'Pass Out & Blocks', icon: UserX, href: '/dashboard/passout', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'Staff Directory', icon: UserSquare2, href: '/dashboard/staff', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'Daily Attendance', icon: CheckCircle, href: '/dashboard/attendance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER'] },
       { name: 'Syllabus & LMS', icon: BookOpen, href: '/dashboard/courses', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'] },
@@ -70,6 +73,7 @@ const sidebarLinks = [
       { name: 'Fees & Finance', icon: Wallet, href: '/dashboard/finance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'] },
       { name: 'System Analytics', icon: TrendingUp, href: '/dashboard/analytics', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'School Settings', icon: Settings, href: '/dashboard/settings', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
+      { name: 'Backups & Sync', icon: Database, href: '/dashboard/backups', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
     ]
   }
 ];

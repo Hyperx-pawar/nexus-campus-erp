@@ -1,3 +1,4 @@
+
 'use client';
 
 import RoleGate from '@/components/RoleGate';
@@ -9,11 +10,10 @@ import {
   Briefcase, Wallet, FileBox, Settings, TrendingUp, Award, Zap, Bell, MessageSquare, User, Loader2, Upload,
   RefreshCw, Database, HardDrive, Terminal, Server, Users, CheckCircle2,
   Code, HeartPulse, Scale, GraduationCap, ChevronRight,
-  Ship, Utensils, Coins, Hotel
+  Ship, Utensils, Coins, Hotel, Search, UserX, UserCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-
 
 // ==========================================
 // INTERACTIVE PROFILE EDITOR COMPONENT
@@ -247,10 +247,14 @@ function SettingsEditor({ activeTenant, activeRole }) {
     name: '',
     subdomain: '',
     customDomain: '',
+    societyName: '',
     board: 'CBSE',
     academicYear: '2026-2027',
     logo: '',
     brandColor: '#2563EB',
+    address: '',
+    phone: '',
+    affiliation: '',
     bankName: 'State Bank of India',
     accountName: '',
     accountNo: '',
@@ -266,10 +270,14 @@ function SettingsEditor({ activeTenant, activeRole }) {
         name: activeTenant.name || '',
         subdomain: activeTenant.subdomain || '',
         customDomain: activeTenant.customDomain || '',
+        societyName: activeTenant.settings?.societyName || '',
         board: activeTenant.settings?.board || 'CBSE',
         academicYear: activeTenant.settings?.academicYear || '2026-2027',
         logo: activeTenant.logo || '',
         brandColor: activeTenant.brandColor || '#2563EB',
+        address: activeTenant.address || '',
+        phone: activeTenant.phone || '',
+        affiliation: activeTenant.affiliation || '',
         bankName: activeTenant.settings?.bank?.bankName || 'State Bank of India',
         accountName: activeTenant.settings?.bank?.accountName || '',
         accountNo: activeTenant.settings?.bank?.accountNo || '',
@@ -399,6 +407,17 @@ function SettingsEditor({ activeTenant, activeRole }) {
               </div>
 
               <div className="space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Management / Society Name (Optional)</label>
+                <input 
+                  type="text" 
+                  value={settings.societyName}
+                  onChange={(e) => setSettings({...settings, societyName: e.target.value})}
+                  className="w-full text-xs"
+                  placeholder="e.g. SADALGA EDUCATION SOCIETY'S"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Subdomain Prefix</label>
                 <div className="flex items-center">
                   <input 
@@ -449,6 +468,39 @@ function SettingsEditor({ activeTenant, activeRole }) {
                   className="w-full text-xs"
                   placeholder="e.g. 2026-2027"
                   required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Affiliation / Board Details</label>
+                <input 
+                  type="text" 
+                  value={settings.affiliation}
+                  onChange={(e) => setSettings({...settings, affiliation: e.target.value})}
+                  className="w-full text-xs"
+                  placeholder="e.g. Affiliated to CBSE, Board Code: 99462"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Contact Phone Number</label>
+                <input 
+                  type="text" 
+                  value={settings.phone}
+                  onChange={(e) => setSettings({...settings, phone: e.target.value})}
+                  className="w-full text-xs"
+                  placeholder="e.g. +91 98765 43210"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-[9px] font-black text-text-secondary uppercase tracking-widest ml-1">Institution Campus Address</label>
+                <textarea 
+                  value={settings.address}
+                  onChange={(e) => setSettings({...settings, address: e.target.value})}
+                  className="w-full text-xs bg-bg-main border border-border rounded-xl p-3 text-text-primary outline-none focus:border-accent font-outfit"
+                  rows={2}
+                  placeholder="e.g. Sadalga, Tal. Chikodi, Dist. Belagavi, Karnataka - 591239"
                 />
               </div>
 
@@ -1439,10 +1491,290 @@ function PlacementPortal({ activeTenant, activeRole }) {
 }
 
 // ==========================================
+// INTERACTIVE PASSOUT & BLOCKS PORTAL
+// ==========================================
+function PassoutPortal({ activeTenant, activeRole }) {
+  const { supabase, sharedStudents, setSharedStudents, sharedStaff, setSharedStaff } = useAuth();
+  const [activeTab, setActiveTab] = useState('alumni'); // 'alumni' | 'blocked'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleReadmitStudent = async (student) => {
+    if (!confirm(`Are you sure you want to re-admit "${student.first_name} ${student.last_name}" to the active student roster?`)) return;
+
+    const updatedStudents = sharedStudents.map(s => 
+      s.id === student.id ? { ...s, is_alumni: false, is_active: true } : s
+    );
+    setSharedStudents(updatedStudents);
+
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(student.id);
+    if (supabase && isUUID) {
+      try {
+        await supabase.from('students').update({ is_alumni: false }).eq('id', student.id);
+        await supabase.from('profiles').update({ is_active: true }).eq('id', student.id);
+        toast.success(`Successfully re-admitted ${student.first_name} ${student.last_name}!`);
+      } catch (err) {
+        console.error(err);
+        toast.error('Local changes saved, but failed to sync to database.');
+      }
+    } else {
+      toast.success(`Successfully re-admitted ${student.first_name} ${student.last_name}!`);
+    }
+  };
+
+  const handleReactivateUser = async (user, type) => {
+    if (!confirm(`Are you sure you want to reactivate portal login access for "${user.first_name} ${user.last_name}"?`)) return;
+
+    if (type === 'student') {
+      const updatedStudents = sharedStudents.map(s => 
+        s.id === user.id ? { ...s, is_active: true } : s
+      );
+      setSharedStudents(updatedStudents);
+
+      const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(user.id);
+      if (supabase && isUUID) {
+        try {
+          await supabase.from('profiles').update({ is_active: true }).eq('id', user.id);
+          toast.success(`Portal login access reactivated for student ${user.first_name}!`);
+        } catch (err) {
+          console.error(err);
+          toast.error('Local changes saved, but failed to sync to database.');
+        }
+      } else {
+        toast.success(`Portal login access reactivated for student ${user.first_name}!`);
+      }
+    } else {
+      const updatedStaff = sharedStaff.map(s => 
+        s.id === user.id ? { ...s, is_active: true, is_left: false } : s
+      );
+      setSharedStaff(updatedStaff);
+
+      const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(user.id);
+      if (supabase && isUUID) {
+        try {
+          await supabase.from('profiles').update({ is_active: true }).eq('id', user.id);
+          await supabase.from('staff').update({ is_left: false }).eq('id', user.id);
+          toast.success(`Portal login and active status restored for staff ${user.first_name}!`);
+        } catch (err) {
+          console.error(err);
+          toast.error('Local changes saved, but failed to sync to database.');
+        }
+      } else {
+        toast.success(`Portal login and active status restored for staff ${user.first_name}!`);
+      }
+    }
+  };
+
+  // Filter lists based on tenant
+  const tenantStudents = (sharedStudents || []).filter(s => s.tenant_id === activeTenant.id);
+  const tenantStaff = (sharedStaff || []).filter(s => s.tenant_id === activeTenant.id);
+
+  // Search logic
+  const searchFilter = (item) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const fullName = `${item.first_name || ''} ${item.last_name || ''}`.toLowerCase();
+    const email = (item.email || '').toLowerCase();
+    const id = (item.employee_id || item.admission_no || '').toLowerCase();
+    return fullName.includes(q) || email.includes(q) || id.includes(q);
+  };
+
+  const alumniStudents = tenantStudents.filter(s => s.is_alumni).filter(searchFilter);
+  
+  const blockedStudents = tenantStudents.filter(s => s.is_active === false && !s.is_alumni).filter(searchFilter);
+  const blockedStaff = tenantStaff.filter(s => s.is_active === false || s.is_left).filter(searchFilter);
+  const allBlocked = [
+    ...blockedStudents.map(s => ({ ...s, type: 'student' })),
+    ...blockedStaff.map(s => ({ ...s, type: 'staff' }))
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Search and Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Tab switcher */}
+        <div className="inline-flex p-1 bg-bg-sidebar border border-border rounded-2xl shrink-0">
+          <button
+            onClick={() => setActiveTab('alumni')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'alumni' 
+                ? 'bg-accent text-white shadow-md shadow-accent/15' 
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Pass Out Students ({alumniStudents.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('blocked')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'blocked' 
+                ? 'bg-accent text-white shadow-md shadow-accent/15' 
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Blocked Users ({allBlocked.length})
+          </button>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
+          <input
+            type="text"
+            placeholder="Search by name, email or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-bg-card border border-border rounded-2xl py-2.5 pl-11 pr-4 text-xs text-text-primary placeholder-text-secondary outline-none focus:border-accent transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Grid/List views */}
+      <div className="bg-bg-card border border-border rounded-[2rem] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+        {activeTab === 'alumni' ? (
+          alumniStudents.length === 0 ? (
+            <div className="p-12 text-center text-text-secondary space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-text-secondary">
+                <GraduationCap size={24} />
+              </div>
+              <p className="text-xs font-medium">No passed out alumni records found matching filters.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-border text-text-secondary font-bold select-none bg-bg-sidebar/50">
+                    <th className="p-4">Student Name</th>
+                    <th className="p-4">Admission No</th>
+                    <th className="p-4">Contact Info</th>
+                    <th className="p-4">Alumni Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {alumniStudents.map((student) => (
+                    <tr key={student.id} className="hover:bg-bg-sidebar/20 transition-colors">
+                      <td className="p-4 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                          {student.profile_picture_url ? (
+                            <img src={student.profile_picture_url} className="w-full h-full object-cover" />
+                          ) : (
+                            student.first_name[0]
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-text-primary">{student.first_name} {student.last_name}</p>
+                          <span className="text-[10px] text-text-secondary block mt-0.5">Roll No: {student.roll_no || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono font-bold text-text-secondary">{student.admission_no || 'N/A'}</td>
+                      <td className="p-4">
+                        <p className="text-text-primary">{student.email || 'N/A'}</p>
+                        <span className="text-[10px] text-text-secondary block mt-0.5">{student.phone || 'N/A'}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-500 font-bold text-[9px] uppercase">
+                          Graduated / Alumni
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => handleReadmitStudent(student)}
+                          className="px-3 py-1.5 bg-bg-main hover:bg-accent/10 border border-border hover:border-accent/30 text-text-primary hover:text-accent font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                          title="Restore student to active registry"
+                        >
+                          <RefreshCw size={12} />
+                          <span>Re-admit Student</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          allBlocked.length === 0 ? (
+            <div className="p-12 text-center text-text-secondary space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-text-secondary">
+                <UserX size={24} />
+              </div>
+              <p className="text-xs font-medium">No blocked/deactivated accounts found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-border text-text-secondary font-bold select-none bg-bg-sidebar/50">
+                    <th className="p-4">User Name</th>
+                    <th className="p-4">Role/Type</th>
+                    <th className="p-4">Contact Info</th>
+                    <th className="p-4">Block Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {allBlocked.map((user) => (
+                    <tr key={user.id} className="hover:bg-bg-sidebar/20 transition-colors">
+                      <td className="p-4 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                          {user.profile_picture_url ? (
+                            <img src={user.profile_picture_url} className="w-full h-full object-cover" />
+                          ) : (
+                            user.first_name[0]
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-text-primary">{user.first_name} {user.last_name}</p>
+                          <span className="text-[10px] text-text-secondary block mt-0.5">ID: {user.employee_id || user.admission_no || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2 py-0.5 rounded-lg bg-bg-main border border-border text-[10px] font-bold text-text-primary font-outfit uppercase">
+                          {user.role || 'USER'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-text-primary">{user.email || 'N/A'}</p>
+                        <span className="text-[10px] text-text-secondary block mt-0.5">{user.phone || 'N/A'}</span>
+                      </td>
+                      <td className="p-4">
+                        {user.is_left ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/25 text-yellow-500 font-bold text-[9px] uppercase">
+                            Staff Left / Resigned
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/25 text-red-500 font-bold text-[9px] uppercase">
+                            Portal Login Blocked
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => handleReactivateUser(user, user.type)}
+                          className="px-3 py-1.5 bg-bg-main hover:bg-success/10 border border-border hover:border-success/30 text-text-primary hover:text-success font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                          title="Restore portal access"
+                        >
+                          <UserCheck size={12} />
+                          <span>Restore Access</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // MASTER FALLBACK PAGE COMPONENT
 // ==========================================
 export default function ModuleFallbackPage({ params }) {
-  const resolvedParams = use(params);
+  const resolvedParams = React.use(params);
   const { module } = resolvedParams;
   const { activeTenant, activeRole, activeUser } = useAuth();
 
@@ -1489,6 +1821,13 @@ export default function ModuleFallbackPage({ params }) {
       desc: 'Inspect and edit your active workspace account credentials, contact info, and identity logs.',
       indianInfo: 'Linked to Indian academic registries (Aadhaar / Board ID verification active).',
       roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN', 'TRANSPORT_MANAGER', 'HOSTEL_WARDEN']
+    },
+    passout: {
+      title: 'Pass Out & Blocks',
+      icon: UserX,
+      desc: 'Manage graduated alumni students and restore deactivated or blocked portal logins.',
+      indianInfo: 'Registry complies with Indian school board graduation standards.',
+      roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN']
     }
   };
 
@@ -1550,6 +1889,12 @@ export default function ModuleFallbackPage({ params }) {
       ) : module === 'placement' ? (
         /* Render career & placements portal */
         <PlacementPortal 
+          activeTenant={activeTenant} 
+          activeRole={activeRole} 
+        />
+      ) : module === 'passout' ? (
+        /* Render pass out & blocks portal */
+        <PassoutPortal 
           activeTenant={activeTenant} 
           activeRole={activeRole} 
         />

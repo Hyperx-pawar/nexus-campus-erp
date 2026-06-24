@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { 
   Users, UserPlus, Search, Shield, Sparkles, 
   Trash2, CreditCard, ArrowLeft, Loader2, FileBox, ShieldAlert, X, Plus, FileText, Zap,
-  Mail, Phone, LayoutGrid, List, UserMinus
+  Mail, Phone, LayoutGrid, List, UserMinus, Edit
 } from 'lucide-react';
 import { useAuth } from '@/components/Providers';
 import { toast } from 'sonner';
@@ -27,11 +27,36 @@ export default function StaffRegistryPage() {
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStaffForDossier, setSelectedStaffForDossier] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [parsedStaff, setParsedStaff] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
+  const [editingStaffId, setEditingStaffId] = useState(null);
+
+  const handleOpenEditForm = (staff) => {
+    setEditingStaffId(staff.id);
+    setFormData({
+      firstName: staff.first_name || '',
+      lastName: staff.last_name || '',
+      designation: staff.designation || 'Lecturer',
+      role: staff.role || 'TEACHER',
+      department: staff.department || 'Science',
+      basic: staff.basic || 55000,
+      panNo: staff.pan_no || '',
+      phone: staff.phone || '',
+      email: staff.email || '',
+      avatar: staff.profile_picture_url || '',
+      avatarFile: null,
+      bankName: staff.bank_name || 'State Bank of India',
+      accountNo: staff.account_no || '',
+      ifscCode: staff.ifsc_code || '',
+      isLeft: staff.is_left || false,
+      isActive: staff.is_active !== false
+    });
+    setShowAddForm(true);
+  };
 
   const handleToggleStaffStatus = async (staff) => {
     const newStatus = staff.is_active === false;
@@ -46,7 +71,8 @@ export default function StaffRegistryPage() {
     );
     setSharedStaff(updatedStaff);
 
-    if (supabase) {
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(staff.id);
+    if (supabase && isUUID) {
       try {
         const { error } = await supabase
           .from('profiles')
@@ -80,7 +106,8 @@ export default function StaffRegistryPage() {
     );
     setSharedStaff(updatedStaff);
 
-    if (supabase) {
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(staff.id);
+    if (supabase && isUUID) {
       try {
         await supabase
           .from('staff')
@@ -117,7 +144,9 @@ export default function StaffRegistryPage() {
     avatarFile: null,
     bankName: 'State Bank of India',
     accountNo: '',
-    ifscCode: ''
+    ifscCode: '',
+    isLeft: false,
+    isActive: true
   });
 
   const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN'];
@@ -185,7 +214,7 @@ export default function StaffRegistryPage() {
 
     try {
       setLoading(true);
-      const staffId = `staff-${Date.now()}`;
+      const staffId = editingStaffId || `staff-${Date.now()}`;
       
       // Upload profile picture if selected
       let profilePicUrl = formData.avatar || '';
@@ -199,41 +228,103 @@ export default function StaffRegistryPage() {
         }
       }
 
-      const deptCodes = {
-        Science: 'SCI',
-        Humanities: 'HUM',
-        Administration: 'ADM',
-        Support: 'SUP'
-      };
-      const deptCode = deptCodes[formData.department] || 'GEN';
-      const randomCode = Math.floor(100 + Math.random() * 900);
-      const empId = `EMP-${deptCode}-${randomCode}`;
+      if (editingStaffId) {
+        // --- EDIT MODE ---
+        const existingStaff = sharedStaff.find(s => s.id === editingStaffId) || {};
+        const updatedStaff = {
+          ...existingStaff,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          designation: formData.designation,
+          role: formData.role || 'TEACHER',
+          department: formData.department,
+          basic: Number(formData.basic),
+          pan_no: uppercasePan,
+          phone: formData.phone || '+91 98765 43210',
+          email: formData.email,
+          profile_picture_url: profilePicUrl,
+          bank_name: formData.bankName || 'State Bank of India',
+          account_no: formData.accountNo || 'N/A',
+          ifsc_code: formData.ifscCode || 'N/A',
+          is_left: formData.isLeft,
+          is_active: formData.isActive
+        };
 
-      const newStaff = {
-        id: staffId,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        employee_id: empId,
-        designation: formData.designation,
-        role: formData.role || 'TEACHER',
-        department: formData.department,
-        basic: Number(formData.basic),
-        allowances: 0,
-        deductions: 0,
-        pan_no: uppercasePan,
-        phone: formData.phone || '+91 98765 43210',
-        email: formData.email,
-        tenant_id: activeTenant.id,
-        profile_picture_url: profilePicUrl,
-        bank_name: formData.bankName || 'State Bank of India',
-        account_no: formData.accountNo || 'N/A',
-        ifsc_code: formData.ifscCode || 'N/A',
-        documents: []
-      };
+        const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(editingStaffId);
+        if (supabase && isUUID) {
+          await supabase
+            .from('staff')
+            .update({
+              first_name: updatedStaff.first_name,
+              last_name: updatedStaff.last_name,
+              designation: updatedStaff.designation,
+              department_id: null,
+              basic: updatedStaff.basic,
+              pan_no: updatedStaff.pan_no,
+              phone: updatedStaff.phone,
+              email: updatedStaff.email,
+              profile_picture_url: updatedStaff.profile_picture_url,
+              bank_name: updatedStaff.bank_name,
+              account_no: updatedStaff.account_no,
+              ifsc_code: updatedStaff.ifsc_code,
+              is_left: updatedStaff.is_left
+            })
+            .eq('id', editingStaffId);
 
-      setSharedStaff([newStaff, ...sharedStaff]);
-      toast.success(`Faculty member "${formData.firstName} ${formData.lastName}" onboarded successfully with ID: ${empId}!`);
-      
+          await supabase
+            .from('profiles')
+            .update({
+              email: updatedStaff.email,
+              phone: updatedStaff.phone,
+              role: updatedStaff.role,
+              is_active: updatedStaff.is_active
+            })
+            .eq('id', editingStaffId);
+        }
+
+        setSharedStaff(sharedStaff.map(s => s.id === editingStaffId ? updatedStaff : s));
+        toast.success(`Faculty member "${formData.firstName} ${formData.lastName}" updated successfully!`);
+        setEditingStaffId(null);
+      } else {
+        // --- CREATE MODE ---
+        const deptCodes = {
+          Science: 'SCI',
+          Humanities: 'HUM',
+          Administration: 'ADM',
+          Support: 'SUP'
+        };
+        const deptCode = deptCodes[formData.department] || 'GEN';
+        const randomCode = Math.floor(100 + Math.random() * 900);
+        const empId = `EMP-${deptCode}-${randomCode}`;
+
+        const newStaff = {
+          id: staffId,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          employee_id: empId,
+          designation: formData.designation,
+          role: formData.role || 'TEACHER',
+          department: formData.department,
+          basic: Number(formData.basic),
+          allowances: 0,
+          deductions: 0,
+          pan_no: uppercasePan,
+          phone: formData.phone || '+91 98765 43210',
+          email: formData.email,
+          tenant_id: activeTenant.id,
+          profile_picture_url: profilePicUrl,
+          bank_name: formData.bankName || 'State Bank of India',
+          account_no: formData.accountNo || 'N/A',
+          ifsc_code: formData.ifscCode || 'N/A',
+          is_active: true,
+          is_left: false,
+          documents: []
+        };
+
+        setSharedStaff([newStaff, ...sharedStaff]);
+        toast.success(`Faculty member "${formData.firstName} ${formData.lastName}" onboarded successfully with ID: ${empId}!`);
+      }
+
       setFormData({
         firstName: '',
         lastName: '',
@@ -248,13 +339,15 @@ export default function StaffRegistryPage() {
         avatarFile: null,
         bankName: 'State Bank of India',
         accountNo: '',
-        ifscCode: ''
+        ifscCode: '',
+        isLeft: false,
+        isActive: true
       });
       setShowAddForm(false);
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      toast.error('Failed to onboard staff member.');
+      toast.error(editingStaffId ? 'Failed to update staff member.' : 'Failed to onboard staff member.');
     }
   };
 
@@ -434,6 +527,15 @@ export default function StaffRegistryPage() {
   const tenantStaff = sharedStaff.filter(s => s.tenant_id === activeTenant.id);
 
   const filteredStaff = tenantStaff.filter(s => {
+    // Status Filter Selection
+    if (statusFilter === 'active') {
+      if (s.is_active === false || s.is_left) return false;
+    } else if (statusFilter === 'blocked') {
+      if (s.is_active !== false) return false;
+    } else if (statusFilter === 'left') {
+      if (!s.is_left) return false;
+    }
+
     const term = searchQuery.toLowerCase();
     return (
       s.first_name.toLowerCase().includes(term) ||
@@ -624,9 +726,12 @@ export default function StaffRegistryPage() {
 
       <Modal
         open={showAddForm}
-        onClose={() => setShowAddForm(false)}
-        title="Staff Member Onboarding Dossier"
-        icon={<UserPlus size={18} />}
+        onClose={() => {
+          setShowAddForm(false);
+          setEditingStaffId(null);
+        }}
+        title={editingStaffId ? "Edit Faculty & Staff Details" : "Staff Member Onboarding Dossier"}
+        icon={editingStaffId ? <Edit size={18} /> : <UserPlus size={18} />}
         size="lg"
       >
         <form onSubmit={handleOnboard} className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -890,6 +995,44 @@ export default function StaffRegistryPage() {
                 </div>
               </div>
             </div>
+            {editingStaffId && (
+              <div className="md:col-span-2 p-5 bg-slate-100/50 border border-border rounded-2xl space-y-4">
+                <h4 className="text-xs font-bold text-accent uppercase tracking-wider font-outfit">Enrolment & Portal Status</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Staff Roster Status</label>
+                    <select
+                      value={formData.isLeft ? 'LEFT' : 'ACTIVE'}
+                      onChange={(e) => {
+                        const isLeftVal = e.target.value === 'LEFT';
+                        setFormData({
+                          ...formData,
+                          isLeft: isLeftVal,
+                          isActive: isLeftVal ? false : formData.isActive
+                        });
+                      }}
+                      className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
+                    >
+                      <option value="ACTIVE">Active Staff</option>
+                      <option value="LEFT">Left / Resigned (Deactivates Portal)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Portal Account Login</label>
+                    <select
+                      value={formData.isActive ? 'ACTIVE' : 'BLOCKED'}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'ACTIVE' })}
+                      className="w-full text-xs bg-bg-sidebar text-text-primary py-2.5 px-3 rounded-xl border border-border"
+                      disabled={formData.isLeft}
+                    >
+                      <option value="ACTIVE">Active Portal Access</option>
+                      <option value="BLOCKED">Deactivated / Blocked Access</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Calculations Breakdown */}
             <div className="md:col-span-2 p-4 bg-bg-main border border-border rounded-2xl space-y-2 text-xs">
               <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest block">Monthly Payroll Estimate</span>
@@ -902,10 +1045,10 @@ export default function StaffRegistryPage() {
             <button 
               type="submit" 
               disabled={loading}
-              className="md:col-span-2 py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all mt-4 flex items-center justify-center gap-2"
+              className="md:col-span-2 py-4 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all mt-4 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
-              <span>Register Faculty Member</span>
+              {loading ? <Loader2 className="animate-spin" size={16} /> : (editingStaffId ? <Edit size={16} /> : <UserPlus size={16} />)}
+              <span>{editingStaffId ? 'Save Faculty Changes' : 'Register Faculty Member'}</span>
             </button>
           </form>
       </Modal>
@@ -1086,8 +1229,21 @@ export default function StaffRegistryPage() {
               className="w-full bg-slate-100/50 border border-border rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-all text-xs text-text-primary placeholder:text-text-secondary"
             />
           </div>
-          
           <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-100/50 border border-border rounded-2xl px-4 py-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary whitespace-nowrap">Account Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-transparent text-xs text-text-primary outline-none py-1.5 cursor-pointer font-bold font-outfit"
+              >
+                <option value="all" className="bg-bg-sidebar">All Accounts</option>
+                <option value="active" className="bg-bg-sidebar">Active Staff</option>
+                <option value="blocked" className="bg-bg-sidebar">Blocked Portal</option>
+                <option value="left" className="bg-bg-sidebar">Left/Resigned</option>
+              </select>
+            </div>
+            
             {/* View Mode Toggle */}
             <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-border">
               <button
@@ -1128,30 +1284,68 @@ export default function StaffRegistryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStaff.map((staff) => {
               const docCount = (staff.documents || []).length;
+              const roleThemes = {
+                ADMIN: {
+                  bg: 'bg-indigo-500/5',
+                  border: 'border-indigo-500/10 hover:border-indigo-500/25',
+                  badge: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/10',
+                  avatarBg: 'bg-indigo-50',
+                  text: 'text-indigo-600',
+                  blob: 'from-indigo-500/10 to-transparent'
+                },
+                TEACHER: {
+                  bg: 'bg-amber-500/5',
+                  border: 'border-amber-500/10 hover:border-amber-500/25',
+                  badge: 'bg-amber-500/10 text-amber-700 border-amber-500/10',
+                  avatarBg: 'bg-amber-50',
+                  text: 'text-amber-600',
+                  blob: 'from-amber-500/10 to-transparent'
+                },
+                OFFICE: {
+                  bg: 'bg-emerald-500/5',
+                  border: 'border-emerald-500/10 hover:border-emerald-500/25',
+                  badge: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/10',
+                  avatarBg: 'bg-emerald-50',
+                  text: 'text-emerald-600',
+                  blob: 'from-emerald-500/10 to-transparent'
+                }
+              };
+              const theme = roleThemes[staff.role] || {
+                bg: 'bg-slate-500/5',
+                border: 'border-slate-500/10 hover:border-slate-500/25',
+                badge: 'bg-slate-500/10 text-slate-700 border-slate-500/10',
+                avatarBg: 'bg-slate-50',
+                text: 'text-slate-600',
+                blob: 'from-slate-500/10 to-transparent'
+              };
+
               return (
                 <div 
                   key={staff.id} 
-                  className="bg-white hover:bg-slate-50/20 border border-border hover:border-accent/25 rounded-3xl p-6 transition-all hover:shadow-lg hover:shadow-slate-100 flex flex-col justify-between group relative overflow-hidden"
+                  className="group relative bg-white border border-slate-100 hover:border-slate-200/80 rounded-3xl p-5 hover:shadow-xl hover:shadow-slate-100/50 transition-all duration-300 flex flex-col justify-between overflow-hidden"
                 >
-                  <div className="space-y-4">
+                  {/* Decorative Role Blob */}
+                  <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${theme.blob} rounded-bl-full translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-300 pointer-events-none`} />
+
+                  <div className="space-y-4 relative z-10">
                     {/* Header: Avatar, Name, Role badge */}
                     <div className="flex items-start gap-4">
                       {staff.profile_picture_url ? (
                         <img 
                           src={staff.profile_picture_url} 
                           alt={`${staff.first_name} ${staff.last_name}`} 
-                          className="w-14 h-14 rounded-2xl object-cover border border-border shadow-sm shrink-0" 
+                          className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md shadow-slate-100 shrink-0" 
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-lg font-black font-outfit shrink-0">
+                        <div className={`w-14 h-14 rounded-2xl ${theme.avatarBg} border border-slate-100/80 flex items-center justify-center ${theme.text} text-lg font-black font-outfit shrink-0`}>
                           {staff.first_name[0]}{staff.last_name[0]}
                         </div>
                       )}
-                      <div className="space-y-1 min-w-0">
-                        <span className="inline-flex text-[9px] font-black text-accent uppercase tracking-wider bg-accent/5 px-2.5 py-0.5 rounded-lg border border-accent/10">
+                      <div className="space-y-0.5 min-w-0">
+                        <span className={`inline-flex text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${theme.badge}`}>
                           {staff.role || 'TEACHER'}
                         </span>
-                        <h4 className="text-sm font-black text-text-primary mt-1 truncate flex items-center gap-1.5">
+                        <h4 className="text-sm font-black text-slate-800 tracking-tight truncate flex items-center gap-1.5">
                           <span>{staff.first_name} {staff.last_name}</span>
                           {staff.is_left && (
                             <span className="text-[7px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-1.5 py-0.5 rounded">
@@ -1164,37 +1358,37 @@ export default function StaffRegistryPage() {
                             </span>
                           )}
                         </h4>
-                        <p className="text-[10px] text-text-secondary font-mono tracking-tight">{staff.employee_id}</p>
+                        <p className="text-[10px] text-slate-400 font-mono tracking-tight">{staff.employee_id}</p>
                       </div>
                     </div>
 
                     {/* Metadata details */}
                     <div className="grid grid-cols-2 gap-y-3.5 gap-x-3 pt-3.5 border-t border-slate-100 text-xs">
                       <div className="space-y-0.5">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Designation</span>
-                        <span className="font-semibold text-text-primary leading-tight block truncate">{staff.designation}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Designation</span>
+                        <span className="font-bold text-slate-700 leading-tight block truncate" title={staff.designation}>{staff.designation}</span>
                       </div>
                       <div className="space-y-0.5">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Department</span>
-                        <span className="font-semibold text-text-primary leading-tight block truncate">{staff.department}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Department</span>
+                        <span className="font-bold text-slate-700 leading-tight block truncate" title={staff.department}>{staff.department}</span>
                       </div>
                       <div className="space-y-0.5">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">Basic Pay</span>
-                        <span className="font-mono font-black text-accent">₹{staff.basic?.toLocaleString('en-IN') || '0'}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Basic Pay</span>
+                        <span className="font-mono font-black text-emerald-600 block">₹{staff.basic?.toLocaleString('en-IN') || '0'}</span>
                       </div>
                       <div className="space-y-0.5">
-                        <span className="text-[9px] font-black text-text-secondary uppercase tracking-wider block">PAN Code</span>
-                        <span className="font-mono text-text-secondary tracking-wider block uppercase truncate">{staff.pan_no || 'N/A'}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">PAN Code</span>
+                        <span className="font-mono text-slate-600 tracking-wider block uppercase truncate bg-slate-50 border border-slate-100/80 px-1.5 py-0.5 rounded text-[10px] w-max">{staff.pan_no || 'N/A'}</span>
                       </div>
                     </div>
 
                     {/* Contact Details */}
-                    <div className="pt-3.5 border-t border-slate-100 space-y-2 text-[11px]">
-                      <div className="flex items-center gap-2 text-text-secondary min-w-0">
+                    <div className="bg-slate-50/50 rounded-2xl p-3 border border-slate-100/50 space-y-2 text-[11px]">
+                      <div className="flex items-center gap-2 text-slate-600 min-w-0">
                         <Mail size={12} className="shrink-0 text-slate-400" />
                         <span className="truncate select-all" title={staff.email}>{staff.email}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-text-secondary">
+                      <div className="flex items-center gap-2 text-slate-600">
                         <Phone size={12} className="shrink-0 text-slate-400" />
                         <span>{staff.phone || '+91 98765 43210'}</span>
                       </div>
@@ -1202,54 +1396,63 @@ export default function StaffRegistryPage() {
                   </div>
 
                   {/* Actions & Dossier summary */}
-                  <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-1.5 bg-slate-100/60 px-2.5 py-1 rounded-xl border border-border">
-                      <FileText size={10} className="text-slate-500" />
-                      <span className="text-[9px] font-bold text-slate-600">
-                        {docCount === 0 ? 'No Docs' : `${docCount} Doc${docCount > 1 ? 's' : ''}`}
-                      </span>
+                  <div className="relative z-10">
+                    {/* Primary Actions Row */}
+                    <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
+                      <button 
+                        onClick={() => handleOpenEditForm(staff)}
+                        className="py-2 px-3 bg-accent text-white hover:bg-accent/90 hover:shadow-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[10px] active:scale-95 cursor-pointer"
+                        title="Edit Staff Details"
+                      >
+                        <Edit size={12} />
+                        <span>Edit Info</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => setSelectedStaffForDossier(staff)}
+                        className="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-[10px] active:scale-95 cursor-pointer"
+                        title="Staff Documents & Dossier"
+                      >
+                        <FileBox size={12} className="text-slate-500" />
+                        <span>Dossier ({docCount})</span>
+                      </button>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    {/* Utility Controls Row */}
+                    <div className="grid grid-cols-3 gap-1.5 mt-2">
                       <button 
-                        onClick={() => handleToggleStaffLeftStatus(staff)}
-                        className={`px-2.5 py-1.5 text-[9px] font-black rounded-xl transition-all flex items-center gap-1 active:scale-95 border ${
-                          staff.is_left 
-                            ? 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 border-indigo-500/10' 
-                            : 'bg-slate-100 hover:bg-indigo-50 text-slate-600 border-slate-200'
-                        }`}
-                        title={staff.is_left ? "Restore to Active Staff" : "Mark as Left/Resigned"}
+                        onClick={() => simulateStaffSession(staff)}
+                        className="py-1.5 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-100 hover:border-emerald-200 rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
+                        title="Login as Staff (RBAC Simulator)"
                       >
-                        <UserMinus size={10} />
-                        <span>{staff.is_left ? 'Re-admit' : 'Left'}</span>
+                        <Zap size={11} />
+                        <span className="text-[9px] font-bold">Simulate</span>
                       </button>
+
                       <button 
                         onClick={() => handleToggleStaffStatus(staff)}
-                        className={`px-2.5 py-1.5 text-[9px] font-black rounded-xl transition-all flex items-center gap-1 active:scale-95 border ${
+                        className={`py-1.5 rounded-lg border transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer ${
                           staff.is_active === false 
-                            ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/10' 
-                            : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 border-red-500/10'
+                            ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-100 hover:border-red-200' 
+                            : 'bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 border-slate-100 hover:border-red-100'
                         }`}
                         title={staff.is_active === false ? "Activate Portal" : "Deactivate Portal"}
                       >
-                        <ShieldAlert size={10} />
-                        <span>{staff.is_active === false ? 'Unblock' : 'Block'}</span>
+                        <ShieldAlert size={11} />
+                        <span className="text-[9px] font-bold">{staff.is_active === false ? 'Unblock' : 'Block'}</span>
                       </button>
+
                       <button 
-                        onClick={() => simulateStaffSession(staff)}
-                        className="px-2.5 py-1.5 bg-success/10 hover:bg-success/20 text-success text-[9px] font-black rounded-xl border border-success/10 transition-all flex items-center gap-0.5 active:scale-95"
-                        title="Login as Staff (RBAC Simulator)"
+                        onClick={() => handleToggleStaffLeftStatus(staff)}
+                        className={`py-1.5 rounded-lg border transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer ${
+                          staff.is_left 
+                            ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-100 hover:border-indigo-200' 
+                            : 'bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 border-slate-100 hover:border-indigo-100'
+                        }`}
+                        title={staff.is_left ? "Restore to Active Staff" : "Mark as Left/Resigned"}
                       >
-                        <Zap size={10} />
-                        <span>Simulate</span>
-                      </button>
-                      <button 
-                        onClick={() => setSelectedStaffForDossier(staff)}
-                        className="px-2.5 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-[9px] font-black rounded-xl border border-accent/10 transition-all flex items-center gap-0.5 active:scale-95"
-                        title="Staff Documents & Dossier"
-                      >
-                        <FileBox size={10} />
-                        <span>Dossier</span>
+                        <UserMinus size={11} />
+                        <span className="text-[9px] font-bold">{staff.is_left ? 'Re-admit' : 'Left'}</span>
                       </button>
                     </div>
                   </div>
@@ -1267,6 +1470,7 @@ export default function StaffRegistryPage() {
                   <th className="pb-3">Department</th>
                   <th className="pb-3">PAN Code</th>
                   <th className="pb-3">Basic Pay</th>
+                  <th className="pb-3">Portal Access</th>
                   <th className="pb-3 text-right pr-2">Action</th>
                 </tr>
               </thead>
@@ -1306,36 +1510,76 @@ export default function StaffRegistryPage() {
                       <td className="py-4 font-semibold text-slate-700">{staff.department}</td>
                       <td className="py-4 font-mono text-text-secondary uppercase">{staff.pan_no || 'N/A'}</td>
                       <td className="py-4 font-mono text-text-secondary">₹{staff.basic.toLocaleString('en-IN')}</td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-1.5">
+                          {staff.is_left ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded">
+                                Left
+                              </span>
+                              <button
+                                onClick={() => handleToggleStaffLeftStatus(staff)}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 text-slate-600 text-[8px] font-black rounded border border-slate-200 transition-all active:scale-95"
+                                title="Restore to Active Staff"
+                              >
+                                Re-admit
+                              </button>
+                            </div>
+                          ) : staff.is_active === false ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded">
+                                Blocked
+                              </span>
+                              <button
+                                onClick={() => handleToggleStaffStatus(staff)}
+                                className="px-1.5 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                                title="Activate Portal Access"
+                              >
+                                Unblock
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded">
+                                Active
+                              </span>
+                              <button
+                                onClick={() => handleToggleStaffStatus(staff)}
+                                className="px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                                title="Deactivate Portal Access"
+                              >
+                                Block
+                              </button>
+                              <button
+                                onClick={() => handleToggleStaffLeftStatus(staff)}
+                                className="px-1.5 py-0.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                                title="Mark as Left"
+                              >
+                                Left
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-4 text-right pr-2">
                         <div className="flex justify-end gap-1">
                           <button 
-                            onClick={() => handleToggleStaffLeftStatus(staff)}
-                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
-                              staff.is_left ? 'text-indigo-600 hover:text-indigo-700 bg-indigo-50/50' : 'text-slate-400 hover:text-indigo-600'
-                            }`}
-                            title={staff.is_left ? "Restore to Active Staff" : "Mark as Left/Resigned"}
+                            onClick={() => handleOpenEditForm(staff)}
+                            className="p-1.5 text-text-secondary hover:text-accent rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+                            title="Edit Staff Details"
                           >
-                            <UserMinus size={14} />
-                          </button>
-                          <button 
-                            onClick={() => handleToggleStaffStatus(staff)}
-                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
-                              staff.is_active === false ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-500 hover:text-red-600'
-                            }`}
-                            title={staff.is_active === false ? "Activate Portal" : "Deactivate Portal"}
-                          >
-                            <ShieldAlert size={14} />
+                            <Edit size={14} />
                           </button>
                           <button 
                             onClick={() => simulateStaffSession(staff)}
-                            className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all"
+                            className="p-1.5 text-text-secondary hover:text-success rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
                             title="Login as Staff (RBAC Simulator)"
                           >
                             <Zap size={14} />
                           </button>
                           <button 
                             onClick={() => setSelectedStaffForDossier(staff)}
-                            className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all"
+                            className="p-1.5 text-text-secondary hover:text-text-primary rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
                             title="Staff Documents & Dossier"
                           >
                             <FileBox size={14} />

@@ -4,17 +4,167 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { getPendingWrites, processQueue, registerStatusCallback, enqueueWrite } from '@/lib/writeQueue';
 
 const AuthContext = createContext(null);
 
 export default function Providers({ children }) {
   const router = useRouter();
-  const [supabase] = useState(() => 
-    createBrowserClient(
+  const [pendingWritesCount, setPendingWritesCount] = useState(0);
+
+  const [supabase] = useState(() => {
+    const rawClient = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
-    )
-  );
+    );
+    
+    // Create a proxy/wrapper for the Supabase client to capture and handle offline writes automatically!
+    return new Proxy(rawClient, {
+      get(target, prop, receiver) {
+        if (prop === 'from') {
+          return function(table) {
+            const queryBuilder = target.from(table);
+            
+            // Wrap the query builder
+            return new Proxy(queryBuilder, {
+              get(qTarget, qProp) {
+                // If it's a write action: 'insert', 'update', 'delete', 'upsert'
+                if (['insert', 'update', 'delete', 'upsert'].includes(qProp)) {
+                  return function(...args) {
+                    const action = qProp;
+                    const payload = args[0]; // for insert, update, upsert
+                    
+                    // Call the original method to get the FilterBuilder/Promise
+                    const filterBuilder = qTarget[qProp](...args);
+                    
+                    // We need to capture filtering conditions like .eq(col, val) or .in(col, val)
+                    let eqColumn = null;
+                    let eqValue = null;
+                    
+                    const filterProxy = new Proxy(filterBuilder, {
+                      get(fTarget, fProp) {
+                        if (fProp === 'eq') {
+                          return function(col, val) {
+                            eqColumn = col;
+                            eqValue = val;
+                            return fTarget.eq(col, val);
+                          };
+                        }
+                        
+                        // When the query is actually executed, it is awaited (i.e. then() is called)
+                        if (fProp === 'then') {
+                          return function(onFulfilled, onRejected) {
+                            // Run the original query
+                            return fTarget.then(
+                              async (result) => {
+                                if (result && result.error) {
+                                  const isNetworkErr = result.error.message?.includes('Failed to fetch') || 
+                                                       result.error.status === 0 || 
+                                                       (typeof navigator !== 'undefined' && !navigator.onLine);
+                                  if (isNetworkErr) {
+                                    console.warn(`[Supabase Proxy] Write failed due to network. Queuing:`, { table, action, payload, eqColumn, eqValue });
+                                    enqueueWrite(table, action, payload, eqColumn, eqValue);
+                                    toast.warning('You are offline. Changes saved locally and will sync when connection is restored.');
+                                    return onFulfilled({ data: null, error: null, offlineQueued: true });
+                                  }
+                                }
+                                return onFulfilled(result);
+                              },
+                              async (err) => {
+                                const isNetworkErr = err.message?.includes('Failed to fetch') || 
+                                                     (typeof navigator !== 'undefined' && !navigator.onLine);
+                                if (isNetworkErr) {
+                                  console.warn(`[Supabase Proxy] Promise rejected due to network. Queuing:`, { table, action, payload, eqColumn, eqValue });
+                                  enqueueWrite(table, action, payload, eqColumn, eqValue);
+                                  toast.warning('You are offline. Changes saved locally and will sync when connection is restored.');
+                                  return onFulfilled({ data: null, error: null, offlineQueued: true });
+                                }
+                                if (onRejected) return onRejected(err);
+                                throw err;
+                              }
+                            );
+                          };
+                        }
+                        
+                        // Otherwise return standard properties
+                        const val = fTarget[fProp];
+                        return typeof val === 'function' ? val.bind(fTarget) : val;
+                      }
+                    });
+                    
+                    return filterProxy;
+                  };
+                }
+                
+                const val = qTarget[qProp];
+                return typeof val === 'function' ? val.bind(qTarget) : val;
+              }
+            });
+          };
+        }
+        
+        const val = target[prop];
+        return typeof val === 'function' ? val.bind(target) : val;
+      }
+    });
+  });
+
+  // Subscribe to offline write queue changes
+  useEffect(() => {
+    const unsubscribe = registerStatusCallback((count) => {
+      setPendingWritesCount(count);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen for the custom online sync trigger
+  useEffect(() => {
+    const handleSyncTrigger = async () => {
+      if (supabase && typeof window !== 'undefined' && navigator.onLine) {
+        const { count } = await processQueue(supabase);
+        if (count > 0) {
+          toast.success(`Automatically synced ${count} pending write operations to database!`);
+        }
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('nexus-erp-sync-trigger', handleSyncTrigger);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('nexus-erp-sync-trigger', handleSyncTrigger);
+      }
+    };
+  }, [supabase]);
+
+  // Manual trigger for syncing
+  const syncOfflineWrites = async () => {
+    if (!supabase) return;
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      toast.error('Cannot sync: Browser is currently offline.');
+      return;
+    }
+    
+    const resolvePromise = new Promise(async (resolve, reject) => {
+      try {
+        const { count, remaining } = await processQueue(supabase);
+        if (remaining > 0) {
+          reject(new Error(`Synced ${count} items, but ${remaining} items failed and are still in queue.`));
+        } else {
+          resolve(count);
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    toast.promise(resolvePromise, {
+      loading: 'Syncing offline changes to database...',
+      success: (count) => `Successfully synced ${count} write operations!`,
+      error: (err) => err.message || 'Failed to sync some write operations.'
+    });
+  };
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +205,27 @@ export default function Providers({ children }) {
       const savedTheme = localStorage.getItem('campus-erp-theme') || localStorage.getItem('nexus-theme') || 'light';
       setTheme(savedTheme);
       document.documentElement.className = savedTheme;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedActiveTenant = localStorage.getItem('nexus-active-tenant');
+      const savedAvailableTenants = localStorage.getItem('nexus-available-tenants');
+      if (savedActiveTenant) {
+        try {
+          setActiveTenant(JSON.parse(savedActiveTenant));
+        } catch (e) {
+          console.error('Failed to parse active tenant from localStorage:', e);
+        }
+      }
+      if (savedAvailableTenants) {
+        try {
+          setAvailableTenants(JSON.parse(savedAvailableTenants));
+        } catch (e) {
+          console.error('Failed to parse available tenants from localStorage:', e);
+        }
+      }
     }
   }, []);
 
@@ -1206,7 +1377,7 @@ export default function Providers({ children }) {
         if (session?.user) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('is_active')
+            .select('is_active, role')
             .eq('id', session.user.id)
             .single();
 
@@ -1218,7 +1389,10 @@ export default function Providers({ children }) {
             return;
           }
 
-          const role = session.user.app_metadata?.role || 'STUDENT';
+          let role = profile?.role || session.user.app_metadata?.role || 'STUDENT';
+          if (session.user.email?.toLowerCase() === 'vishal0025pawar@gmail.com') {
+            role = 'SUPER_ADMIN';
+          }
           const tenantId = session.user.app_metadata?.tenant_id;
           setActiveRole(role);
           setActiveUser({
@@ -1239,10 +1413,26 @@ export default function Providers({ children }) {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
-        const role = session.user.app_metadata?.role || 'STUDENT';
+        let role = session.user.app_metadata?.role || 'STUDENT';
+        if (session.user.email?.toLowerCase() === 'vishal0025pawar@gmail.com') {
+          role = 'SUPER_ADMIN';
+        } else {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+            if (profile?.role) {
+              role = profile.role;
+            }
+          } catch (e) {
+            console.warn('Could not load profile role on auth state change:', e);
+          }
+        }
         setActiveRole(role);
         setActiveUser({
           name: session.user.user_metadata?.first_name 
@@ -1432,6 +1622,9 @@ export default function Providers({ children }) {
     const tenant = availableTenants.find(t => t.id === tenantId);
     if (tenant) {
       setActiveTenant(tenant);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nexus-active-tenant', JSON.stringify(tenant));
+      }
       
       // Update simulated user's email subdomain dynamically if they are not super admin or parent
       if (activeRole !== 'SUPER_ADMIN' && activeRole !== 'PARENT') {
@@ -1655,53 +1848,73 @@ export default function Providers({ children }) {
   };
 
   const updateTenant = (tenantData) => {
-    setActiveTenant(prev => ({
-      ...prev,
-      name: tenantData.name,
-      subdomain: tenantData.subdomain,
-      customDomain: tenantData.customDomain,
-      logo: tenantData.logo,
-      brandColor: tenantData.brandColor || prev.brandColor,
-      settings: {
-        ...prev.settings,
-        board: tenantData.board,
-        academicYear: tenantData.academicYear,
-        bank: {
-          bankName: tenantData.bankName,
-          accountName: tenantData.accountName,
-          accountNo: tenantData.accountNo,
-          ifscCode: tenantData.ifscCode,
-          upiId: tenantData.upiId,
-          qrCode: tenantData.qrCode
+    setActiveTenant(prev => {
+      const updated = {
+        ...prev,
+        name: tenantData.name,
+        subdomain: tenantData.subdomain,
+        customDomain: tenantData.customDomain,
+        logo: tenantData.logo,
+        brandColor: tenantData.brandColor || prev.brandColor,
+        address: tenantData.address !== undefined ? tenantData.address : prev.address,
+        phone: tenantData.phone !== undefined ? tenantData.phone : prev.phone,
+        affiliation: tenantData.affiliation !== undefined ? tenantData.affiliation : prev.affiliation,
+        settings: {
+          ...prev.settings,
+          board: tenantData.board,
+          academicYear: tenantData.academicYear,
+          societyName: tenantData.societyName !== undefined ? tenantData.societyName : prev.settings?.societyName,
+          bank: {
+            bankName: tenantData.bankName,
+            accountName: tenantData.accountName,
+            accountNo: tenantData.accountNo,
+            ifscCode: tenantData.ifscCode,
+            upiId: tenantData.upiId,
+            qrCode: tenantData.qrCode
+          }
         }
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nexus-active-tenant', JSON.stringify(updated));
       }
-    }));
+      return updated;
+    });
     
-    setAvailableTenants(prev => prev.map(t => 
-      t.id === activeTenant.id 
-        ? { 
-            ...t, 
-            name: tenantData.name, 
-            subdomain: tenantData.subdomain, 
-            customDomain: tenantData.customDomain,
-            logo: tenantData.logo,
-            brandColor: tenantData.brandColor || t.brandColor,
-            settings: {
-              ...t.settings,
-              board: tenantData.board,
-              academicYear: tenantData.academicYear,
-              bank: {
-                bankName: tenantData.bankName,
-                accountName: tenantData.accountName,
-                accountNo: tenantData.accountNo,
-                ifscCode: tenantData.ifscCode,
-                upiId: tenantData.upiId,
-                qrCode: tenantData.qrCode
+    setAvailableTenants(prev => {
+      const updatedList = prev.map(t => 
+        t.id === activeTenant.id 
+          ? { 
+              ...t, 
+              name: tenantData.name, 
+              subdomain: tenantData.subdomain, 
+              customDomain: tenantData.customDomain,
+              logo: tenantData.logo,
+              brandColor: tenantData.brandColor || t.brandColor,
+              address: tenantData.address !== undefined ? tenantData.address : t.address,
+              phone: tenantData.phone !== undefined ? tenantData.phone : t.phone,
+              affiliation: tenantData.affiliation !== undefined ? tenantData.affiliation : t.affiliation,
+              settings: {
+                ...t.settings,
+                board: tenantData.board,
+                academicYear: tenantData.academicYear,
+                societyName: tenantData.societyName !== undefined ? tenantData.societyName : t.settings?.societyName,
+                bank: {
+                  bankName: tenantData.bankName,
+                  accountName: tenantData.accountName,
+                  accountNo: tenantData.accountNo,
+                  ifscCode: tenantData.ifscCode,
+                  upiId: tenantData.upiId,
+                  qrCode: tenantData.qrCode
+                }
               }
-            }
-          } 
-        : t
-    ));
+            } 
+          : t
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nexus-available-tenants', JSON.stringify(updatedList));
+      }
+      return updatedList;
+    });
     
     toast.success('System configuration saved successfully!');
   };
@@ -1800,7 +2013,9 @@ export default function Providers({ children }) {
       handleInstallApp,
       pushSubscribed,
       pushPermissionStatus,
-      subscribeToPush
+      subscribeToPush,
+      pendingWritesCount,
+      syncOfflineWrites
     }}>
       {children}
     </AuthContext.Provider>

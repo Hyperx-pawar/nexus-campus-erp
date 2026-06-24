@@ -89,6 +89,7 @@ export default function StudentRegistryPage() {
   // Bulk Selection & Promotion States
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [selectedClassFilter, setSelectedClassFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showBulkPromoteModal, setShowBulkPromoteModal] = useState(false);
   const [bulkPromotionTargetClassId, setBulkPromotionTargetClassId] = useState('');
   const [bulkPromotionResetFees, setBulkPromotionResetFees] = useState(true);
@@ -370,6 +371,50 @@ export default function StudentRegistryPage() {
     toast.success(`Successfully promoted ${selectedStudentIds.length} students to ${targetClassName}!`);
     setSelectedStudentIds([]);
     setShowBulkPromoteModal(false);
+  };
+
+  const handleBulkPassOutStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    
+    const confirmMsg = `Are you sure you want to mark the ${selectedStudentIds.length} selected students as Pass Out / Alumni? This will automatically deactivate their portal accounts.`;
+    if (!confirm(confirmMsg)) return;
+
+    const updatedStudents = sharedStudents.map(s => 
+      selectedStudentIds.includes(s.id) ? {
+        ...s,
+        is_alumni: true,
+        is_active: false
+      } : s
+    );
+    setSharedStudents(updatedStudents);
+
+    if (supabase) {
+      try {
+        const { error: studentErr } = await supabase
+          .from('students')
+          .update({ is_alumni: true })
+          .in('id', selectedStudentIds);
+
+        const { error: profileErr } = await supabase
+          .from('profiles')
+          .update({ is_active: false })
+          .in('id', selectedStudentIds);
+
+        if (studentErr || profileErr) {
+          console.error("Bulk passout error:", studentErr || profileErr);
+          toast.error("Failed to update database status, but updated local state.");
+        } else {
+          toast.success(`Successfully graduated ${selectedStudentIds.length} students and blocked their portal accounts!`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("An unexpected error occurred during bulk graduation.");
+      }
+    } else {
+      toast.success(`[Demo Mode] Successfully graduated ${selectedStudentIds.length} students!`);
+    }
+
+    setSelectedStudentIds([]);
   };
 
   const handleOpenEditForm = (student) => {
@@ -799,7 +844,8 @@ export default function StudentRegistryPage() {
     );
     setSharedStudents(updatedStudents);
 
-    if (supabase) {
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(student.id);
+    if (supabase && isUUID) {
       try {
         const { error } = await supabase
           .from('profiles')
@@ -833,7 +879,8 @@ export default function StudentRegistryPage() {
     );
     setSharedStudents(updatedStudents);
 
-    if (supabase) {
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(student.id);
+    if (supabase && isUUID) {
       try {
         await supabase
           .from('students')
@@ -1133,6 +1180,15 @@ export default function StudentRegistryPage() {
 
     // Class Filter Selection
     if (selectedClassFilter && s.class_id !== selectedClassFilter) return false;
+
+    // Status Filter Selection
+    if (statusFilter === 'active') {
+      if (s.is_active === false || s.is_alumni) return false;
+    } else if (statusFilter === 'blocked') {
+      if (s.is_active !== false) return false;
+    } else if (statusFilter === 'alumni') {
+      if (!s.is_alumni) return false;
+    }
 
     // Teacher Restriction
     if (activeRole === 'TEACHER') {
@@ -2583,6 +2639,23 @@ export default function StudentRegistryPage() {
               </select>
             </div>
 
+            <div className="flex items-center gap-2 bg-slate-100/50 border border-border rounded-2xl px-4 py-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary whitespace-nowrap">Account Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setSelectedStudentIds([]);
+                }}
+                className="bg-transparent text-xs text-text-primary outline-none py-1.5 cursor-pointer font-bold font-outfit"
+              >
+                <option value="all" className="bg-bg-sidebar">All Accounts</option>
+                <option value="active" className="bg-bg-sidebar">Active (Studying)</option>
+                <option value="blocked" className="bg-bg-sidebar">Blocked Portal</option>
+                <option value="alumni" className="bg-bg-sidebar">Pass Out (Alumni)</option>
+              </select>
+            </div>
+
             {isAdmin && selectedClassFilter && (
               <button
                 type="button"
@@ -2632,6 +2705,14 @@ export default function StudentRegistryPage() {
                 <ArrowUpCircle size={14} />
                 <span>Bulk Promote</span>
               </button>
+              <button
+                type="button"
+                onClick={handleBulkPassOutStudents}
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-600/15 active:scale-95 transition-all"
+              >
+                <GraduationCap size={14} />
+                <span>Bulk Pass Out</span>
+              </button>
             </div>
           </div>
         )}
@@ -2664,6 +2745,7 @@ export default function StudentRegistryPage() {
                 <th className="pb-3">Category</th>
                 <th className="pb-3">Parent / Guardian</th>
                 <th className="pb-3">Parent Contact info</th>
+                <th className="pb-3">Portal Access</th>
                 <th className="pb-3 text-right pr-2">Action</th>
               </tr>
             </thead>
@@ -2744,6 +2826,65 @@ export default function StudentRegistryPage() {
                   <td className="py-4 text-text-secondary font-mono text-[10px]">
                     {getParentContact(student.parent_id)}
                   </td>
+                  <td className="py-4">
+                    <div className="flex items-center gap-1.5">
+                      {student.is_alumni ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black uppercase bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded">
+                            Pass Out
+                          </span>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleToggleStudentAlumniStatus(student)}
+                              className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 text-slate-600 text-[8px] font-black rounded border border-slate-200 transition-all active:scale-95"
+                              title="Restore to Active Student"
+                            >
+                              Re-admit
+                            </button>
+                          )}
+                        </div>
+                      ) : student.is_active === false ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded">
+                            Blocked
+                          </span>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleToggleStudentActiveStatus(student)}
+                              className="px-1.5 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                              title="Activate Portal Access"
+                            >
+                              Unblock
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded">
+                            Active
+                          </span>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleToggleStudentActiveStatus(student)}
+                              className="px-1.5 py-0.5 bg-red-500 hover:bg-red-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                              title="Deactivate Portal Access"
+                            >
+                              Block
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleToggleStudentAlumniStatus(student)}
+                              className="px-1.5 py-0.5 bg-indigo-500 hover:bg-indigo-600 text-white text-[8px] font-black rounded transition-all active:scale-95 shadow-xs"
+                              title="Graduate Student"
+                            >
+                              Graduate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-4 text-right pr-2">
                     <div className="flex justify-end gap-1.5">
                       {isAdmin && (
@@ -2756,30 +2897,6 @@ export default function StudentRegistryPage() {
                             <Edit size={14} />
                           </button>
                           
-                          <button
-                            onClick={() => handleToggleStudentAlumniStatus(student)}
-                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
-                              student.is_alumni 
-                                ? 'text-indigo-600 hover:text-indigo-700 bg-indigo-500/5' 
-                                : 'text-slate-400 hover:text-indigo-600'
-                            }`}
-                            title={student.is_alumni ? "Mark as Active Student" : "Mark as Pass Out (Graduate)"}
-                          >
-                            <GraduationCap size={15} />
-                          </button>
-
-                          <button
-                            onClick={() => handleToggleStudentActiveStatus(student)}
-                            className={`p-1.5 rounded-lg hover:bg-slate-100 transition-all ${
-                              student.is_active === false 
-                                ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-500/5' 
-                                : 'text-red-500 hover:text-red-600'
-                            }`}
-                            title={student.is_active === false ? "Unblock Portal Login" : "Block Portal Login"}
-                          >
-                            <ShieldAlert size={14} />
-                          </button>
-
                           <button 
                             onClick={() => {
                               setSelectedStudentForPromotion(student);
