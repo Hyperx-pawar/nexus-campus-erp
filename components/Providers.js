@@ -1248,11 +1248,8 @@ export default function Providers({ children }) {
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setShowInstallBtn(false);
     } else {
-      // Also show for mobile clients as a helper
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        setShowInstallBtn(true);
-      }
+      // Show for all web clients to make it easy to download/install the app
+      setShowInstallBtn(true);
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
