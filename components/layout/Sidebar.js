@@ -77,7 +77,7 @@ const sidebarLinks = [
       { name: 'Fees & Finance', icon: Wallet, href: '/dashboard/finance', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ACCOUNTANT'] },
       { name: 'System Analytics', icon: TrendingUp, href: '/dashboard/analytics', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
       { name: 'School Settings', icon: Settings, href: '/dashboard/settings', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
-      { name: 'Backups & Sync', icon: Database, href: '/dashboard/backups', roles: ['SUPER_ADMIN', 'SCHOOL_ADMIN'] },
+      { name: 'Backups & Sync', icon: Database, href: '/dashboard/backups', roles: ['SUPER_ADMIN'] },
     ]
   }
 ];

@@ -402,7 +402,7 @@ export default function BackupsPage() {
     }
   };
 
-  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN'];
+  const allowedRoles = ['SUPER_ADMIN'];
   if (!allowedRoles.includes(activeRole)) {
     return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Backups & Sync" />;
   }
