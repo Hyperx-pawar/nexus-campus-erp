@@ -402,9 +402,13 @@ export default function BackupsPage() {
     }
   };
 
+  const allowedRoles = ['SUPER_ADMIN', 'SCHOOL_ADMIN'];
+  if (!allowedRoles.includes(activeRole)) {
+    return <RoleGate allowedRoles={allowedRoles} activeRole={activeRole} moduleName="Backups & Sync" />;
+  }
+
   return (
-    <RoleGate allowedRoles={['SUPER_ADMIN', 'SCHOOL_ADMIN']}>
-      <div className="space-y-8 animate-slide-up">
+    <div className="space-y-8 animate-slide-up">
         
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -832,6 +836,5 @@ export default function BackupsPage() {
         )}
         
       </div>
-    </RoleGate>
   );
 }
