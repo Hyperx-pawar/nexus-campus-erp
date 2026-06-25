@@ -379,10 +379,15 @@ export default function StudentRegistryPage() {
     const confirmMsg = `Are you sure you want to mark the ${selectedStudentIds.length} selected students as Pass Out / Alumni? This will automatically deactivate their portal accounts.`;
     if (!confirm(confirmMsg)) return;
 
+    const yearInput = prompt("Enter the graduation/pass-out year (e.g. 2026):", new Date().getFullYear());
+    if (yearInput === null) return; // cancelled
+    const passoutYearVal = parseInt(yearInput, 10) || new Date().getFullYear();
+
     const updatedStudents = sharedStudents.map(s => 
       selectedStudentIds.includes(s.id) ? {
         ...s,
         is_alumni: true,
+        passout_year: passoutYearVal,
         is_active: false
       } : s
     );
@@ -392,7 +397,7 @@ export default function StudentRegistryPage() {
       try {
         const { error: studentErr } = await supabase
           .from('students')
-          .update({ is_alumni: true })
+          .update({ is_alumni: true, passout_year: passoutYearVal })
           .in('id', selectedStudentIds);
 
         const { error: profileErr } = await supabase
@@ -452,6 +457,7 @@ export default function StudentRegistryPage() {
       avatar: student.profile_picture_url || '',
       avatarFile: null,
       isAlumni: student.is_alumni || false,
+      passoutYear: student.passout_year || '',
       isActive: student.is_active !== false
     });
     setShowAddForm(true);
@@ -491,6 +497,7 @@ export default function StudentRegistryPage() {
     avatar: '',
     avatarFile: null,
     isAlumni: false,
+    passoutYear: '',
     isActive: true
   });
 
@@ -684,6 +691,7 @@ export default function StudentRegistryPage() {
           hostelFee: hostelFeeValue,
           profile_picture_url: profilePicUrl,
           is_alumni: formData.isAlumni,
+          passout_year: formData.isAlumni ? (parseInt(formData.passoutYear, 10) || new Date().getFullYear()) : null,
           is_active: formData.isActive
         };
 
@@ -695,7 +703,10 @@ export default function StudentRegistryPage() {
               .eq('id', editingStudentId);
             await supabase
               .from('students')
-              .update({ is_alumni: formData.isAlumni })
+              .update({ 
+                is_alumni: formData.isAlumni,
+                passout_year: formData.isAlumni ? (parseInt(formData.passoutYear, 10) || new Date().getFullYear()) : null
+              })
               .eq('id', editingStudentId);
           } catch (dbErr) {
             console.error('Failed to sync status to Supabase:', dbErr);
@@ -768,7 +779,9 @@ export default function StudentRegistryPage() {
           enableHostel: formData.enableHostel,
           hostelBlockId: formData.hostelBlockId,
           hostelFee: hostelFeeValue,
-          profile_picture_url: profilePicUrl
+          profile_picture_url: profilePicUrl,
+          is_alumni: false,
+          passout_year: null
         };
 
         const parent = {
@@ -870,10 +883,18 @@ export default function StudentRegistryPage() {
 
     if (!confirm(confirmMsg)) return;
 
+    let passoutYearVal = null;
+    if (isAlumniVal) {
+      const yearInput = prompt("Enter the graduation/pass-out year (e.g. 2026):", new Date().getFullYear());
+      if (yearInput === null) return; // cancelled
+      passoutYearVal = parseInt(yearInput, 10) || new Date().getFullYear();
+    }
+
     const updatedStudents = sharedStudents.map(s => 
       s.id === student.id ? { 
         ...s, 
         is_alumni: isAlumniVal,
+        passout_year: passoutYearVal,
         is_active: isAlumniVal ? false : s.is_active 
       } : s
     );
@@ -884,13 +905,18 @@ export default function StudentRegistryPage() {
       try {
         await supabase
           .from('students')
-          .update({ is_alumni: isAlumniVal })
+          .update({ is_alumni: isAlumniVal, passout_year: passoutYearVal })
           .eq('id', student.id);
 
         if (isAlumniVal) {
           await supabase
             .from('profiles')
             .update({ is_active: false })
+            .eq('id', student.id);
+        } else {
+          await supabase
+            .from('profiles')
+            .update({ is_active: true })
             .eq('id', student.id);
         }
         toast.success(`Student marked as ${isAlumniVal ? 'Pass Out' : 'Active'} successfully!`);
@@ -2146,7 +2172,7 @@ export default function StudentRegistryPage() {
             {editingStudentId && (
               <div className="space-y-4 pt-4 border-t border-border animate-in fade-in duration-200">
                 <h4 className="text-xs font-bold text-accent uppercase tracking-wider">4. Account & Enrolment Status</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={`grid grid-cols-1 ${formData.isAlumni ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Academic Status</label>
                     <select 
@@ -2156,6 +2182,7 @@ export default function StudentRegistryPage() {
                         setFormData({
                           ...formData, 
                           isAlumni: isAlumniVal,
+                          passoutYear: isAlumniVal ? (formData.passoutYear || String(new Date().getFullYear())) : '',
                           isActive: isAlumniVal ? false : formData.isActive
                         });
                       }}
@@ -2165,6 +2192,20 @@ export default function StudentRegistryPage() {
                       <option value="PASS_OUT">Pass Out / Alumni (Deactivates Portal)</option>
                     </select>
                   </div>
+                  {formData.isAlumni && (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Pass Out Year</label>
+                      <input 
+                        type="number" 
+                        placeholder={String(new Date().getFullYear())}
+                        value={formData.passoutYear}
+                        onChange={(e) => setFormData({...formData, passoutYear: e.target.value})}
+                        className="w-full text-xs font-mono bg-bg-sidebar text-text-primary py-2 px-3 rounded-xl border border-border"
+                        min="1900"
+                        max="2100"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-1">Portal Account Login</label>
                     <select 

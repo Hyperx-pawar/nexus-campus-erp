@@ -1497,19 +1497,28 @@ function PassoutPortal({ activeTenant, activeRole }) {
   const { supabase, sharedStudents, setSharedStudents, sharedStaff, setSharedStaff } = useAuth();
   const [activeTab, setActiveTab] = useState('alumni'); // 'alumni' | 'blocked'
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPassoutYear, setSelectedPassoutYear] = useState('ALL');
+
+  const uniquePassoutYears = React.useMemo(() => {
+    const tenantStudents = (sharedStudents || []).filter(s => s.tenant_id === activeTenant.id);
+    const years = tenantStudents
+      .filter(s => s.is_alumni && s.passout_year)
+      .map(s => s.passout_year);
+    return Array.from(new Set(years)).sort((a, b) => b - a);
+  }, [sharedStudents, activeTenant]);
 
   const handleReadmitStudent = async (student) => {
     if (!confirm(`Are you sure you want to re-admit "${student.first_name} ${student.last_name}" to the active student roster?`)) return;
 
     const updatedStudents = sharedStudents.map(s => 
-      s.id === student.id ? { ...s, is_alumni: false, is_active: true } : s
+      s.id === student.id ? { ...s, is_alumni: false, is_active: true, passout_year: null } : s
     );
     setSharedStudents(updatedStudents);
 
     const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(student.id);
     if (supabase && isUUID) {
       try {
-        await supabase.from('students').update({ is_alumni: false }).eq('id', student.id);
+        await supabase.from('students').update({ is_alumni: false, passout_year: null }).eq('id', student.id);
         await supabase.from('profiles').update({ is_active: true }).eq('id', student.id);
         toast.success(`Successfully re-admitted ${student.first_name} ${student.last_name}!`);
       } catch (err) {
@@ -1578,7 +1587,10 @@ function PassoutPortal({ activeTenant, activeRole }) {
     return fullName.includes(q) || email.includes(q) || id.includes(q);
   };
 
-  const alumniStudents = tenantStudents.filter(s => s.is_alumni).filter(searchFilter);
+  const alumniStudents = tenantStudents
+    .filter(s => s.is_alumni)
+    .filter(s => selectedPassoutYear === 'ALL' || String(s.passout_year) === selectedPassoutYear)
+    .filter(searchFilter);
   
   const blockedStudents = tenantStudents.filter(s => s.is_active === false && !s.is_alumni).filter(searchFilter);
   const blockedStaff = tenantStaff.filter(s => s.is_active === false || s.is_left).filter(searchFilter);
@@ -1615,16 +1627,40 @@ function PassoutPortal({ activeTenant, activeRole }) {
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-          <input
-            type="text"
-            placeholder="Search by name, email or ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-bg-card border border-border rounded-2xl py-2.5 pl-11 pr-4 text-xs text-text-primary placeholder-text-secondary outline-none focus:border-accent transition-all"
-          />
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          {/* Year Filter Dropdown - Only show for alumni tab */}
+          {activeTab === 'alumni' && uniquePassoutYears.length > 0 && (
+            <div className="relative w-full sm:w-48 shrink-0">
+              <select
+                value={selectedPassoutYear}
+                onChange={(e) => setSelectedPassoutYear(e.target.value)}
+                className="w-full bg-bg-card border border-border rounded-2xl py-2.5 px-4 text-xs text-text-primary outline-none focus:border-accent transition-all appearance-none cursor-pointer pr-8 font-semibold"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`,
+                  backgroundPosition: 'right 0.75rem center',
+                  backgroundSize: '1rem',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              >
+                <option value="ALL">All Pass Out Years</option>
+                {uniquePassoutYears.map(year => (
+                  <option key={year} value={String(year)}>Class of {year}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Search Input */}
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
+            <input
+              type="text"
+              placeholder="Search by name, email or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-bg-card border border-border rounded-2xl py-2.5 pl-11 pr-4 text-xs text-text-primary placeholder-text-secondary outline-none focus:border-accent transition-all"
+            />
+          </div>
         </div>
       </div>
 
@@ -1675,6 +1711,9 @@ function PassoutPortal({ activeTenant, activeRole }) {
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-500 font-bold text-[9px] uppercase">
                           Graduated / Alumni
                         </span>
+                        {student.passout_year && (
+                          <span className="text-[10px] text-text-secondary block mt-1 font-mono font-bold">Class of {student.passout_year}</span>
+                        )}
                       </td>
                       <td className="p-4 text-right">
                         <button
